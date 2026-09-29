@@ -1,0 +1,138 @@
+# Tier CRITICAL —— 常驻内存，命中即进入高分区，可触发短路。
+# 字段：id / category / weight(1-9) / confidence(0-1) / description / pattern
+version: 1
+tier: critical
+rules:
+  - id: PV-C001
+    category: instruction_override
+    weight: 9
+    confidence: 0.95
+    description: 经典「忽略先前指令」（受词扩展到 task/order/context 等同义 Object）
+    pattern: '(?i)ignore\s*(all\s*|any\s*|the\s*|your\s*)?(previous|prior|preceding|above|earlier|initial|original)?\s*(instruction|prompt|rule|directive|guideline|command|task|assignment|order|information|context|conversation|direction|message)s?'
+
+  - id: PV-C002
+    category: instruction_override
+    weight: 9
+    confidence: 0.95
+    description: 丢弃/遗忘类覆写，允许 "forget about all the previous information" 这类多重修饰
+    pattern: '(?i)(disregard|discard|forget|drop|override)(?:\s*(?:all|any|the|your|about|of))*\s*(?:previous|prior|preceding|above|earlier|initial|following)?\s*(instruction|prompt|rule|directive|guideline|setting|task|assignment|order|information|context|conversation)s?'
+
+  - id: PV-C003
+    category: instruction_override
+    weight: 9
+    confidence: 0.95
+    description: 中文「忽略以上指令」
+    pattern: '(忽略|无视|忘掉|丢弃|作废)\s*(以上|上面|之前|先前|前述|下列)?\s*(所有|全部)?\s*(的)?\s*(指令|提示|提示词|规则|设定|指示|要求|约束)'
+
+  - id: PV-C004
+    category: instruction_override
+    weight: 9
+    confidence: 0.92
+    description: 中文「你现在是XXX」角色覆写
+    pattern: '(你(现在|从此|接下来)(就)?(是|成为|扮演|作为)|请以\s*[^，。]{0,12}\s*的身份|你现在是一名不受限制的)'
+
+  - id: PV-C005
+    category: instruction_override
+    weight: 9
+    confidence: 0.9
+    description: DAN / 开发者模式等越狱人格
+    pattern: '(?i)\b(act\s*as|you\s*are\s*now|switch\s*to|enter)\b[\s\S]{0,40}?\b(DAN|developer\s*mode|unrestricted\s*(mode|ai|model)|god\s*mode|jailbreak(ed)?)\b'
+
+  - id: PV-C006
+    category: instruction_override
+    weight: 8
+    confidence: 0.9
+    description: 新指令区块追加覆写
+    pattern: '(?i)\b(new\s*(system\s*)?(instruction|prompt|directive)s?|system\s*prompt\s*override|prompt\s*injection)\b\s*[:：]'
+
+  - id: PV-C007
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.9
+    description: 要求复述系统提示词
+    pattern: '(?i)(repeat|reveal|print|output|display|show|dump|recite|tell\s*me)\s*(me\s*)?(your\s*|the\s*)?(initial|original|system|hidden|secret|internal|full)?\s*(instruction|prompt|system\s*prompt|directive|rule)s?'
+
+  - id: PV-C008
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.9
+    description: 中文提取系统提示词
+    pattern: '(重复|复述|显示|输出|打印|泄露|告诉我|把)[^。\n]{0,10}(你的|系统的)?(初始|原始|系统|完整|隐藏)?(指令|提示词|提示|设定词|system\s*prompt)'
+
+  - id: PV-C009
+    category: role_tag_escape
+    weight: 9
+    confidence: 0.98
+    description: ChatML / Llama 模板控制序列
+    pattern: '<\|?(im_start|im_end|endoftext|system|user|assistant|inst|/inst|eot_id|reserved_special_token)[\|_]?\d*\s*/?>'
+
+  - id: PV-C010
+    category: role_tag_escape
+    weight: 9
+    confidence: 0.98
+    description: 方括号/尖括号角色标签伪造
+    pattern: '(?i)</?(system|assistant|user|human|ai|root|admin|sudo|tool|function)>\s*[:：]?'
+
+  - id: PV-C011
+    category: role_tag_escape
+    weight: 9
+    confidence: 0.95
+    description: 伪系统权限声明写入
+    pattern: '(?i)(\[|【|\()(system|superuser|root|admin|sudo|developer\s*message)(\]|】|\))'
+
+  - id: PV-C012
+    category: privilege_escalation
+    weight: 8
+    confidence: 0.9
+    description: 要求绕过安全护栏
+    pattern: '(?i)(bypass|disable|turn\s*off|remove|ignore|lift|override)\s*(all\s*|any\s*)?(your\s*|the\s*)?(safety|security|content|ethical|moral)?\s*(restriction|guardrail|filter|guard|limitation|protection|guideline|moderation)s?'
+
+  - id: PV-C013
+    category: privilege_escalation
+    weight: 8
+    confidence: 0.9
+    description: 中文要求绕过限制
+    pattern: '(绕过|关闭|禁用|解除|无视|取消)[^。\n]{0,8}(安全|内容|道德|合规)?(限制|约束|护栏|审核|过滤|审查|防火墙|风控|审查机制)'
+
+  - id: PV-C014
+    category: tool_injection
+    weight: 8
+    confidence: 0.88
+    description: 要求立即执行系统命令后回传结果
+    pattern: '(?i)(execute|run|invoke|launch)\s*(the\s*)?(following\s*)?(shell|terminal|system|bash|powershell|console)?\s*command[\s\S]{0,60}?(and|then|&&|;)\s*(send|post|return|upload|exfiltrate)'
+
+  # —— 以下为接入 deepset 公开集后，依据 train 子集迭代补充的多语种规则 ——
+  - id: PV-C015
+    category: instruction_override
+    weight: 9
+    confidence: 0.95
+    description: 德语「忘记/忽略之前所有任务与指令」，覆盖德语变格与变音（Aufträge/Angaben）
+    pattern: '(?i)(vergiss|vergessen\s*sie|vergiß|ignoriere|ignorieren\s*sie|missachte|missachten\s*sie|überspring)\s*(?:(?:alle|die|deine|ihre|sämtliche|nun|jetzt|doch|bitte)\s*)*(?:(?:vorherigen|bisherigen|vorigen|früheren|alten|obigen|vorangegangenen|gesamten|vorangehenden)\s*)*(aufgab(en|e)?|auftr(ag|äge|agen)|angab(en|e)?|anweisung(en)?|information(en)?|regel(n)?|hinweis(en?|e)|befehl(en?|e)|instruktion(en)?|kontext)'
+
+  - id: PV-C019
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.9
+    description: 德语要求泄露提示词（Zeige mir deinen gesamten Prompt-Text）
+    pattern: '(?i)(zeig(e|en)?|nenn(en|e)?|sag(e|en)?|geben\s*sie|gib|schreib(e|en)?|druck(e|en)?|kopier(e|en)?)\s*(mir\s*)?(deine[nmrs]?|die|den|das)?\s*(?:kompletten?|vollständigen?|gesamten?|ursprünglichen?|eigenen?|internen?)?\s*(prompt(\s|-|_)?text|systemprompt|system\s*prompt|anweisung(en)?|eingabeaufforderung|instruktion(en)?|startprompt)'
+
+  - id: PV-C020
+    category: instruction_override
+    weight: 8
+    confidence: 0.88
+    description: 德语「忽略上述指令，改为输出…」
+    pattern: '(?i)(ignorier(en|e)?|vergiss|missachte|überspring)\s*(sie\s*)?(?:die|alle|deine|bisherigen|obigen|vorherigen)?[\s\S]{0,40}(stattdessen|anstatt|und\s*(gib|geben\s*sie|schreib(e|en)?|sag(e|en)?|zeig(e|en)?|nenn(en|e)?))'
+
+  - id: PV-C016
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.9
+    description: 德语要求泄露提示词
+    pattern: '(?i)(zeige|zeig|nenn|sage|gib|schreibe|drucke)\s*(mir\s*)?(deinen?|die|den)?\s*(?:kompletten?|vollständigen?|gesamten?|ursprünglichen?)?\s*(prompt|anweisung|systemprompt|eingabeaufforderung|instruktion)e?n?'
+
+  - id: PV-C017
+    category: instruction_override
+    weight: 7
+    confidence: 0.85
+    description: 上下文重置 + 新任务接管（"forget everything, new task:" 类）
+    pattern: '(?i)(forget|disregard)\s*(all|everything|about)?[\s\S]{0,30}?(start\s*over|new\s*task|following\s*task|neue\s*aufgabe|konzentriere\s*dich)'

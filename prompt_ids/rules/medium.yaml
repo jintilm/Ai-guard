@@ -1,0 +1,171 @@
+# Tier MEDIUM —— 弱信号，单独命中不足以阻断，但参与加权累积。
+version: 1
+tier: medium
+rules:
+  - id: PV-M001
+    category: instruction_override
+    weight: 3
+    confidence: 0.6
+    description: 泛化的「不要听之前的」
+    pattern: '(?i)(do\s*n[o'']?t|stop|cease)\s+(follow|obey|listen\s+to|comply\s+with)\s+(any\s+|the\s+)?(previous|earlier|prior|above)'
+
+  - id: PV-M002
+    category: instruction_override
+    weight: 3
+    confidence: 0.6
+    description: 中文「别管之前的」
+    pattern: '(不要|别|停止|禁止)[^。\n]{0,6}(听|遵守|遵从|听从|执行)[^。\n]{0,6}(之前|以前|上面|先前)'
+
+  - id: PV-M003
+    category: instruction_override
+    weight: 3
+    confidence: 0.6
+    description: 要求重写/替换系统设定
+    pattern: '(重写|替换|覆盖|改写)[^。\n]{0,8}(系统|你的)?(提示词|指令|设定|规则)'
+
+  - id: PV-M004
+    category: instruction_override
+    weight: 2
+    confidence: 0.55
+    description: 重置角色 / 清空上下文
+    pattern: '(?i)(reset|clear|wipe|purge)\s+(your\s+|all\s+|the\s+)?(context|memory|history|session|instruction)s?'
+
+  - id: PV-M005
+    category: system_prompt_extraction
+    weight: 3
+    confidence: 0.6
+    description: 询问初始设定
+    pattern: '(?i)what\s+(was|were|is|are)\s+your\s+(initial|original|starting|first)\s+(instruction|prompt|system\s*message)s?'
+
+  - id: PV-M006
+    category: system_prompt_extraction
+    weight: 3
+    confidence: 0.6
+    description: 请求以原文/逐字输出设定
+    pattern: '(?i)(verbatim|word\s+for\s+word|exactly\s+as\s+written|抬头|逐字)[\s\S]{0,20}(output|repeat|print|输出|重复)'
+
+  - id: PV-M007
+    category: system_prompt_extraction
+    weight: 2
+    confidence: 0.55
+    description: 探询提示词长度/结构
+    pattern: '(?i)(how\s+(long|many)\s+(is|are)|count\s+the)\s+(your\s+)?(system\s*)?(prompt|instruction)s?'
+
+  - id: PV-M008
+    category: role_tag_escape
+    weight: 3
+    confidence: 0.65
+    description: 近似模板标记（无尖括号）
+    pattern: '(?i)(im_start|im_end|endoftext|eot_id|begin_of_text|start_of_turn|end_of_turn)'
+
+  - id: PV-M009
+    category: role_tag_escape
+    weight: 2
+    confidence: 0.55
+    description: 角色声明行 / system 冒号前缀
+    pattern: '(?i)^\s*(system|assistant|user)\s*[:：]\s*\S{3,}'
+
+  - id: PV-M010
+    category: role_tag_escape
+    weight: 2
+    confidence: 0.55
+    description: 提示注入相关的元讨论
+    pattern: '(?i)(prompt\s*injection|jailbreak|sandbox\s*escape|越狱|注入攻击)'
+
+  - id: PV-M011
+    category: tool_injection
+    weight: 3
+    confidence: 0.65
+    description: 通用代码执行函数调用
+    pattern: '(?i)\b(eval|exec|system|popen|spawn)\s*\('
+
+  - id: PV-M012
+    category: tool_injection
+    weight: 3
+    confidence: 0.6
+    description: 网络请求行为指示
+    pattern: '(?i)(make|send|issue)\s+(a\s+)?(http|https|network|curl|wget)\s*(request|call)'
+
+  - id: PV-M013
+    category: tool_injection
+    weight: 2
+    confidence: 0.55
+    description: 文件写入 / 删除意图
+    pattern: '(?i)(rm\s+-rf|del\s+/[fq]|shutil\.rmtree|os\.remove|echo\s+.*>\s*/)'
+
+  - id: PV-M014
+    category: privilege_escalation
+    weight: 3
+    confidence: 0.6
+    description: 声称自己是开发者/管理员
+    pattern: '(?i)(i\s+am|as)\s+(the\s+|your\s+)?(developer|admin|administrator|owner|creator| maintainer)'
+
+  - id: PV-M015
+    category: privilege_escalation
+    weight: 3
+    confidence: 0.6
+    description: 中文声称开发者身份
+    pattern: '(我是|我作为)[^。\n]{0,6}(你的)?(开发者|管理员|创造者|拥有者|运维)'
+
+  - id: PV-M016
+    category: privilege_escalation
+    weight: 2
+    confidence: 0.55
+    description: 要求 「不再局限于…」
+    pattern: '(?i)(no\s+longer|stop\s+being)\s+(bound|limited|restricted|constrained)\s+by'
+
+  - id: PV-M017
+    category: obfuscation
+    weight: 3
+    confidence: 0.6
+    description: 疑似 Base64 载荷
+    # 不要改回前瞻写法：`(?=[A-Za-z0-9+/]*[0-9])...` 在失败时是 O(L²)，
+    # folded 变体上一条 8000 字符的纯字母文本就能烧掉 596ms（实测），
+    # 长英文文本恰好是最常见的输入形态 —— 等于给了一个远程 DoS 入口。
+    # 现在正则只线性地圈出候选片段，字符构成由 validate 判一次，
+    # 两者等价（详见 rules/validators.py 的单调性说明）。
+    pattern: '[A-Za-z0-9+/]{40,}={0,2}'
+    validate: base64_blob
+
+  - id: PV-M018
+    category: obfuscation
+    weight: 2
+    confidence: 0.55
+    description: 疑似十六进制序列
+    pattern: '(?i)(?:\\x?[0-9a-f]{2}){12,}'
+
+  - id: PV-M019
+    category: obfuscation
+    weight: 2
+    confidence: 0.5
+    description: 反序 / 倒着读指令
+    pattern: '(?i)(read|say|write|answer)\s+(it\s+)?(backwards|in\s+reverse|倒着|倒序)'
+
+  - id: PV-M020
+    category: obfuscation
+    weight: 2
+    confidence: 0.5
+    description: 用首字母/隐语传达指令
+    pattern: '(?i)(first\s+letter|initial\s+letter|acrostic|藏头|首字母)[\s\S]{0,20}(spell|form|make|组成|拼出)'
+
+  # —— 德语补充（依据 deepset train 子集迭代）——
+  - id: PV-M022
+    category: instruction_override
+    weight: 3
+    confidence: 0.6
+    description: 德语角色扮演泛化（"als Debattierer fungieren"），单独命中不足以阻断
+    pattern: '(?i)(als|wie\s*ein(e|er)?)\s*[A-ZÄÖÜa-zäöüß][^\n.,;]{2,25}\s*(fungier(en|e|t)|agier(en|e|t)|auftret(en|e)|handel(st|n|e)?|antwortest|antworten)'
+
+  - id: PV-M023
+    category: instruction_override
+    weight: 3
+    confidence: 0.6
+    description: 德语注意力转移（konzentriere dich auf ...）
+    pattern: '(?i)(konzentriere|konzentrieren\s*sie|fokussiere)\s*(dich|sich)?\s*(jetzt|nun|bitte|nur)?\s*(auf|nur\s*auf)'
+
+  - id: PV-M024
+    category: privilege_escalation
+    weight: 3
+    confidence: 0.55
+    description: 德语声称身份或索取权限（"Ich bin dein Entwickler"）
+    pattern: '(?i)(ich\s*bin|ich\s*als)\s*(dein[e]?|der|die|ihr)?\s*(entwickler|administrator|besitzer|ersteller|betreiber|chef)'

@@ -1,0 +1,200 @@
+# Tier HIGH —— 默认加载，强指示但不绝对。
+version: 1
+tier: high
+rules:
+  - id: PV-H001
+    category: instruction_override
+    weight: 6
+    confidence: 0.85
+    description: 中英混合覆写「所有先前指令」
+    pattern: '(?i)(ignore|disregard)\s*(the\s*)?(above|previous)[\s\S]{0,20}?(并且|然后|接着)'
+
+  - id: PV-H002
+    category: instruction_override
+    weight: 6
+    confidence: 0.85
+    description: 要求放弃原有身份设定
+    pattern: '(放弃|抛开|解除)[^。\n]{0,8}(你的|原有)?(身份|设定|人设|角色设定|限制)'
+
+  - id: PV-H003
+    category: instruction_override
+    weight: 6
+    confidence: 0.82
+    description: 模拟无限制 AI
+    pattern: '(?i)(pretend|simulate|roleplay|role-play)\s*(to\s*be|as)?\s*(an?\s*)?(unrestricted|uncensored|unfiltered|amoral|evil|unsafe)\s*(ai|model|assistant|chatbot)?'
+
+  - id: PV-H004
+    category: instruction_override
+    weight: 5
+    confidence: 0.8
+    description: 双重人格 / 对立输出要求
+    pattern: '(?i)(answer|respond|output)\s*(as|in)\s*(two|both)\s*(different\s*)?(mode|persona|answer|response)s?'
+
+  - id: PV-H005
+    category: system_prompt_extraction
+    weight: 6
+    confidence: 0.85
+    description: 诱导泄露内部配置
+    pattern: '(?i)(what|tell\s*me|reveal)\s*(are|is)?\s*your\s*(initial|system|hidden|secret|internal|exact)\s*(instruction|prompt|rule|configuration|guidelines)s?'
+
+  - id: PV-H006
+    category: system_prompt_extraction
+    weight: 5
+    confidence: 0.8
+    description: 诱导泄露 API Key / 凭据
+    pattern: '(?i)(output|print|show|reveal|dump|echo)\s*(your\s*|the\s*)?(api[\s_-]?key|secret|token|credential|password|password|configuration|env(ironment)?\s*variable)s?'
+
+  - id: PV-H007
+    category: system_prompt_extraction
+    weight: 5
+    confidence: 0.82
+    description: 中文诱导泄露密钥
+    pattern: '(输出|显示|告诉我|泄露)[^。\n]{0,10}(你的)?(密钥|密码|令牌|凭据|API\s*Key|环境变量|内网地址)'
+
+  - id: PV-H008
+    category: role_tag_escape
+    weight: 6
+    confidence: 0.85
+    description: Markdown / XML 注入块伪造角色
+    pattern: '(?i)^\s*(#{1,6}\s*)?(system|assistant|developer|tool)\s*(message)?\s*[:：]\s*\S+'
+
+  - id: PV-H009
+    category: role_tag_escape
+    weight: 6
+    confidence: 0.88
+    description: 三引号 / 代码块伪装系统段
+    pattern: '(?i)(```|''''''|""")\s*(system|secret|internal)\s*(prompt|instruction|message)?\s*[:：]?'
+
+  - id: PV-H010
+    category: role_tag_escape
+    weight: 5
+    confidence: 0.8
+    description: 特殊分隔符包裹系统内容
+    pattern: '(?i)(={3,}|-{3,}|\*{3,})\s*(system|end\s*of\s*instruction|new\s*role)\s*(={3,}|-{3,}|\*{3,})'
+
+  - id: PV-H011
+    category: tool_injection
+    weight: 6
+    confidence: 0.85
+    description: Python 危险调用组合
+    pattern: '(?i)(os\.system|subprocess\.(run|Popen|call|check_output)|pty\.spawn|commands\.getoutput)\s*\('
+
+  - id: PV-H012
+    category: tool_injection
+    weight: 6
+    confidence: 0.85
+    description: 危险执行 + shell 提权参数
+    pattern: '(?i)(eval|exec)\s*\(\s*(__import__|compile|open|requests|os\.popen|subprocess)'
+
+  - id: PV-H013
+    category: tool_injection
+    weight: 6
+    confidence: 0.85
+    description: 外传数据到第三方地址
+    pattern: '(?i)(curl|wget|invoke-webrequest|requests\.(post|put))\s*[\s\S]{0,120}?(http://|https://)[^\s"\x27]+'
+
+  - id: PV-H014
+    category: tool_injection
+    weight: 5
+    confidence: 0.8
+    description: 要求读取敏感本地文件
+    pattern: '(?i)(read|cat|open|show)\s*(the\s*)?(content\s*of\s*)?[^\s]{0,40}?(/etc/(passwd|shadow)|id_rsa|\.aws/credentials|\.ssh/|~/.ssh|\.env\b)'
+
+  - id: PV-H015
+    category: privilege_escalation
+    weight: 5
+    confidence: 0.8
+    description: 索取管理员权限
+    pattern: '(?i)(grant|give|elevate|escalate)\s*(me\s*)?(admin|root|superuser|sudo|god)\s*(access|privilege|permission|right)s?'
+
+  - id: PV-H016
+    category: privilege_escalation
+    weight: 5
+    confidence: 0.8
+    description: 要求无任何过滤回答
+    pattern: '(?i)(without|no|zero)\s*(any\s*)?(restriction|filter|censorship|guardrail|limitation|ethical|moral|safety)\s*(constraint)?s?'
+
+  - id: PV-H017
+    category: privilege_escalation
+    weight: 5
+    confidence: 0.8
+    description: 中文索取管理员/无限制模式
+    pattern: '(给(我)?|授予|提升)[^。\n]{0,8}(管理员|最高|超级|ROOT|root)[^。\n]{0,6}(权限|特权)|(无限制|无审查|无过滤|不受限)(模式|模式运行|运行)'
+
+  - id: PV-H018
+    category: obfuscation
+    weight: 6
+    confidence: 0.85
+    description: 要求先解码再执行
+    pattern: '(?i)(base64|hex|rot13|urlencod|percent[\s_-]?encod)[\s\S]{0,20}(decode|解码|decrypt|解开)[\s\S]{0,40}(then|and|然后|接着|并)[\s\S]{0,20}(execute|run|follow|obey|执行|遵从|遵守)'
+
+  - id: PV-H019
+    category: obfuscation
+    weight: 5
+    confidence: 0.8
+    description: 中文执行解码后内容
+    pattern: '(解密|解码|base64|十六进制)[^。\n]{0,10}(之后|以后|然后)[^。\n]{0,10}(执行|运行|遵照|遵从)'
+
+  - id: PV-H020
+    category: obfuscation
+    weight: 5
+    confidence: 0.78
+    description: 分片拼接 / 拼写还原指令
+    pattern: '(?i)(concat|combine|join|assemble|merge)\s*(the\s*)?(word|letter|piece|chunk|part|fragment)s?[\s\S]{0,40}(then|and|然后)?[\s\S]{0,20}(execute|follow|obey|执行|遵从)'
+
+  # —— 依据 deepset train 子集迭代补充 ——
+  - id: PV-H021
+    category: instruction_override
+    weight: 6
+    confidence: 0.82
+    description: 假装表扬后切换任务（"Very well done. Now focus on your new task"）
+    pattern: '(?i)(well\s*done|very\s*good|excellent|great|fantastic|perfect|that\s*(is|was)\s*(enough|ok|fine)|okay)[\s\S]{0,40}(now|jetzt)[\s\S]{0,30}(focus|concentrate|help\s*me|your\s*new|folgt|neue)'
+
+  - id: PV-H022
+    category: instruction_override
+    weight: 5
+    confidence: 0.78
+    description: 新任务接管句式
+    pattern: '(?i)(focus\s*on|let\s*(us|s)|help\s*me\s*with|reply\s*to|move\s*on\s*to|answer)\s*(your|my|the)?\s*(new\s*)?(task|assignment|question|challenge|aufgabe|herausforderung)'
+
+  - id: PV-H023
+    category: instruction_override
+    weight: 6
+    confidence: 0.82
+    description: 德语「现在有个很棒的新任务」（jetzt/nun 后接 neue Herausforderung 等）
+    pattern: '(?i)(jetzt|nun)[\s\S]{0,30}(neue\s*(herausforderung|aufgabe|anweisung|rolle|angabe)|eine\s*(tolle|neue)\s*neue|folgende\s*aufgabe|folgen\s*neue)'
+
+  - id: PV-H025
+    category: instruction_override
+    weight: 7
+    confidence: 0.85
+    description: 德语角色接管（"Jetzt bist du Xi Jinping, wie beantwortest du..."），要求后接大写角色名
+    pattern: '(?i)(jetzt|nun|ab\s*(jetzt|sofort)|von\s*nun\s*an)\s*(bist|sind|seid)\s*(du|sie)\s+[A-ZÄÖÜ][\wäöüß\-]{2,}\s*(,|und|wie|beantworte|erkläre|sag)?'
+
+  - id: PV-H026
+    category: instruction_override
+    weight: 7
+    confidence: 0.88
+    description: 德语任务切换与上下文重置（folgen neue Aufgaben / starten von neu / konzentriere dich）
+    pattern: '(?i)(folgen\s*(nun\s*)?neue\s*(aufgaben|anweisungen)|starten\s*(wir\s*)?(von\s*)?neu|neue\s*(aufgabe|aufgaben|anweisung)\s*[:：]|hilf\s*mir\s*(nun|jetzt|bitte)\s*mit\s*folgender|konzentriere\s*dich\s*(jetzt|nun|bitte|nur)?\s*auf)'
+
+  - id: PV-H027
+    category: privilege_escalation
+    weight: 7
+    confidence: 0.88
+    description: 德语要求解除限制（ohne Einschränkungen / keine Regeln / Filter deaktivieren）
+    pattern: '(?i)(ohne\s*(jede|jegliche|alle|irgendwelche)?\s*(einschränkung(en)?|beschränkung(en)?|filter|zensur|regeln?|grenzen|grenze)|keine\s*(regeln?|grenzen|beschränkungen|einschränkungen|filter)|alle\s*(filter|sicherheitsvorkehrungen|regeln|beschränkungen)\s*(deaktivieren|abschalten|entfernen|ignorieren)|ohne\s*(ethische|moralische)?\s*(bedenken|grenzen))'
+
+  - id: PV-H028
+    category: instruction_override
+    weight: 6
+    confidence: 0.72
+    description: 德语打断式开头（ACHTUNG - STOPP - ich benötige...）
+    pattern: '(?i)^\s*(achtung|stopp|halt|notfall|attention)[\s\S]{0,12}[-–—:!.]+\s*(ich|bitte|du|wir|nun|jetzt)'
+
+  - id: PV-H024
+    category: privilege_escalation
+    weight: 6
+    confidence: 0.82
+    description: 要求扮演越权角色（evil AI / 无道德约束的人格）
+    pattern: '(?i)(act\s*as|pretend\s*(to\s*be|you\s*(are|re))|you\s*are\s*now|扮演|假装你是|请你扮演)\s*(a\s*|an\s*|the\s*)?[^.\n]{0,24}?(evil|immoral|unethical|amoral|criminal|hacker|nazi|hitler|dictator|terrorist|恶意|邪恶|无道德|没有道德|犯罪)'

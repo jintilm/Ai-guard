@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-ids"
+version = "0.1.0"
+description = "提示词注入检测系统：归一化 → 解码展开 → L1 规则 / L2 启发 / L3 语义 → 加权融合决策"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "prompt-ids contributors" }]
+keywords = ["prompt injection", "LLM security", "guardrail", "提示词注入"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+]
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# regex 要放进 dev：引擎等价性测试在没装它时会整体 skip，装了才真正跑到
+dev = ["pytest>=7.0", "ruff>=0.4", "regex>=2023.0"]
+# CPU 版 torch 建议用官方 CPU 源安装，体积比默认 CUDA 包小一个量级：
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch
+semantic = ["transformers>=4.36", "torch>=2.1", "scikit-learn>=1.3", "joblib>=1.3"]
+# 向量记忆库，可选；缺失时自动退回 numpy 暴力检索
+memory = ["faiss-cpu>=1.7", "numpy>=1.24"]
+# 规则层正则引擎。regex 对字面量前缀会先做一次快速定位再回溯，
+# 实测中文长文本 4.8×、公开集 1.15×，且与 re 语法兼容、结果逐条一致。
+# 不装则自动退回标准库 re，只是慢一些，不会少检。
+speed = ["regex>=2023.0"]
+
+[project.scripts]
+prompt-ids = "prompt_ids.cli:main"
+prompt-ids-proxy = "prompt_ids.proxy.__main__:main"
+prompt-ids-api = "prompt_ids.api.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["prompt_ids*"]
+
+[tool.setuptools.package-data]
+prompt_ids = ["rules/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
