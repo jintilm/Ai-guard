@@ -1,0 +1,78 @@
+{
+  "L1 仅规则": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.72,
+      "f1": 0.8372,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.8353,
+      "tp": 36,
+      "fp": 0,
+      "tn": 35,
+      "fn": 14
+    },
+    "latency_ms": {
+      "mean": 1.12,
+      "p50": 0.36,
+      "p95": 0.792,
+      "p99": 11.847,
+      "max": 65.981
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.72,
+        "f1": 0.8372,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8353,
+        "tp": 36,
+        "fp": 0,
+        "tn": 35,
+        "fn": 14
+      }
+    }
+  },
+  "L1+L2 规则+启发": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.74,
+      "f1": 0.8506,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.8471,
+      "tp": 37,
+      "fp": 0,
+      "tn": 35,
+      "fn": 13
+    },
+    "latency_ms": {
+      "mean": 0.681,
+      "p50": 0.4,
+      "p95": 0.721,
+      "p99": 5.405,
+      "max": 25.585
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.74,
+        "f1": 0.8506,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8471,
+        "tp": 37,
+        "fp": 0,
+        "tn": 35,
+        "fn": 13
+      }
+    }
+  }
+}

@@ -258,6 +258,31 @@ def handle_memory_feedback(ctx: ApiContext, payload: Any, params: dict) -> tuple
     }
 
 
+def handle_events(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """最近审计事件（只含指纹，不含原文），供实时看板滚动展示。
+
+    读的是审计文件尾部，不额外维护一份内存缓冲 —— 与命令行 `tail -f`、
+    离线分析看到的完全是同一份数据，不会出现「页面显示的和服务记录的不一致」。
+    """
+    try:
+        limit = max(1, min(200, int(params.get("limit", 50))))
+    except (TypeError, ValueError):
+        limit = 50
+    logger = ctx.audit
+    if logger is None or not logger.enabled or logger.path is None:
+        return 200, {"enabled": False, "count": 0, "events": []}
+    logger.flush()  # 缓冲写模式下先把待写事件落盘，保证读到的是最新
+    from prompt_ids.audit.logger import tail_events
+
+    events = tail_events(logger.path, limit=limit)
+    return 200, {
+        "enabled": True,
+        "count": len(events),
+        "path": str(logger.path),
+        "events": [e.to_dict() for e in events],
+    }
+
+
 def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     det = ctx.rule_detector
     book = det.rulebook if det and hasattr(det, "rulebook") else None
@@ -283,6 +308,29 @@ def handle_health(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
     }
 
 
+def handle_providers(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """当前的语义后端 + LLM 提供商可用性清单。
+
+    给前端（看板/检测台）和运维用：一眼看清「现在实际在用哪一家」，
+    避免出现「以为在用 DeepSeek、其实静默降级到轻量模型」这种错觉。
+    """
+    from prompt_ids.detectors.semantic.factory import provider_table
+
+    detector = ctx.pipeline.semantic_detector
+    backend = getattr(detector, "backend", None) if detector else None
+    active = backend.info() if backend is not None else {}
+    active.pop("providers", None)  # 21 家清单已在下面单独给，避免重复
+    return 200, {
+        "active": {
+            "semantic_enabled": bool(detector and detector.enabled),
+            "mode": getattr(detector, "mode", ""),
+            "backend": getattr(backend, "name", "null"),
+            **active,
+        },
+        "providers": provider_table(),
+    }
+
+
 def handle_openapi(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     return 200, OPENAPI
 
@@ -300,7 +348,9 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/v1/memory/search", handle_memory_search),
     ("POST", "/v1/memory/feedback", handle_memory_feedback),
     ("GET", "/v1/memory/stats", handle_memory_stats),
+    ("GET", "/v1/providers", handle_providers),
     ("GET", "/v1/metrics", handle_metrics),
+    ("GET", "/v1/events", handle_events),
     ("GET", "/v1/openapi.json", handle_openapi),
     ("GET", "/healthz", handle_health),
     ("GET", "/health", handle_health),

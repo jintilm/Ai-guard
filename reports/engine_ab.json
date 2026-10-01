@@ -1,0 +1,56 @@
+{
+  "engine_a": "re",
+  "engine_b": "regex",
+  "eq_method": "per-sample finding fingerprint",
+  "regex_version": "2026.9.10",
+  "dataset": "E:\\Code\\Ai-guard\\data\\full.jsonl",
+  "sections": {
+    "public_corpus": {
+      "samples": 817,
+      "rounds": 3,
+      "re_ms": 665.278,
+      "regex_ms": 578.049,
+      "speedup": 1.1509,
+      "identical": true,
+      "difference_count": 0
+    },
+    "long_text": [
+      {
+        "label": "中文为主",
+        "chars": 8241,
+        "re_ms": 92.343,
+        "regex_ms": 18.238,
+        "speedup": 5.0632,
+        "identical": true
+      },
+      {
+        "label": "英文为主",
+        "chars": 24609,
+        "re_ms": 227.531,
+        "regex_ms": 163.465,
+        "speedup": 1.3919,
+        "identical": true
+      }
+    ],
+    "extreme": [
+      {
+        "label": "中文为主",
+        "chars": 16053,
+        "re_ms": 208.77,
+        "regex_ms": 63.748,
+        "speedup": 3.2749,
+        "identical": true
+      },
+      {
+        "label": "英文为主",
+        "chars": 47973,
+        "re_ms": 478.666,
+        "regex_ms": 342.411,
+        "speedup": 1.3979,
+        "identical": true
+      }
+    ]
+  },
+  "failures": 0,
+  "verdict": "identical"
+}

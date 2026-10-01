@@ -41,6 +41,10 @@ class PipelineConfig:
     semantic_backend: str = "auto"
     semantic_model: str = ""
     semantic_timeout_s: float | None = None
+    #: LLM 回退链：逗号分隔的 provider/model，主端点失败时顺次尝试
+    semantic_fallbacks: str = ""
+    #: True 时忽略所有云端 Key，强制本地推理（断网/离线演示用）
+    semantic_local_only: bool = False
     # 向量记忆库（自进化）：开启后会把确认的攻击写回记忆
     memory_enabled: bool = False
     memory_encoder: str = "auto"
@@ -134,6 +138,21 @@ class Pipeline:
             self.cold_start_ms[detector.name] = round(
                 self.cold_start_ms.get(detector.name, 0.0) + cost, 3
             )
+
+    def close(self) -> None:
+        """释放各层持有的外部资源（模型句柄、记忆库文件等），供服务退出时调用。
+
+        关停路径与启动路径同理：不能因为某个可选层释放失败就把其它层漏掉，
+        更不能把异常抛给调用方的 finally 块。
+        """
+        for detector in self.registry:
+            closer = getattr(detector, "close", None)
+            if not callable(closer):
+                continue
+            try:
+                closer()
+            except Exception:  # noqa: BLE001 - 关停尽力而为，不掩盖真实退出
+                continue
 
     # ---------- 主流程 ----------
     def cache_key(self, fp: str, policy_name: str | None = None) -> str:
@@ -325,12 +344,25 @@ def create_pipeline(
     rulebook = RuleBook(rules_dir, tiers) if rules_dir else RuleBook(tiers=tiers)
     if semantic is None:
         # 关闭时显式用 null 后端，避免白占一个模型句柄
+        backend_spec = cfg.semantic_backend if cfg.semantic_enabled else "null"
+        backend_kwargs: dict = {}
+        if cfg.semantic_fallbacks:
+            backend_kwargs["fallbacks"] = cfg.semantic_fallbacks
+        if cfg.semantic_local_only:
+            # 离线/演示模式：直接挑一个免 Key 的本地端点，绕开云端选型
+            from prompt_ids.detectors.semantic.providers import local_candidates
+
+            locals_ = local_candidates()
+            if locals_ and backend_spec in ("", "auto", "llm"):
+                backend_spec = locals_[0]
+            backend_kwargs["allow_fallbacks"] = False
         semantic = SemanticDetector(
             mode=cfg.semantic_mode,
             enabled=cfg.semantic_enabled,
             model_name=cfg.semantic_model,
-            backend=cfg.semantic_backend if cfg.semantic_enabled else "null",
+            backend=backend_spec,
             timeout_s=cfg.semantic_timeout_s,
+            backend_kwargs=backend_kwargs,
         )
     if memory is None:
         # 复用 L3 已加载的模型句柄：让记忆库自己 build_encoder("auto") 会再

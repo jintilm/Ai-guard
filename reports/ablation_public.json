@@ -1,0 +1,405 @@
+{
+  "L1 仅规则": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.2536,
+      "f1": 0.4045,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.6793,
+      "tp": 89,
+      "fp": 0,
+      "tn": 466,
+      "fn": 262
+    },
+    "latency_ms": {
+      "mean": 0.898,
+      "p50": 0.521,
+      "p95": 2.2,
+      "p99": 4.349,
+      "max": 66.0
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.72,
+        "f1": 0.8372,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8353,
+        "tp": 36,
+        "fp": 0,
+        "tn": 35,
+        "fn": 14
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.1,
+        "f1": 0.1818,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5345,
+        "tp": 6,
+        "fp": 0,
+        "tn": 56,
+        "fn": 54
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.2069,
+        "f1": 0.3429,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7051,
+        "tp": 42,
+        "fp": 0,
+        "tn": 343,
+        "fn": 161
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.1316,
+        "f1": 0.2326,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5286,
+        "tp": 5,
+        "fp": 0,
+        "tn": 32,
+        "fn": 33
+      }
+    }
+  },
+  "L1+L2 规则+启发": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.2564,
+      "f1": 0.4082,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.6805,
+      "tp": 90,
+      "fp": 0,
+      "tn": 466,
+      "fn": 261
+    },
+    "latency_ms": {
+      "mean": 0.92,
+      "p50": 0.58,
+      "p95": 2.362,
+      "p99": 4.875,
+      "max": 25.715
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.74,
+        "f1": 0.8506,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8471,
+        "tp": 37,
+        "fp": 0,
+        "tn": 35,
+        "fn": 13
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.1,
+        "f1": 0.1818,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5345,
+        "tp": 6,
+        "fp": 0,
+        "tn": 56,
+        "fn": 54
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.2069,
+        "f1": 0.3429,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7051,
+        "tp": 42,
+        "fp": 0,
+        "tn": 343,
+        "fn": 161
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.1316,
+        "f1": 0.2326,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5286,
+        "tp": 5,
+        "fp": 0,
+        "tn": 32,
+        "fn": 33
+      }
+    }
+  },
+  "L1+L2+L3 (fallback 门禁)": {
+    "confusion": {
+      "precision": 0.9604,
+      "recall": 0.5527,
+      "f1": 0.7016,
+      "false_positive_rate": 0.0172,
+      "specificity": 0.9828,
+      "accuracy": 0.798,
+      "tp": 194,
+      "fp": 8,
+      "tn": 458,
+      "fn": 157
+    },
+    "latency_ms": {
+      "mean": 71.444,
+      "p50": 88.714,
+      "p95": 127.439,
+      "p99": 192.397,
+      "max": 543.951
+    },
+    "semantic_calls": 575,
+    "semantic_call_rate": 0.7038,
+    "semantic": {
+      "backend": "local_model",
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "mode": "fallback",
+      "available": true,
+      "timeout_s": 10.0,
+      "calls": 575,
+      "timeouts": 0,
+      "errors": 0,
+      "avg_latency_ms": 99.28,
+      "last_error": null
+    },
+    "by_source": {
+      "builtin": {
+        "precision": 0.9778,
+        "recall": 0.88,
+        "f1": 0.9263,
+        "false_positive_rate": 0.0286,
+        "specificity": 0.9714,
+        "accuracy": 0.9176,
+        "tp": 44,
+        "fp": 1,
+        "tn": 34,
+        "fn": 6
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.35,
+        "f1": 0.5185,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6638,
+        "tp": 21,
+        "fp": 0,
+        "tn": 56,
+        "fn": 39
+      },
+      "deepset_train": {
+        "precision": 0.9579,
+        "recall": 0.4483,
+        "f1": 0.6107,
+        "false_positive_rate": 0.0117,
+        "specificity": 0.9883,
+        "accuracy": 0.7875,
+        "tp": 91,
+        "fp": 4,
+        "tn": 339,
+        "fn": 112
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    }
+  },
+  "L1+L2+L3 (always 全量)": {
+    "confusion": {
+      "precision": 0.9423,
+      "recall": 0.5584,
+      "f1": 0.7013,
+      "false_positive_rate": 0.0258,
+      "specificity": 0.9742,
+      "accuracy": 0.7956,
+      "tp": 196,
+      "fp": 12,
+      "tn": 454,
+      "fn": 155
+    },
+    "latency_ms": {
+      "mean": 95.831,
+      "p50": 88.975,
+      "p95": 127.608,
+      "p99": 187.559,
+      "max": 492.421
+    },
+    "semantic_calls": 817,
+    "semantic_call_rate": 1.0,
+    "semantic": {
+      "backend": "local_model",
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "mode": "always",
+      "available": true,
+      "timeout_s": 10.0,
+      "calls": 817,
+      "timeouts": 0,
+      "errors": 0,
+      "avg_latency_ms": 94.18,
+      "last_error": null
+    },
+    "by_source": {
+      "builtin": {
+        "precision": 0.9057,
+        "recall": 0.96,
+        "f1": 0.932,
+        "false_positive_rate": 0.1429,
+        "specificity": 0.8571,
+        "accuracy": 0.9176,
+        "tp": 48,
+        "fp": 5,
+        "tn": 30,
+        "fn": 2
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.3667,
+        "f1": 0.5366,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6724,
+        "tp": 22,
+        "fp": 0,
+        "tn": 56,
+        "fn": 38
+      },
+      "deepset_train": {
+        "precision": 0.9565,
+        "recall": 0.4335,
+        "f1": 0.5966,
+        "false_positive_rate": 0.0117,
+        "specificity": 0.9883,
+        "accuracy": 0.7821,
+        "tp": 88,
+        "fp": 4,
+        "tn": 339,
+        "fn": 115
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    }
+  },
+  "L3 仅语义": {
+    "confusion": {
+      "precision": 0.9409,
+      "recall": 0.5442,
+      "f1": 0.6895,
+      "false_positive_rate": 0.0258,
+      "specificity": 0.9742,
+      "accuracy": 0.7895,
+      "tp": 191,
+      "fp": 12,
+      "tn": 454,
+      "fn": 160
+    },
+    "latency_ms": {
+      "mean": 109.725,
+      "p50": 104.612,
+      "p95": 149.803,
+      "p99": 222.066,
+      "max": 558.995
+    },
+    "semantic_calls": 817,
+    "semantic_call_rate": 1.0,
+    "semantic": {
+      "backend": "local_model",
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "mode": "always",
+      "available": true,
+      "timeout_s": 10.0,
+      "calls": 817,
+      "timeouts": 0,
+      "errors": 0,
+      "avg_latency_ms": 109.22,
+      "last_error": null
+    },
+    "by_source": {
+      "builtin": {
+        "precision": 0.9,
+        "recall": 0.9,
+        "f1": 0.9,
+        "false_positive_rate": 0.1429,
+        "specificity": 0.8571,
+        "accuracy": 0.8824,
+        "tp": 45,
+        "fp": 5,
+        "tn": 30,
+        "fn": 5
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.3667,
+        "f1": 0.5366,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6724,
+        "tp": 22,
+        "fp": 0,
+        "tn": 56,
+        "fn": 38
+      },
+      "deepset_train": {
+        "precision": 0.9556,
+        "recall": 0.4236,
+        "f1": 0.587,
+        "false_positive_rate": 0.0117,
+        "specificity": 0.9883,
+        "accuracy": 0.7784,
+        "tp": 86,
+        "fp": 4,
+        "tn": 339,
+        "fn": 117
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    }
+  }
+}

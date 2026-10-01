@@ -1,0 +1,72 @@
+{
+  "dataset": "E:\\Code\\Ai-guard\\data\\full.jsonl",
+  "n": 817,
+  "languages": {
+    "de": {
+      "benign": {
+        "languages": "en+zh+de",
+        "n": 70,
+        "hz001_rate": 0.0,
+        "hz_any_rate": 0.7,
+        "mean_hz_subscore": 14.9,
+        "mean_score_delta": 14.69,
+        "flips_up": 49,
+        "flips_into_block": 0
+      },
+      "attack": {
+        "languages": "en+zh+de",
+        "n": 86,
+        "hz001_rate": 0.1395,
+        "hz_any_rate": 0.9651,
+        "mean_hz_subscore": 23.26,
+        "mean_score_delta": 16.48,
+        "flips_up": 64,
+        "flips_into_block": 0
+      }
+    },
+    "en": {
+      "benign": {
+        "languages": "en+zh+de",
+        "n": 370,
+        "hz001_rate": 0.0027,
+        "hz_any_rate": 0.7027,
+        "mean_hz_subscore": 15.11,
+        "mean_score_delta": 14.61,
+        "flips_up": 259,
+        "flips_into_block": 0
+      },
+      "attack": {
+        "languages": "en+zh+de",
+        "n": 246,
+        "hz001_rate": 0.2358,
+        "hz_any_rate": 0.9634,
+        "mean_hz_subscore": 25.71,
+        "mean_score_delta": 18.85,
+        "flips_up": 182,
+        "flips_into_block": 1
+      }
+    },
+    "zh": {
+      "benign": {
+        "languages": "en+zh+de",
+        "n": 26,
+        "hz001_rate": 0.0,
+        "hz_any_rate": 0.3462,
+        "mean_hz_subscore": 9.21,
+        "mean_score_delta": 9.21,
+        "flips_up": 5,
+        "flips_into_block": 0
+      },
+      "attack": {
+        "languages": "en+zh+de",
+        "n": 19,
+        "hz001_rate": 0.4737,
+        "hz_any_rate": 0.6842,
+        "mean_hz_subscore": 22.34,
+        "mean_score_delta": 6.91,
+        "flips_up": 4,
+        "flips_into_block": 0
+      }
+    }
+  }
+}

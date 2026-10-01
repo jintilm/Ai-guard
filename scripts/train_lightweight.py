@@ -15,11 +15,23 @@
   2. 留出集（未参与训练）  —— **唯一的泛化数字**
   3. 污染对照            —— 故意用含留出集的全量数据训练，量化"背答案"能虚高多少
 
+## 为什么裸跑会被拒绝（重要）
+
+`python scripts/train_lightweight.py`（不带 --dataset）只会拿 **85 条内置种子集**
+训练，然后**覆盖生产模型** models/lightweight.joblib，并打出一份看着像模像样、
+实则毫无泛化意义的指标。本项目已经被"产物悄悄过期/漂移"坑过多次
+（见 MEMORY 里 ablation_public.json 差 8.7 倍召回那一课），所以这里默认**响亮失败**：
+不带 --dataset 又想写默认输出路径时，只会打印正确命令并退出，绝不静默训练。
+
+要重建生产模型，用：
+
+    python scripts/train_lightweight.py --only --dataset data/full.jsonl --holdout deepset_test
+
 用法：
-    python scripts/train_lightweight.py
-    python scripts/train_lightweight.py --dataset data/full.jsonl --only
-    python scripts/train_lightweight.py --holdout deepset_test          # 默认
-    python scripts/train_lightweight.py --holdout ""                    # 明确不隔离（仅做对照）
+    python scripts/train_lightweight.py --only --dataset data/full.jsonl   # 重建生产模型
+    python scripts/train_lightweight.py --dataset data/full.jsonl          # 拼上内置种子集
+    python scripts/train_lightweight.py --dataset data/full.jsonl --holdout ""  # 关闭隔离（仅对照）
+    python scripts/train_lightweight.py --force --out /tmp/toy.joblib      # 种子集小跑（调试）
 """
 from __future__ import annotations
 
@@ -137,7 +149,28 @@ def main() -> int:
     parser.add_argument("--report", default=str(REPORT_DIR / "lightweight.json"))
     parser.add_argument("--cv", type=int, default=5, help="交叉验证折数")
     parser.add_argument("--no-cv", action="store_true", help="跳过交叉验证")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="允许在只有内置种子集时写默认模型路径（仅调试用，产物不可作结论）",
+    )
     args = parser.parse_args()
+
+    # 防呆闸门：裸跑（无 --dataset）只会在 85 条种子集上训练，却会覆盖生产模型。
+    # 这是"产物悄悄漂移"类事故，必须响亮失败而不是静默产出一份假指标。
+    if not args.dataset and not args.force and Path(args.out).resolve() == DEFAULT_OUT.resolve():
+        print(
+            "拒绝执行：没有指定 --dataset，只会在 85 条内置种子集上训练，\n"
+            "而这会覆盖生产模型 models/lightweight.joblib，得到的指标没有泛化意义。\n\n"
+            "重建生产模型请用：\n"
+            f"    python scripts/train_lightweight.py --only --dataset data/full.jsonl "
+            f"--holdout {DEFAULT_HOLDOUT}\n\n"
+            "确实只想在种子集上小跑（例如调试），请显式二选一：\n"
+            "    · 加 --force（沿用默认输出路径），或\n"
+            "    · 改 --out 到一个临时路径，例如 --out /tmp/toy.joblib",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         import joblib  # noqa: F401

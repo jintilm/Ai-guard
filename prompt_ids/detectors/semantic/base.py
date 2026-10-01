@@ -19,12 +19,17 @@ class Prediction:
     rationale: str
     backend: str
     latency_ms: float = 0.0
+    #: False = **没拿到可用判决**（后端不可用 / 超时 / 网络或解析失败）。
+    #: 这类预测**不携带任何关于文本的信息**，因此不能当"确信正常"用：
+    #: 判别层的 contribution() 见到 ok=False 必须弃票，否则一次网络抖动
+    #: 会把规则层证据打 75 折（p=0 → 乘性因子 0.75），凭空制造漏报。
+    ok: bool = True
 
     def clamp(self) -> "Prediction":
         p = min(1.0, max(0.0, self.probability))
         if p == self.probability:
             return self
-        return Prediction(p, self.rationale, self.backend, self.latency_ms)
+        return Prediction(p, self.rationale, self.backend, self.latency_ms, self.ok)
 
 
 class SemanticBackend(ABC):
@@ -64,7 +69,7 @@ class NullBackend(SemanticBackend):
     name = "null"
 
     def predict(self, text: str) -> Prediction:
-        return Prediction(0.0, "语义后端不可用，已跳过", self.name)
+        return Prediction(0.0, "语义后端不可用，已跳过", self.name, ok=False)
 
     def is_available(self) -> bool:
         return False

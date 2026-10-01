@@ -151,14 +151,17 @@ class LocalModelBackend(SemanticBackend):
 
     def predict(self, text: str) -> Prediction:
         if not text.strip():
-            return Prediction(0.0, "空文本", self.name)
+            return Prediction(0.0, "空文本", self.name, ok=False)
         if not self.is_available():
-            return Prediction(0.0, "未安装 transformers/torch", self.name)
+            return Prediction(0.0, "未安装 transformers/torch", self.name, ok=False)
         started = time.perf_counter()
         try:
             probability, label = self._score_one(text)
         except Exception as exc:
-            return Prediction(0.0, f"本地推理失败：{exc}", self.name, (time.perf_counter() - started) * 1000)
+            return Prediction(
+                0.0, f"本地推理失败：{exc}", self.name,
+                (time.perf_counter() - started) * 1000, ok=False,
+            )
         elapsed = (time.perf_counter() - started) * 1000
         rationale = f"{self.model_name} 判定 label={label} p={probability:.3f}"
         return Prediction(probability, rationale, self.name, elapsed)

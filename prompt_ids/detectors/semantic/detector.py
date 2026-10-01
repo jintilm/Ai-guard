@@ -43,13 +43,16 @@ class SemanticDetector(Detector):
         model_name: str = "",
         backend: SemanticBackend | str | None = None,
         timeout_s: float | None = None,
+        backend_kwargs: dict[str, Any] | None = None,
     ):
         super().__init__(enabled=enabled)
         if mode not in MODES:
             raise ValueError(f"未知语义层模式 {mode}，可选：{MODES}")
         self.mode = mode
         self.model_name = model_name
-        self.backend: SemanticBackend = self._resolve_backend(backend, model_name, enabled)
+        self.backend: SemanticBackend = self._resolve_backend(
+            backend, model_name, enabled, backend_kwargs or {}
+        )
         self.timeout_s = self.backend.default_timeout_s if timeout_s is None else timeout_s
 
         self.calls = 0
@@ -62,15 +65,20 @@ class SemanticDetector(Detector):
 
     # ---------- 构造 ----------
     def _resolve_backend(
-        self, backend: SemanticBackend | str | None, model_name: str, enabled: bool
+        self,
+        backend: SemanticBackend | str | None,
+        model_name: str,
+        enabled: bool,
+        backend_kwargs: dict[str, Any] | None = None,
     ) -> SemanticBackend:
+        extra = dict(backend_kwargs or {})
         if isinstance(backend, SemanticBackend):
             return backend
         if backend is not None:
-            return build_backend(backend, model_name=model_name)
+            return build_backend(backend, model_name=model_name, **extra)
         if not enabled:
             return NullBackend()
-        return build_backend("auto", model_name=model_name)
+        return build_backend("auto", model_name=model_name, **extra)
 
     @property
     def effective_model_name(self) -> str:
@@ -96,11 +104,15 @@ class SemanticDetector(Detector):
         except TimeoutError:
             self.timeouts += 1
             self.last_error = f"语义后端超时（>{self.timeout_s}s）"
-            prediction = Prediction(0.0, self.last_error, self.backend.name, self.timeout_s * 1000)
+            prediction = Prediction(
+                0.0, self.last_error, self.backend.name, self.timeout_s * 1000, ok=False
+            )
         except Exception as exc:
             self.errors += 1
             self.last_error = str(exc)[:200]
-            prediction = Prediction(0.0, f"语义后端异常：{self.last_error}", self.backend.name)
+            prediction = Prediction(
+                0.0, f"语义后端异常：{self.last_error}", self.backend.name, ok=False
+            )
 
         prediction = prediction.clamp()
         if prediction.latency_ms <= 0:
@@ -109,6 +121,7 @@ class SemanticDetector(Detector):
                 prediction.rationale,
                 prediction.backend,
                 (time.perf_counter() - started) * 1000,
+                prediction.ok,
             )
         self.calls += 1
         self.total_latency_ms += prediction.latency_ms
@@ -161,8 +174,15 @@ class SemanticDetector(Detector):
 
         即使没产生 finding 也返回分数 —— 语义层同样能扮演"降噪"角色，
         把规则层误判的正常文本拉回安全区。
+
+        **但"没拿到判决"不等于"确信正常"**：后端不可用 / 超时 / 网络或解析
+        失败时 `ok=False`，此处必须弃票（返回 None，让该层从融合里退出），
+        否则 p=0 会经乘性因子把规则层证据打到 75 折 —— 一次网络抖动就能
+        凭空制造漏报，而外面完全看不出来。
         """
         if not self.enabled or self.last_prediction is None:
+            return None
+        if not self.last_prediction.ok:
             return None
         return round(self.last_prediction.probability * 100.0, 2)
 

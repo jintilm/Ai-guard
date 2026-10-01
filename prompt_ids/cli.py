@@ -21,6 +21,7 @@ from prompt_ids.core.verdict import FusionConfig
 from prompt_ids.rules.loader import RuleBook
 
 EXIT_PASS = 0
+EXIT_FAIL = 1
 EXIT_REVIEW = 2
 EXIT_BLOCK = 3
 
@@ -48,11 +49,25 @@ def build_argparser() -> argparse.ArgumentParser:
     sem = p.add_argument_group("语义层 L3")
     sem.add_argument("--semantic", action="store_true", help="启用语义层（自动挑可用后端）")
     sem.add_argument("--semantic-backend", default="auto",
-                     help="后端：auto/local/llm/deepseek/openai/lightweight 或 HF repo id")
+                     help="后端：auto/local/lightweight/null，或 21 家提供商之一"
+                          "（deepseek/openai/azure/qwen/zhipu/moonshot/siliconflow/volces/"
+                          "qianfan/minimax/anthropic/groq/mistral/together/openrouter/xai/"
+                          "perplexity/ollama/vllm/lmstudio/custom），"
+                          "也接受 LiteLLM 风格一行写法 groq/llama-3.3-70b-versatile，"
+                          "或 HuggingFace repo id。用 --list-providers 看全部")
     sem.add_argument("--semantic-mode", default="fallback", help="预筛门禁：fallback/always/hybrid/confirm")
-    sem.add_argument("--semantic-model", default="", help="自定义模型名（如 deepseek-chat）")
+    sem.add_argument("--semantic-model", default="", help="自定义模型名（如 deepseek-v4-flash）")
     sem.add_argument("--semantic-timeout", type=float, default=None, help="单次推理超时秒数")
+    sem.add_argument("--semantic-fallbacks", default="",
+                     help="回退链，逗号分隔的 provider/model，主端点失败时顺次尝试。"
+                          "如 groq/llama-3.3-70b-versatile,xai/grok-4.3")
+    sem.add_argument("--semantic-local-only", action="store_true",
+                     help="不用云端 Key，强制走本地推理后端")
     sem.add_argument("--probe", action="store_true", help="打印各语义后端的可用性后退出")
+    sem.add_argument("--list-providers", action="store_true",
+                     help="列出全部提供商、默认模型、Key 变量与当前可用性后退出")
+    sem.add_argument("--list-models", metavar="PROVIDER", nargs="?", const="",
+                     help="向端点查当前真实模型清单后退出（模型名换代时用它核对）")
     mem = p.add_argument_group("向量记忆库 L4（自进化）")
     mem.add_argument("--memory", action="store_true", help="启用记忆库，确认的攻击会自动写回")
     mem.add_argument("--memory-encoder", default="auto", help="编码器：auto/deberta/hashing")
@@ -106,6 +121,8 @@ def _make_pipeline(args: argparse.Namespace) -> Pipeline:
             semantic_backend=args.semantic_backend,
             semantic_model=args.semantic_model,
             semantic_timeout_s=args.semantic_timeout,
+            semantic_fallbacks=args.semantic_fallbacks,
+            semantic_local_only=args.semantic_local_only,
             memory_enabled=args.memory,
             memory_encoder=args.memory_encoder,
             memory_threshold=args.memory_threshold,
@@ -114,6 +131,81 @@ def _make_pipeline(args: argparse.Namespace) -> Pipeline:
             audit_path=args.audit,
         ),
     )
+
+
+def _disp_width(text: str) -> int:
+    """终端显示宽度：CJK 全角字符占 2 列。
+
+    直接拿 len() 排版会在中文列上歪掉 —— 「未配置」是 3 个字符但 6 列宽，
+    `f"{s:<6}"` 只补 3 个空格，于是中文列右边的列整体错位。
+    """
+    import unicodedata
+
+    return sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in text)
+
+
+def _pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - _disp_width(text))
+
+
+def _print_providers() -> int:
+    """人类可读的提供商清单 —— 比 --probe 的 JSON 更适合排环境问题。"""
+    from prompt_ids.detectors.semantic import provider_table
+
+    rows = provider_table()
+    available = [r for r in rows if r["available"]]
+    headers = ("提供商", "状态", "默认模型", "Key 环境变量")
+    cells = [
+        (r["provider"], "可用" if r["available"] else "未配置", r["model"] or "—",
+         " / ".join(r["key_env"]) or "（免 Key）")
+        for r in rows
+    ]
+    widths = [
+        max(_disp_width(headers[i]), *(_disp_width(row[i]) for row in cells))
+        for i in range(len(headers))
+    ]
+
+    print(f"共 {len(rows)} 家提供商，当前可用 {len(available)} 家\n")
+    print("  ".join(_pad(h, w) for h, w in zip(headers, widths)).rstrip())
+    print("-" * (sum(widths) + 2 * (len(widths) - 1)))
+    for row in cells:
+        print("  ".join(_pad(c, w) for c, w in zip(row, widths)).rstrip())
+    print()
+    if available:
+        print("可用：" + ", ".join(r["provider"] for r in available))
+    else:
+        print("一家都没配。把 Key 填进项目根目录 .env 即可（模板见 .env.example）。")
+        print("提示：ollama / vllm / lmstudio 免 Key，但要显式 --semantic-backend 才会用。")
+    print("\n写法：--semantic-backend <提供商>，或一行写完 --semantic-backend groq/llama-3.3-70b-versatile")
+    print("模型名会随厂商换代漂移，用 --list-models <提供商> 查当前真实清单。")
+    return EXIT_PASS
+
+
+def _print_models(provider: str) -> int:
+    """向端点查模型清单 —— 模型名换代时的唯一可靠来源。"""
+    from prompt_ids.detectors.semantic import list_models, provider_names
+
+    target = (provider or "").strip().lower()
+    if not target:
+        from prompt_ids.detectors.semantic.providers import resolve_provider
+
+        target = resolve_provider("auto")
+        if not target:
+            print("未指定提供商，且没有已配 Key 的可推断提供商。")
+            print("用法：--list-models deepseek    可选：" + ", ".join(provider_names()))
+            return EXIT_PASS
+        print(f"（未指定提供商，按 auto 选型推断为 {target}）")
+
+    result = list_models(target)
+    if not result.get("ok"):
+        print(f"查询失败：{result.get('error')}")
+        print(f"端点：{result.get('url', '(未配置)')}")
+        return EXIT_FAIL
+
+    print(f"{target} 端点 {result['url']} 共返回 {result['count']} 个模型：\n")
+    for name in result["models"]:
+        print(f"  {name}")
+    return EXIT_PASS
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -129,6 +221,12 @@ def main(argv: list[str] | None = None) -> int:
 
         print(json.dumps(probe(), ensure_ascii=False, indent=2))
         return EXIT_PASS
+
+    if args.list_providers:
+        return _print_providers()
+
+    if args.list_models is not None:
+        return _print_models(args.list_models or "")
 
     pipeline = _make_pipeline(args)
     if args.semantic:

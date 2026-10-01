@@ -55,19 +55,19 @@ class LightweightBackend(SemanticBackend):
 
     def predict(self, text: str) -> Prediction:
         if not text.strip():
-            return Prediction(0.0, "空文本", self.name)
+            return Prediction(0.0, "空文本", self.name, ok=False)
         started = time.perf_counter()
         if not self.is_available():
-            return Prediction(0.0, "轻量模型未训练或依赖缺失", self.name)
+            return Prediction(0.0, "轻量模型未训练或依赖缺失", self.name, ok=False)
         try:
             model = self.load()
         except Exception as exc:
             self._load_error = str(exc)
-            return Prediction(0.0, f"轻量模型加载失败：{exc}", self.name)
+            return Prediction(0.0, f"轻量模型加载失败：{exc}", self.name, ok=False)
         try:
             probability = float(model.predict_proba([text])[0][1])
         except Exception as exc:
-            return Prediction(0.0, f"轻量模型推理失败：{exc}", self.name)
+            return Prediction(0.0, f"轻量模型推理失败：{exc}", self.name, ok=False)
         elapsed = (time.perf_counter() - started) * 1000
         return Prediction(probability, f"TF-IDF+LR p={probability:.3f}", self.name, elapsed)
 

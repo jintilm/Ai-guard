@@ -1,0 +1,420 @@
+{
+  "L1 仅规则": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.2536,
+      "f1": 0.4045,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.6793,
+      "tp": 89,
+      "fp": 0,
+      "tn": 466,
+      "fn": 262
+    },
+    "latency_ms": {
+      "mean": 1.974,
+      "p50": 1.226,
+      "p95": 4.898,
+      "p99": 10.29,
+      "max": 149.668
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 0,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.72,
+        "f1": 0.8372,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8353,
+        "tp": 36,
+        "fp": 0,
+        "tn": 35,
+        "fn": 14
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.1,
+        "f1": 0.1818,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5345,
+        "tp": 6,
+        "fp": 0,
+        "tn": 56,
+        "fn": 54
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.2069,
+        "f1": 0.3429,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7051,
+        "tp": 42,
+        "fp": 0,
+        "tn": 343,
+        "fn": 161
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.1316,
+        "f1": 0.2326,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5286,
+        "tp": 5,
+        "fp": 0,
+        "tn": 32,
+        "fn": 33
+      }
+    }
+  },
+  "L1+L2 规则+启发": {
+    "confusion": {
+      "precision": 1.0,
+      "recall": 0.2564,
+      "f1": 0.4082,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.6805,
+      "tp": 90,
+      "fp": 0,
+      "tn": 466,
+      "fn": 261
+    },
+    "latency_ms": {
+      "mean": 2.432,
+      "p50": 1.591,
+      "p95": 6.062,
+      "p99": 12.633,
+      "max": 75.584
+    },
+    "semantic_calls": 0,
+    "semantic_call_rate": 0.0,
+    "semantic": {},
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 0,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.74,
+        "f1": 0.8506,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8471,
+        "tp": 37,
+        "fp": 0,
+        "tn": 35,
+        "fn": 13
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.1,
+        "f1": 0.1818,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5345,
+        "tp": 6,
+        "fp": 0,
+        "tn": 56,
+        "fn": 54
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.2069,
+        "f1": 0.3429,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7051,
+        "tp": 42,
+        "fp": 0,
+        "tn": 343,
+        "fn": 161
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.1316,
+        "f1": 0.2326,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5286,
+        "tp": 5,
+        "fp": 0,
+        "tn": 32,
+        "fn": 33
+      }
+    }
+  },
+  "L1+L2+L3 (fallback 门禁)": {
+    "confusion": {
+      "precision": 0.9887,
+      "recall": 0.7493,
+      "f1": 0.8525,
+      "false_positive_rate": 0.0064,
+      "specificity": 0.9936,
+      "accuracy": 0.8886,
+      "tp": 263,
+      "fp": 3,
+      "tn": 463,
+      "fn": 88
+    },
+    "latency_ms": {
+      "mean": 7104.015,
+      "p50": 2.293,
+      "p95": 41649.252,
+      "p99": 60013.808,
+      "max": 60020.791
+    },
+    "semantic_calls": 575,
+    "semantic_call_rate": 0.7038,
+    "semantic": {
+      "backend": "llm_judge",
+      "model": "llm_judge",
+      "mode": "fallback",
+      "available": true,
+      "timeout_s": 60.0,
+      "calls": 575,
+      "timeouts": 20,
+      "errors": 0,
+      "avg_latency_ms": 18488.12,
+      "last_error": "语义后端超时（>60.0s）"
+    },
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 302,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.9,
+        "f1": 0.9474,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.9412,
+        "tp": 45,
+        "fp": 0,
+        "tn": 35,
+        "fn": 5
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.5333,
+        "f1": 0.6957,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7586,
+        "tp": 32,
+        "fp": 0,
+        "tn": 56,
+        "fn": 28
+      },
+      "deepset_train": {
+        "precision": 0.9933,
+        "recall": 0.7291,
+        "f1": 0.8409,
+        "false_positive_rate": 0.0029,
+        "specificity": 0.9971,
+        "accuracy": 0.8974,
+        "tp": 148,
+        "fp": 1,
+        "tn": 342,
+        "fn": 55
+      },
+      "garak": {
+        "precision": 0.95,
+        "recall": 1.0,
+        "f1": 0.9744,
+        "false_positive_rate": 0.0625,
+        "specificity": 0.9375,
+        "accuracy": 0.9714,
+        "tp": 38,
+        "fp": 2,
+        "tn": 30,
+        "fn": 0
+      }
+    }
+  },
+  "L1+L2+L3 (always 全量)": {
+    "confusion": {
+      "precision": 0.9893,
+      "recall": 0.7892,
+      "f1": 0.878,
+      "false_positive_rate": 0.0064,
+      "specificity": 0.9936,
+      "accuracy": 0.9058,
+      "tp": 277,
+      "fp": 3,
+      "tn": 463,
+      "fn": 74
+    },
+    "latency_ms": {
+      "mean": 8126.005,
+      "p50": 2.121,
+      "p95": 30646.428,
+      "p99": 60010.583,
+      "max": 1835433.565
+    },
+    "semantic_calls": 817,
+    "semantic_call_rate": 1.0,
+    "semantic": {
+      "backend": "llm_judge",
+      "model": "llm_judge",
+      "mode": "always",
+      "available": true,
+      "timeout_s": 60.0,
+      "calls": 817,
+      "timeouts": 14,
+      "errors": 0,
+      "avg_latency_ms": 19883.62,
+      "last_error": "语义后端超时（>60.0s）"
+    },
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 563,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.98,
+        "f1": 0.9899,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.9882,
+        "tp": 49,
+        "fp": 0,
+        "tn": 35,
+        "fn": 1
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.5667,
+        "f1": 0.7234,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7759,
+        "tp": 34,
+        "fp": 0,
+        "tn": 56,
+        "fn": 26
+      },
+      "deepset_train": {
+        "precision": 0.9936,
+        "recall": 0.7685,
+        "f1": 0.8667,
+        "false_positive_rate": 0.0029,
+        "specificity": 0.9971,
+        "accuracy": 0.9121,
+        "tp": 156,
+        "fp": 1,
+        "tn": 342,
+        "fn": 47
+      },
+      "garak": {
+        "precision": 0.95,
+        "recall": 1.0,
+        "f1": 0.9744,
+        "false_positive_rate": 0.0625,
+        "specificity": 0.9375,
+        "accuracy": 0.9714,
+        "tp": 38,
+        "fp": 2,
+        "tn": 30,
+        "fn": 0
+      }
+    }
+  },
+  "L3 仅语义": {
+    "confusion": {
+      "precision": 0.9893,
+      "recall": 0.792,
+      "f1": 0.8797,
+      "false_positive_rate": 0.0064,
+      "specificity": 0.9936,
+      "accuracy": 0.907,
+      "tp": 278,
+      "fp": 3,
+      "tn": 463,
+      "fn": 73
+    },
+    "latency_ms": {
+      "mean": 481.217,
+      "p50": 0.285,
+      "p95": 0.656,
+      "p99": 14720.21,
+      "max": 60011.71
+    },
+    "semantic_calls": 817,
+    "semantic_call_rate": 1.0,
+    "semantic": {
+      "backend": "llm_judge",
+      "model": "llm_judge",
+      "mode": "always",
+      "available": true,
+      "timeout_s": 60.0,
+      "calls": 817,
+      "timeouts": 3,
+      "errors": 0,
+      "avg_latency_ms": 19670.19,
+      "last_error": "语义后端超时（>60.0s）"
+    },
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 808,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.98,
+        "f1": 0.9899,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.9882,
+        "tp": 49,
+        "fp": 0,
+        "tn": 35,
+        "fn": 1
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.6,
+        "f1": 0.75,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7931,
+        "tp": 36,
+        "fp": 0,
+        "tn": 56,
+        "fn": 24
+      },
+      "deepset_train": {
+        "precision": 0.9936,
+        "recall": 0.7635,
+        "f1": 0.8635,
+        "false_positive_rate": 0.0029,
+        "specificity": 0.9971,
+        "accuracy": 0.9103,
+        "tp": 155,
+        "fp": 1,
+        "tn": 342,
+        "fn": 48
+      },
+      "garak": {
+        "precision": 0.95,
+        "recall": 1.0,
+        "f1": 0.9744,
+        "false_positive_rate": 0.0625,
+        "specificity": 0.9375,
+        "accuracy": 0.9714,
+        "tp": 38,
+        "fp": 2,
+        "tn": 30,
+        "fn": 0
+      }
+    }
+  }
+}

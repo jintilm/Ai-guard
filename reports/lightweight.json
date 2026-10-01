@@ -1,0 +1,71 @@
+{
+  "holdout": {
+    "precision": 1.0,
+    "recall": 0.8167,
+    "f1": 0.8991,
+    "false_positive_rate": 0.0,
+    "specificity": 1.0,
+    "accuracy": 0.9052,
+    "tp": 49,
+    "fp": 0,
+    "tn": 56,
+    "fn": 11,
+    "total": 116
+  },
+  "pool": {
+    "total": 817,
+    "attack": 351,
+    "benign": 466
+  },
+  "sources": {
+    "deepset_train": 546,
+    "deepset_test": 116,
+    "builtin": 85,
+    "garak": 70
+  },
+  "train": {
+    "total": 701,
+    "attack": 291,
+    "benign": 410
+  },
+  "holdout_n": 116,
+  "cross_validation": {
+    "precision": 0.916,
+    "recall": 0.8247,
+    "f1": 0.868,
+    "false_positive_rate": 0.0537,
+    "specificity": 0.9463,
+    "accuracy": 0.8959,
+    "tp": 240,
+    "fp": 22,
+    "tn": 388,
+    "fn": 51,
+    "total": 701
+  },
+  "train_fit": {
+    "precision": 0.9966,
+    "recall": 1.0,
+    "f1": 0.9983,
+    "false_positive_rate": 0.0024,
+    "specificity": 0.9976,
+    "accuracy": 0.9986,
+    "tp": 291,
+    "fp": 1,
+    "tn": 409,
+    "fn": 0,
+    "total": 701
+  },
+  "holdout_contaminated": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "false_positive_rate": 0.0,
+    "specificity": 1.0,
+    "accuracy": 1.0,
+    "tp": 60,
+    "fp": 0,
+    "tn": 56,
+    "fn": 0,
+    "total": 116
+  }
+}
