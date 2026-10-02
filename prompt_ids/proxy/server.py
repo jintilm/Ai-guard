@@ -128,10 +128,25 @@ class ProxyConfig:
         max_tool_segments: int = 32,
         # 全部段共享的字符预算：规则层约 5.4µs/字符，2MB body ≈ 11s CPU
         max_total_scan_chars: int = 60_000,
+        # **客户端**鉴权用的 Key（与 `PROMPT_IDS_UPSTREAM_KEY` 完全是两件事：
+        # 后者是给上游的凭据，客户端的 Authorization 头会被透传给它）。
+        #
+        # 为什么代理现在也需要这个：容器/K8s 部署必然 `--host 0.0.0.0`
+        # （Pod 里 127.0.0.1 别的容器摸不到），而此前**没有任何东西挡得住**
+        # 同网段的任何人 —— 限流不是鉴权。此前唯一「正确姿势」是文档里的一句话，
+        # 没有可运行的示例。现在有了开关与 `scripts/deploy_check.py`。
+        #
+        # ⚠ 用独立的 env 名而不是复用 `PROMPT_IDS_API_KEY`：复用会让「我给 API
+        # 配了鉴权」被误读成「代理也有鉴权」，而那两处的威胁面完全不同。
+        # **默认空 = 不鉴权**，保持既有行为不变；对外暴露时 `net.py` 会告警。
+        client_key: str = "",
     ):
         self.upstream = (upstream or _first_env("PROMPT_IDS_UPSTREAM", "OPENAI_BASE_URL",
                                                 default="https://api.openai.com/v1")).rstrip("/")
         self.api_key = api_key if api_key is not None else _first_env("PROMPT_IDS_UPSTREAM_KEY", "OPENAI_API_KEY")
+        # 客户端鉴权用**独立**的 env 名（见 __init__ 里的注释：不能复用
+        # PROMPT_IDS_API_KEY，否则「给 API 配了鉴权」会被误读成代理也有）
+        self.client_key = client_key or _first_env("PROMPT_IDS_PROXY_CLIENT_KEY", default="")
         self.port = port
         self.host = host
         self.timeout_s = timeout_s
@@ -564,8 +579,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
             "type": "method_not_allowed", "code": "method_not_allowed"}})
 
     def do_GET(self) -> None:
+        # 健康检查**不鉴权**：编排系统（compose / K8s）探针通常不带自定义头，
+        # 而 /healthz 只回 {status, upstream}，没有敏感信息。
+        # ⚠ upstream 那部分是 URL —— 别把它当成「无害」：某些网关把凭据放
+        # query 里。所以这里只回「配置了没配置」，不回 URL 本身。
         if self.path.rstrip("/") in ("/healthz", "/health"):
-            self._send_json(200, {"status": "ok", "upstream": self.config.upstream})
+            self._send_json(200, {"status": "ok",
+                                  "upstream_configured": bool(self.config.upstream)})
+            return
+        if not self._client_authorized():
+            self._send_json(401, {"error": {
+                "message": "缺少或错误的客户端 Key（X-API-Key）",
+                "type": "unauthorized", "code": "unauthorized"}})
             return
         self._passthrough("GET", b"")
 
@@ -629,7 +654,33 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if total > max_bytes:
                 return False, total
 
+    def _client_authorized(self) -> bool:
+        """客户端鉴权（`PROMPT_IDS_PROXY_CLIENT_KEY`，默认空 = 不鉴权）。
+
+        ⚠ 与 `self.config.api_key` **完全无关**：那个是给上游的凭据，
+        而客户端的 Authorization 头会被**透传**给它（`_upstream_headers`）。
+        混用会导致「客户端令牌顶掉上游凭据」或「上游凭据被当成客户端令牌」。
+        """
+        from prompt_ids.auth import authorized
+
+        return authorized(self.headers, self.config.client_key)
+
+    def _reject_unauthorized(self) -> None:
+        """401。**先排空 body 再响应**，否则客户端收到的是 RST 而不是 401
+        （与 413 / 411 同一个坑，本项目已因此复发三次）。"""
+        self._drain(len(self.headers.get("Content-Length") or 0) or 0)
+        if self.headers.get("Transfer-Encoding", "").lower().strip() == "chunked":
+            self._drain_chunked()
+        self._send_json(401, {"error": {
+            "message": "缺少或错误的客户端 Key（X-API-Key）",
+            "type": "unauthorized", "code": "unauthorized"}})
+
     def do_POST(self) -> None:
+        # 鉴权在读 body **之前**：与限流同一个理由 —— 否则被拒的请求仍然能
+        # 把 2MB body 灌进代理，等于给未鉴权的调用方一个免费的流量放大器。
+        if not self._client_authorized():
+            self._reject_unauthorized()
+            return
         # 限流在**读 body 之前**判：否则被限流的请求仍然能把 2MB body 灌进代理
         if self._rate_limited():
             self._drain(len(self.headers.get("Content-Length") or 0) or 0)
@@ -1279,10 +1330,11 @@ def _leak_event(leak) -> bytes:
 
 
 def create_server(config: ProxyConfig) -> ThreadingHTTPServer:
-    # 代理**没有客户端鉴权**：config.api_key 是给上游用的凭据，而客户端的
-    # Authorization 头被原样透传（见 `_upstream_headers`）。按 IP 的限流与
-    # canary 签发配额都不是鉴权。所以绑非回环地址必须显式告警。
-    warn_if_exposed(config.host, service="透明代理", authenticated=False)
+    # `client_key` 配了 ⇒ 有客户端鉴权（`X-API-Key`）。⚠ 与 `api_key` 无关：
+    # 那个是给上游的凭据，客户端的 Authorization 头会被**透传**给它。
+    # 按 IP 的限流与 canary 签发配额**都不是鉴权**。
+    warn_if_exposed(config.host, service="透明代理",
+                    authenticated=bool(config.client_key))
     handler = type("BoundProxyHandler", (ProxyHandler,), {"config": config})
     return ThreadingHTTPServer((config.host, config.port), handler)
 

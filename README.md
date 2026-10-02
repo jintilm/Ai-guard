@@ -1434,7 +1434,33 @@ agent_bench 10 · rules_redos 9 · preprocess 8 · engine 7 · decoder 6 · pint
 - 单进程单实例设计：`/v1/metrics` 里的 `cache.scope == "process"`，
   多副本部署时那个命中率**不可跨实例比较**
 - 容器化部署必须 `--host 0.0.0.0`（Pod 内 `127.0.0.1` 别的容器摸不到），
-  请务必前置反向代理做 TLS/鉴权 —— compose 只把端口发布到宿主回环，不替你做鉴权
+  所以**需要鉴权**。但不必只靠反代 —— 三个入口现在都能自己鉴权
+  （默认关闭，保持既有行为不变）：
+
+  | 入口 | 开关 | 环境变量 |
+  |---|---|---|
+  | 代理 | `--client-key` | `PROMPT_IDS_PROXY_CLIENT_KEY` |
+  | 检测台 | `--client-key` | `PROMPT_IDS_WEB_CLIENT_KEY` |
+  | REST API | `--api-key` | `PROMPT_IDS_API_KEY` |
+
+  ⚠ 刻意用**三个不同的变量名**：复用同一个会让「我给 API 开了鉴权」被误读成
+  三个入口都开了，而它们的威胁面完全不同 —— 代理的 `Authorization` 头是
+  **透传给上游**的，所以它只能用 `X-API-Key` 表达自己的凭据。
+  `/healthz` **不鉴权**（编排探针不带业务凭据，而它只回 `{status}`）；
+  看板 HTML 也不鉴权（只含实验数字，鉴权会让「拷走就能交」失效）。
+
+  查自己的部署配到位没有：
+
+  ```bash
+  python scripts/deploy_check.py            # 静态检查配置（逐条列三道门 + 哪些查不到）
+  python scripts/deploy_check.py --runtime  # 真起服务验鉴权行为（不联网）
+  ```
+
+  `deploy/nginx.conf` 是**可运行的参考配置**（不是声明），
+  `tests/test_client_auth.py` 逐条断言里面标 ⚠ 的项：TLS、
+  `X-Forwarded-For`（缺它则按 IP 限流把**所有人**算成一个桶，第一个请求就耗尽额度）、
+  `X-API-Key` 透传、体积上限、以及**超时必须 > LLM 的 p90**
+  （nginx 默认 60s 覆盖不住实测 p90≈40s 的长尾 ⇒ 间歇性 504 而服务日志一切正常）
 
 ### 路线图与现状（2026-10）
 

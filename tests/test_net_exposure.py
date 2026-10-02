@@ -75,15 +75,46 @@ def test_no_warning_emits_nothing_at_all_on_loopback():
 
 
 # ---------------------------------------------------------------- 三个入口都接上了
-def test_proxy_declares_itself_unauthenticated():
-    """代理没有客户端鉴权：api_key 是给上游的，客户端 Authorization 是透传的。"""
-    assert "warn_if_exposed" in _source_of("create_server", "prompt_ids.proxy.server")
-    assert "authenticated=False" in _source_of("create_server", "prompt_ids.proxy.server")
+def test_proxy_passes_its_real_auth_state_to_the_exposure_check():
+    """`warn_if_exposed` 的 `authenticated` 必须**跟着配置走**。
+
+    踩过：这条守护原本断言源码里有字面量 `authenticated=False`（那时确实没有
+    鉴权）。后来给代理加了 `--client-key`，实现改成了 `authenticated=bool(...)`
+    —— 守护因此变红，而**如果当初写的是「恒为 False」这条断言被顺手改掉**，
+    就会出现「配了鉴权还在告警」或「没配却不告警」两种静默失效。
+    现在断言的是**依赖关系**：值来自 client_key。
+    """
+    proxy = _source_of("create_server", "prompt_ids.proxy.server")
+    assert "warn_if_exposed" in proxy
+    assert "authenticated=bool(config.client_key)" in proxy
+
+    # 行为层面（比源码字符串可靠）：配了 Key ⇒ 不告警
+    import io
+    from contextlib import redirect_stderr
+
+    from prompt_ids.proxy.server import ProxyConfig, create_server
+
+    err = io.StringIO()
+    with redirect_stderr(err):
+        server = create_server(ProxyConfig(host="0.0.0.0", port=0,
+                                           client_key="configured"))
+    server.server_close()
+    assert err.getvalue() == "", "配了 client_key 却还在告警暴露面"
 
 
-def test_playground_declares_itself_unauthenticated():
-    assert "warn_if_exposed" in _source_of("serve", "prompt_ids.web.playground")
-    assert "authenticated=False" in _source_of("serve", "prompt_ids.web.playground")
+def test_playground_passes_its_real_auth_state_to_the_exposure_check():
+    playground = _source_of("serve", "prompt_ids.web.playground")
+    assert "warn_if_exposed" in playground
+    assert 'authenticated=bool(client_key)' in playground
+
+    import io
+    from contextlib import redirect_stderr
+
+    err = io.StringIO()
+    with redirect_stderr(err):
+        assert net.exposure_report("0.0.0.0", service="检测台",
+                                   authenticated=True) == ""
+    assert err.getvalue() == ""
 
 
 def test_api_warning_depends_on_its_own_auth_switch():

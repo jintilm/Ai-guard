@@ -32,6 +32,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="关掉出站密钥扫描（默认开：输出里出现第三方凭据会抹成 [REDACTED:*]）")
     parser.add_argument("--rate-limit", type=int, default=0,
                         help="每来源 IP 的请求上限，0 = 关闭（默认）。生产建议显式设置")
+    parser.add_argument("--client-key", default="",
+                        help="客户端鉴权用的 Key（X-API-Key），默认读 "
+                             "PROMPT_IDS_PROXY_CLIENT_KEY，不设 = 不鉴权。"
+                             "⚠ 与 --upstream 的凭据是两件事：客户端的 "
+                             "Authorization 头会被透传给上游。"
+                             "对外监听（--host 0.0.0.0）时强烈建议设置")
     args = parser.parse_args(argv)
 
     pipeline = create_pipeline(
@@ -64,9 +70,17 @@ def main(argv: list[str] | None = None) -> int:
         redact_leak=not args.no_redact,
         scan_secrets=not args.no_scan_secrets,
         rate_limit=args.rate_limit,
+        client_key=args.client_key,
     )
     print(f"上游: {config.upstream}")
     print(f"凭据: {'已配置' if config.api_key else '未配置（上游若为公开网关可忽略）'}")
+    # 客户端鉴权必须**单独报一行**：上游凭据「已配置」很容易被读成「代理有鉴权」，
+    # 而这两件事完全无关 —— 客户端的 Authorization 头会被透传给上游。
+    if config.client_key:
+        print("客户端鉴权: 已启用（X-API-Key）")
+    else:
+        print("客户端鉴权: 未启用 ⚠ 对外监听（--host 0.0.0.0）时必须用 --client-key "
+              "或前置反向代理，否则同网段任何人都能调用")
     print(f"审计: {config.audit.path or '关闭'}")
     print(f"语义层: {'启用 ' + args.semantic_mode if args.semantic else '关闭'}")
     print(f"出站密钥扫描: {'开启' if config.scan_secrets else '关闭'}")

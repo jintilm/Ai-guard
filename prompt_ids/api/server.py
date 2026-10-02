@@ -130,7 +130,12 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         # 鉴权：配置了 Key 就必须提供
-        if self.config.auth_required and not self._authorized():
+        # ⚠ **健康检查豁免**：编排探针（compose healthcheck / K8s liveness）
+        #   不会带业务凭据，若 `/healthz` 也要求 Key，容器会被反复判死并重启 ——
+        #   而服务其实好着。`handle_health` 只回 {status, detectors}，没有敏感信息。
+        #   探针与业务端口分开暴露的部署仍可选择收紧（反代层按路径拦）。
+        if (self.config.auth_required and not self._authorized()
+                and self.path.split("?")[0] not in ("/healthz", "/health")):
             self._drain_body()
             self._error(401, "unauthorized", "缺少或错误的 API Key")
             return
@@ -183,11 +188,12 @@ class ApiHandler(BaseHTTPRequestHandler):
         self._send(status, body)
 
     def _authorized(self) -> bool:
-        provided = self.headers.get("X-API-Key", "")
-        auth = self.headers.get("Authorization", "")
-        if auth.lower().startswith("bearer "):
-            provided = provided or auth[7:].strip()
-        return provided == self.config.api_key
+        # 与 proxy / web 检测台共用 `prompt_ids.auth`（`hmac.compare_digest`
+        # 而不是 `==`）。代理的 Authorization 头是透传给上游的，所以三个入口
+        # 统一用 X-API-Key 承载「本服务的凭据」—— 见 auth 模块 docstring。
+        from prompt_ids.auth import authorized
+
+        return authorized(self.headers, self.config.api_key)
 
     def _content_length(self) -> int:
         """解析 Content-Length，非法值必须是 400 而不是 ValueError 冒泡。"""

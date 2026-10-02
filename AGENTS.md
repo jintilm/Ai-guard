@@ -904,9 +904,46 @@ Pod 里必须 `--host 0.0.0.0`，于是必然落进 ② 那个无鉴权缺口。
 **只发布到宿主回环**且不设 `--api-key` 占位默认值（一个众所周知的默认值比
 「没有鉴权」更糟 —— 后者会触发 `net.py` 往 stderr 打暴露面告警）。
 
-⚠ **仍未给的是「生产部署的安全姿势」**：容器形态下正确做法是
-「服务绑 0.0.0.0 + 前置网关做 TLS/鉴权」，但仓库里没有这份文档或示例配置。
-`README` 已知限制里写明了「代理与检测台没有客户端鉴权」，但那是**声明**不是**方案**。
+### ④ 三条约束之间有一处真实冲突（**已给方案**）
+
+「零依赖静态看板」利于离线，「只绑本机」利于安全，而「容器化部署」**同时要求两者放弃**：
+Pod 里必须 `--host 0.0.0.0`，于是落进「无鉴权暴露面」。
+
+**已修（不是靠反代兜着，是给三个入口都加了开关）**：
+`prompt_ids/auth.py`（`X-API-Key` + `hmac.compare_digest`，与 API 共用一套），
+代理 `--client-key` / `PROMPT_IDS_PROXY_CLIENT_KEY`，
+检测台 `--client-key` / `PROMPT_IDS_WEB_CLIENT_KEY`，API 仍是 `--api-key` / `PROMPT_IDS_API_KEY`。
+⚠ **三个 env 名刻意不同**：复用会让「我给 API 开了鉴权」被误读成三个入口都开了，
+而代理的 `Authorization` 头是**透传给上游**的（它只能用 `X-API-Key` 表达自己的凭据）。
+`/healthz` **不鉴权**（编排探针不带业务凭据，而它只回 `{status}`）；
+看板 HTML 也不鉴权（只含实验数字，鉴权会让「拷走就能交」失效）。
+守护 `tests/test_client_auth.py`（14 项）。
+
+**方案与检查**：`deploy/nginx.conf`（**可运行的参考配置**，不是声明）·
+`scripts/deploy_check.py`（逐条列三道门 + **明确写出哪些查不到**，
+`--runtime` 会真起服务验鉴权行为）· 守护断言 nginx 配置里被标 ⚠ 的项：
+TLS · `X-Forwarded-For`（缺它则按 IP 限流把**所有人**算成一个桶，第一个请求就耗尽额度）
+· `X-API-Key` 透传 · 体积上限 · **超时 > LLM 的 p90**
+（nginx 默认 60s 覆盖不住实测 p90≈40s 的长尾 ⇒ **间歇性 504 而服务日志一切正常**）。
+
+⚠ **反代与内置鉴权是两道独立门，不要只配一道**：反代给了 TLS 但忘了透传
+`X-API-Key` ⇒ 服务侧鉴权等于没开；只配服务侧鉴权不给反代 ⇒ Key 走明文。
+
+### ⑤ 仍未修（当前只剩这 4 项）
+
+1. **Linux CI 腿未实跑** —— 本机无 docker，双平台都没跑过。CI 会替我们回答。
+2. **流式 SSE 推送面板**（第 3 项的一半）—— 出站结论已落审计、
+   看板 4s 轮询可见，但没有推送。做的时候：`PlaygroundState` 加订阅环 +
+   `/v1/stream`，前端登记进 `check_dashboard.py` 的 `checks`。
+   ⚠ **新加鉴权后 SSE 要带 Key**（`fetch` 不能自定义头 ⇒ 用 `EventSource`
+   的话只能走 query 参数，那时要把 Key 挡在 URL 里 —— 别这么做，
+   改成用 `fetch` + `ReadableStream` 手动解析 SSE）。
+3. **转写/翻译的结果文本**（`/v1/audio/transcriptions`、`/v1/audio/translations`
+   的**响应**）不在出站扫描里 —— 那两个端点的输出是模型生成的文本，
+   与 `choices[].message.content` 的路径不同。
+4. **token id 形态的 `input`**（embeddings 的非文本输入）不扫 ——
+   那不是文本，无法用规则扫；正确做法是**记审计说明「输入不是文本、未扫」**，
+   而不是静默跳过。
 
 - **CI 已补**（双平台矩阵）。⚠ Linux 腿未验证。
 - ⚠ **`AGENTS.md` 现在入库了**（用户 2026-10 决定）⇒ 引用纪律与方法学

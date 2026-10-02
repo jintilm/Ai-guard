@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import webbrowser
@@ -1663,6 +1664,15 @@ def build(ablation_path: Path, out: Path, audit_path: Path | None) -> Path:
     return out
 
 
+def _first_env(*names: str, default: str = "") -> str:
+    """取第一个非空的环境变量（与 proxy/api 用同一套，导入期已读 `.env`）。"""
+    for name in names:
+        value = (os.environ.get(name, "") or "").strip()
+        if value:
+            return value
+    return default
+
+
 def _make_context(
     *,
     policy: str = "default",
@@ -1729,6 +1739,7 @@ def serve(out: Path, port: int, refresh_s: int, ablation: Path, audit: Path | No
           semantic_model: str = "", semantic_fallbacks: str = "",
           semantic_local_only: bool = False, memory: bool = False,
           review_corpus_path: str = "",
+          client_key: str = "",
           open_browser: bool = True) -> None:  # pragma: no cover - 需要真实端口
 
     from prompt_ids.web.playground import serve as serve_playground
@@ -1751,10 +1762,17 @@ def serve(out: Path, port: int, refresh_s: int, ablation: Path, audit: Path | No
     rebuild()
     server = serve_playground(
         ctx, str(out), host=host, port=port,
-        refresh_s=refresh_s, rebuild=rebuild,
+        refresh_s=refresh_s, rebuild=rebuild, client_key=client_key,
     )
     url = f"http://{host}:{server.server_address[1]}/{out.name}"
     print(f"检测台已启动 {url}")
+    # 客户端鉴权单独报一行：检测台的 /v1/scan 能让本机替别人跑检测、
+    # /v1/canary/issue 明文发令牌，而「看板能打开」很容易被当成「服务是安全的」。
+    if client_key:
+        print("  客户端鉴权: 已启用（JSON 路由需 X-API-Key；看板 HTML 本身不鉴权）")
+    else:
+        print("  客户端鉴权: 未启用 ⚠ 对外监听（--host 0.0.0.0）时 JSON 路由需 "
+              "--client-key，或前置反向代理")
     print(f"  POST {url.replace(out.name, 'v1/scan')}     单条检测")
     print(f"  POST {url.replace(out.name, 'v1/scan/batch')}  批量检测（每行一条，≤200）")
     print(f"  GET  {url.replace(out.name, 'v1/events')}    最近审计事件（只含指纹）")
@@ -1801,6 +1819,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tiers", default="critical,high,medium", help="启用规则档位")
     parser.add_argument("--rules-dir", default="", help="自定义规则目录")
     parser.add_argument("--policy", default="", help="策略名：default/strict/permissive/log-only")
+    parser.add_argument("--client-key", default="",
+                        help="客户端鉴权用的 Key，默认读 PROMPT_IDS_WEB_CLIENT_KEY，"
+                             "不设 = 不鉴权。⚠ 与 API 入口的 PROMPT_IDS_API_KEY "
+                             "刻意不同名：检测台的 /v1/scan 能让本机替别人跑检测、"
+                             "/v1/canary/issue 明文发令牌。对外监听时必须设置")
     args = parser.parse_args(argv)
 
     out = Path(args.out)
@@ -1816,6 +1839,7 @@ def main(argv: list[str] | None = None) -> int:
             semantic_fallbacks=args.semantic_fallbacks,
             semantic_local_only=args.semantic_local_only, memory=args.memory,
             review_corpus_path=args.review_corpus,
+            client_key=args.client_key or _first_env("PROMPT_IDS_WEB_CLIENT_KEY", default=""),
         )
         return 0
 

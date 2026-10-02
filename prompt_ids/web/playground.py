@@ -35,6 +35,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
+from prompt_ids.auth import authorized
 from prompt_ids.net import warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -43,10 +44,16 @@ MAX_BODY_BYTES = 2 * 1024 * 1024
 class PlaygroundState:
     """进程内共享状态：一个流水线、一个统计计数器。"""
 
-    def __init__(self, ctx: ApiContext, dashboard_path: str, refresh_s: int = 0):
+    def __init__(self, ctx: ApiContext, dashboard_path: str, refresh_s: int = 0,
+                 client_key: str = ""):
         self.ctx = ctx
         self.dashboard_path = dashboard_path
         self.refresh_s = refresh_s
+        #: 客户端鉴权用的 Key（`PROMPT_IDS_WEB_CLIENT_KEY` / `--client-key`）。
+        #: ⚠ 与 API 入口的 `PROMPT_IDS_API_KEY` **刻意不同名**：检测台暴露的是
+        #: `/v1/scan`（让本机替别人跑检测）与 `/v1/canary/issue`（领令牌），
+        #: 复用同一个变量名会让「我给 API 开了鉴权」被误读成检测台也开了。
+        self.client_key = client_key
         self._lock = threading.Lock()
 
     def scan(self, text: str, user: str = "playground", policy: str | None = None) -> dict[str, Any]:
@@ -89,6 +96,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _drain(self, length: int) -> None:
+        """把请求体分块读干净再响应（不装进内存）。
+
+        401 也必须排空：客户端还在发 body 时服务端写错误并关连接 ⇒ RST，
+        前端 `fetch` 看到的是 `ConnectionResetError` 而不是 401，
+        于是「鉴权没配」会被读成「服务崩了」。与 413 / proxy 的 401 同一套做法。
+        """
+        remaining = max(0, length)
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 65536))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+
     def _read_body(self) -> Any:
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY_BYTES:
@@ -127,6 +148,15 @@ class Handler(BaseHTTPRequestHandler):
                 "hint": "可用：POST /v1/scan、GET /v1/rules、GET /v1/providers、GET /v1/metrics、GET /v1/events",
             })
             return
+
+        # GET 路由的鉴权（POST 在 `do_POST` 里、**读 body 之前**判 ——
+        # 见 `_reject_unauthorized` 的注释：读 body 之后再排空会对着空流阻塞）。
+        if (self._needs_key(path)
+                and not authorized(self.headers, self.state.client_key)):
+            self._send_json(401, {
+                "error": "缺少或错误的客户端 Key（X-API-Key）",
+                "hint": "检测台的 JSON 路由需要鉴权；看板 HTML 本身不需要"})
+            return
         params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         try:
             status, body = handler(self.state.ctx, payload, params)
@@ -160,7 +190,37 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_json(404, {"error": "not_found", "path": parsed.path})
 
+    def _needs_key(self, path: str) -> bool:
+        """这个路径是否需要客户端鉴权。
+
+        只挡 `/v1/*` 与 `/api/*`（JSON 路由）：看板 HTML 与静态文件**不挡** ——
+        它们只含实验数字（可公开的那部分），挡了会让「拷走就能交」失效。
+        """
+        if not self.state.client_key:
+            return False
+        return path.startswith(("/v1/", "/api/"))
+
+    def _reject_unauthorized(self) -> None:
+        """401。
+
+        ⚠ **必须在读 body 之前**调用：`_read_body` 会把 `Content-Length` 那些字节
+        一次读走，之后再按同一个长度去「排空」就是**对着空流等数据** ——
+        `rfile.read()` 会一直阻塞到连接关闭，于是每个未鉴权的请求都挂住一个线程，
+        未鉴权的调用方反而成了 DoS 的触发器（实测：请求直接超时，线程不释放）。
+        这也是 413 那条「先排空再响应」在**读 body 之前**判的同一个道理。
+        """
+        length = int(self.headers.get("Content-Length") or 0) or 0
+        if length:
+            self._drain(length)
+        self._send_json(401, {
+            "error": "缺少或错误的客户端 Key（X-API-Key）",
+            "hint": "检测台的 JSON 路由需要鉴权；看板 HTML 本身不需要"})
+
     def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        if self._needs_key(parsed.path) and not authorized(self.headers, self.state.client_key):
+            self._reject_unauthorized()
+            return
         try:
             payload = self._read_body()
         except ApiError as exc:
@@ -181,17 +241,20 @@ def serve(
     port: int = 8765,
     refresh_s: int = 0,
     rebuild=None,
+    client_key: str = "",
 ) -> ThreadingHTTPServer:
     """起服务并返回 server 对象（调用方决定何时 shutdown）。
 
     `rebuild` 给定时会起一个后台线程按 `refresh_s` 重新生成看板 ——
     这样「实验数字」和「在线检测」在同一个页面上都是最新的。
+
+    `client_key` 非空 ⇒ `/v1/*` 路由需要 `X-API-Key`。**看板 HTML 不鉴权**
+    （它只含实验数字，鉴权会让「拷走就能交」失效）。
     """
-    state = PlaygroundState(ctx, dashboard_path, refresh_s)
-    # 检测台**完全没有鉴权概念**（api 那套 PROMPT_IDS_API_KEY 不在这里）：
-    # 暴露的是 /v1/scan、/v1/review、/v1/canary/issue、/v1/events。
-    # 绑非回环地址必须显式告警，否则「让同事看看看板」就等于开了一个无鉴权服务。
-    warn_if_exposed(host, service="检测台", authenticated=False)
+    state = PlaygroundState(ctx, dashboard_path, refresh_s, client_key)
+    # 暴露的是 /v1/scan（让本机替别人跑检测）、/v1/canary/issue（明文发令牌）
+    # —— 配了 client_key 才算有门；绑非回环时 warn_if_exposed 会把缺门说出来。
+    warn_if_exposed(host, service="检测台", authenticated=bool(client_key))
     server = ThreadingHTTPServer((host, port), attach(state))
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
