@@ -1,0 +1,5460 @@
+{
+  "dataset": "data\\pint_recall.jsonl",
+  "n": 549,
+  "attacks": 298,
+  "groups": {
+    "L1 仅规则": {
+      "confusion": {
+        "precision": 0.9688,
+        "recall": 0.104,
+        "f1": 0.1879,
+        "false_positive_rate": 0.004,
+        "specificity": 0.996,
+        "accuracy": 0.5118,
+        "tp": 31,
+        "fp": 1,
+        "tn": 250,
+        "fn": 267,
+        "flagged_rate": 0.0583,
+        "top_patterns": [
+          {
+            "pattern": "PV-C001",
+            "hits": 14
+          },
+          {
+            "pattern": "PV-C015",
+            "hits": 6
+          },
+          {
+            "pattern": "PV-C003",
+            "hits": 5
+          }
+        ]
+      },
+      "review_view": {
+        "precision": 0.9688,
+        "recall": 0.104,
+        "f1": 0.1879,
+        "false_positive_rate": 0.004,
+        "specificity": 0.996,
+        "accuracy": 0.5118,
+        "tp": 31,
+        "fp": 1,
+        "tn": 250,
+        "fn": 267,
+        "flagged_rate": 0.0583,
+        "top_patterns": [
+          {
+            "pattern": "PV-C001",
+            "hits": 14
+          },
+          {
+            "pattern": "PV-C015",
+            "hits": 6
+          },
+          {
+            "pattern": "PV-C003",
+            "hits": 5
+          }
+        ]
+      },
+      "latency_ms": {
+        "mean": 0.633,
+        "p50": 0.483,
+        "p95": 1.058,
+        "p99": 1.254,
+        "max": 66.071
+      },
+      "scanned": 549,
+      "truncated": false,
+      "by_category": {
+        "pint_benign_input:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_chat:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_external_pallms:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 0.3929,
+            "f1": 0.5641,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.3929,
+            "tp": 11,
+            "fp": 0,
+            "tn": 0,
+            "fn": 17,
+            "flagged_rate": 0.3929,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 9
+              },
+              {
+                "pattern": "PV-C002",
+                "hits": 1
+              },
+              {
+                "pattern": "PV-C015",
+                "hits": 1
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 0.3929,
+            "f1": 0.5641,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.3929,
+            "tp": 11,
+            "fp": 0,
+            "tn": 0,
+            "fn": 17,
+            "flagged_rate": 0.3929,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 9
+              },
+              {
+                "pattern": "PV-C002",
+                "hits": 1
+              },
+              {
+                "pattern": "PV-C015",
+                "hits": 1
+              }
+            ]
+          },
+          "n": 28
+        },
+        "pint_hard_negatives:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0833,
+            "specificity": 0.9167,
+            "accuracy": 0.9167,
+            "tp": 0,
+            "fp": 1,
+            "tn": 11,
+            "fn": 0,
+            "flagged_rate": 0.0833,
+            "top_patterns": [
+              {
+                "pattern": "PV-C020",
+                "hits": 1
+              }
+            ]
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0833,
+            "specificity": 0.9167,
+            "accuracy": 0.9167,
+            "tp": 0,
+            "fp": 1,
+            "tn": 11,
+            "fn": 0,
+            "flagged_rate": 0.0833,
+            "top_patterns": [
+              {
+                "pattern": "PV-C020",
+                "hits": 1
+              }
+            ]
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_instruction_override:de": {
+          "lang": "de",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C015",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C015",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_instruction_override:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_instruction_override:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_instruction_override:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_instruction_override:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_instruction_override:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C003",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C003",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C005",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C005",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_short_input:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 5,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 5,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_short_input:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_system_prompt_extraction:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        }
+      },
+      "semantic_calls": 0
+    },
+    "L1+L2 规则+启发": {
+      "confusion": {
+        "precision": 0.9688,
+        "recall": 0.104,
+        "f1": 0.1879,
+        "false_positive_rate": 0.004,
+        "specificity": 0.996,
+        "accuracy": 0.5118,
+        "tp": 31,
+        "fp": 1,
+        "tn": 250,
+        "fn": 267,
+        "flagged_rate": 0.0583,
+        "top_patterns": [
+          {
+            "pattern": "HZ-001",
+            "hits": 26
+          },
+          {
+            "pattern": "HZ-002",
+            "hits": 21
+          },
+          {
+            "pattern": "PV-C001",
+            "hits": 14
+          }
+        ]
+      },
+      "review_view": {
+        "precision": 0.8167,
+        "recall": 0.1644,
+        "f1": 0.2737,
+        "false_positive_rate": 0.0438,
+        "specificity": 0.9562,
+        "accuracy": 0.5264,
+        "tp": 49,
+        "fp": 11,
+        "tn": 240,
+        "fn": 249,
+        "flagged_rate": 0.1093,
+        "top_patterns": [
+          {
+            "pattern": "HZ-001",
+            "hits": 53
+          },
+          {
+            "pattern": "HZ-002",
+            "hits": 49
+          },
+          {
+            "pattern": "PV-C001",
+            "hits": 14
+          }
+        ]
+      },
+      "latency_ms": {
+        "mean": 0.62,
+        "p50": 0.547,
+        "p95": 1.157,
+        "p99": 1.341,
+        "max": 27.032
+      },
+      "scanned": 549,
+      "truncated": false,
+      "by_category": {
+        "pint_benign_input:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_benign_input:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 8,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 8
+        },
+        "pint_chat:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_chat:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 16,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 16
+        },
+        "pint_external_pallms:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 0.3929,
+            "f1": 0.5641,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.3929,
+            "tp": 11,
+            "fp": 0,
+            "tn": 0,
+            "fn": 17,
+            "flagged_rate": 0.3929,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 10
+              },
+              {
+                "pattern": "PV-C001",
+                "hits": 9
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 8
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 0.5357,
+            "f1": 0.6977,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.5357,
+            "tp": 15,
+            "fp": 0,
+            "tn": 0,
+            "fn": 13,
+            "flagged_rate": 0.5357,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 13
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 12
+              },
+              {
+                "pattern": "PV-C001",
+                "hits": 9
+              }
+            ]
+          },
+          "n": 28
+        },
+        "pint_hard_negatives:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0833,
+            "specificity": 0.9167,
+            "accuracy": 0.9167,
+            "tp": 0,
+            "fp": 1,
+            "tn": 11,
+            "fn": 0,
+            "flagged_rate": 0.0833,
+            "top_patterns": [
+              {
+                "pattern": "PV-C020",
+                "hits": 1
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 1
+              }
+            ]
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.25,
+            "specificity": 0.75,
+            "accuracy": 0.75,
+            "tp": 0,
+            "fp": 3,
+            "tn": 9,
+            "fn": 0,
+            "flagged_rate": 0.25,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 3
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 2
+              },
+              {
+                "pattern": "PV-C020",
+                "hits": 1
+              }
+            ]
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.5833,
+            "specificity": 0.4167,
+            "accuracy": 0.4167,
+            "tp": 0,
+            "fp": 7,
+            "tn": 5,
+            "fn": 0,
+            "flagged_rate": 0.5833,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 7
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 7
+              },
+              {
+                "pattern": "PV-M017",
+                "hits": 1
+              }
+            ]
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0833,
+            "specificity": 0.9167,
+            "accuracy": 0.9167,
+            "tp": 0,
+            "fp": 1,
+            "tn": 11,
+            "fn": 0,
+            "flagged_rate": 0.0833,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 1
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 1
+              }
+            ]
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_hard_negatives:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 12,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 12
+        },
+        "pint_instruction_override:de": {
+          "lang": "de",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C015",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 3
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C015",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 3
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_instruction_override:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_instruction_override:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_instruction_override:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 0.8,
+            "f1": 0.8889,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.8,
+            "tp": 4,
+            "fp": 0,
+            "tn": 0,
+            "fn": 1,
+            "flagged_rate": 0.8,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 4
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 4
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_instruction_override:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_instruction_override:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C003",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C003",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:en": {
+          "lang": "en",
+          "block": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C005",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "PV-C005",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_developer_mode:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_fiction_wrapper:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_jailbreak_grandma_sleeper:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_obfuscation:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_privilege_escalation:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_role_tag_escape:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_short_input:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 5,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 5,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_short_input:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_short_input:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 1.0,
+            "accuracy": 1.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 6,
+            "fn": 0,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 6
+        },
+        "pint_system_prompt_extraction:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 1.0,
+            "tp": 5,
+            "fp": 0,
+            "tn": 0,
+            "fn": 0,
+            "flagged_rate": 1.0,
+            "top_patterns": [
+              {
+                "pattern": "HZ-001",
+                "hits": 5
+              },
+              {
+                "pattern": "HZ-002",
+                "hits": 5
+              }
+            ]
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_system_prompt_extraction:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:de": {
+          "lang": "de",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:en": {
+          "lang": "en",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:es": {
+          "lang": "es",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:fr": {
+          "lang": "fr",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:ja": {
+          "lang": "ja",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        },
+        "pint_tool_injection:zh": {
+          "lang": "zh",
+          "block": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "review": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "false_positive_rate": 0.0,
+            "specificity": 0.0,
+            "accuracy": 0.0,
+            "tp": 0,
+            "fp": 0,
+            "tn": 0,
+            "fn": 5,
+            "flagged_rate": 0.0,
+            "top_patterns": []
+          },
+          "n": 5
+        }
+      },
+      "semantic_calls": 0
+    }
+  }
+}

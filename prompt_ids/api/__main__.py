@@ -31,6 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--memory-threshold", type=float, default=0.86)
     parser.add_argument("--memory-dir", default="", help="记忆库目录，存在则加载")
     parser.add_argument("--audit", default="", help="审计日志路径（JSONL，只记指纹不记原文）")
+    parser.add_argument("--review-corpus", default="",
+                        help="复核语料路径（JSONL，**含原文**）。不配就不写。"
+                             "用于把人工结论喂回规则迭代；会自动加进 .gitignore")
     args = parser.parse_args(argv)
 
     ctx = ApiContext(
@@ -42,7 +45,15 @@ def main(argv: list[str] | None = None) -> int:
         memory_threshold=args.memory_threshold,
         memory_dir=args.memory_dir,
         audit_path=args.audit,
+        review_corpus_path=args.review_corpus,
     )
+    if args.review_corpus:
+        # 语料含原文，必须挡住误提交。只加精确路径，不用通配符 ——
+        # 通配符会顺手盖掉别的数据文件，那是不可逆的副作用。
+        from prompt_ids.audit.review_corpus import add_to_gitignore
+
+        if add_to_gitignore(args.review_corpus):
+            print(f"已把 {args.review_corpus} 加进 .gitignore（含原文，刻意不入库）")
     if args.semantic:
         ctx.pipeline.warmup()
 

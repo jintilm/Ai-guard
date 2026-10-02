@@ -27,6 +27,14 @@ from prompt_ids.rules.loader import RuleBook
 COLD_START_REPORT_MS = 100.0
 
 
+def _top_pattern(result) -> str:
+    """权重×置信度最高的命中规则。反哺统计按这个口径归因。"""
+    findings = getattr(result, "findings", None) or []
+    if not findings:
+        return ""
+    return max(findings, key=lambda f: f.weight * f.confidence).pattern_id
+
+
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
     fusion: FusionConfig = FusionConfig()
@@ -154,6 +162,57 @@ class Pipeline:
             except Exception:  # noqa: BLE001 - 关停尽力而为，不掩盖真实退出
                 continue
 
+    def review(self, text: str, *, is_attack: bool, reviewer: str = "",
+               note: str = "") -> dict:
+        """人工复核：给一条检测定性，并把结论喂回记忆层。
+
+        这是「检测 → 复核 → 学习」闭环的落点。三个设计点：
+
+        - **记忆层可选**：没开 `--memory`（或没装 faiss）时复核照样能用，
+          只是结论不影响后续判定，返回 `memory_reason="memory_disabled"` 而不是报错。
+        - **标记误报 = 负向记忆**：走 `feedback(is_attack=False)`，与 L4 既有的
+          双向记忆是同一条通路，不为复核另造一套写入逻辑。
+        - **这里能拿到原文，是因为调用方手里就有**（REST 请求体 / 控制台输入）。
+          审计侧仍然只记指纹 —— 见 `audit.event_from_review` 的说明。
+        """
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("复核需要非空文本")
+        result = self.scan(text, user=reviewer or "reviewer")
+        detector = self.memory_detector
+        absorbed, reason = False, "memory_disabled"
+        if detector is not None and getattr(detector, "enabled", False):
+            # 记下计数器增量再调用：learn() 返回 False 有多种原因（指纹重复、
+            # 容量满、编码器不可用…），混成一句「rejected」会让运维无法判断
+            # 是「这条已经在库里」还是「库满了」，这两种要采取的动作完全不同。
+            before = (detector.deduped, detector.rejected, detector.learned)
+            absorbed = detector.feedback(
+                text, is_attack=is_attack, note=note or "manual review")
+            after = (detector.deduped, detector.rejected, detector.learned)
+            if absorbed:
+                reason = "absorbed"
+            elif after[0] > before[0]:
+                reason = "duplicate_fingerprint"
+            elif after[1] > before[1]:
+                reason = "rejected_by_gate_or_capacity"
+            elif after[2] == before[2]:
+                reason = "encoder_unavailable"
+            else:  # pragma: no cover - 计数器没动但也没成功，属于不该出现的情况
+                reason = "unknown"
+        return {
+            "verdict": "attack" if is_attack else "false_positive",
+            "level": result.level.value,
+            "action": result.action.value,
+            "score": result.score,
+            "fingerprint": result.fingerprint,
+            # 归因：这条结论是**哪些规则**判出来的。反哺规则的第一步就是它 ——
+            # 没有它，「PV-C001 误报率多高」这种问题根本无法回答，只能靠猜。
+            "patterns": [f.pattern_id for f in result.findings],
+            "top_pattern": _top_pattern(result),
+            "memory_absorbed": absorbed,
+            "memory_reason": reason,
+        }
+
     # ---------- 主流程 ----------
     def cache_key(self, fp: str, policy_name: str | None = None) -> str:
         """缓存键必须包含一切会影响判定结果的维度。
@@ -175,7 +234,8 @@ class Pipeline:
             parts.append(f"mem={mem.version}")
         return "|".join(parts)
 
-    def scan(self, text: str, user: str = "default", policy_name: str | None = None) -> ScanResult:
+    def scan(self, text: str, user: str = "default", policy_name: str | None = None,
+             *, semantic: bool | None = None) -> ScanResult:
         started = time.perf_counter()
         if text is None:
             text = ""
@@ -233,6 +293,20 @@ class Pipeline:
         detectors = [d for d in self.registry if d.enabled]
         for index, detector in enumerate(detectors):
             # 预筛门禁：L3 是否调用由前置层的初判分决定
+            # 「这次别用语义层」这道门按 **layer == 3** 判，不按 isinstance：
+            # 「第 3 层是语义层」是结构约定，写死具体类会让任何别的 L3 实现
+            # （含测试替身）绕过它。
+            # 但下面的预筛/预算门**仍然**只对真正的 SemanticDetector 生效 ——
+            # 那两道门要读 should_invoke()，别把它顺手扩成所有 layer 3 的检测器
+            # （扩过一次，直接弄挂了 test_warmup_survives_broken_backend 的替身）。
+            if getattr(detector, "layer", 0) == 3 and semantic is False:
+                # 调用方显式要求跳过 L3。目前只有代理的 system/developer 段在用它：
+                # 那类消息是**应用自己写的**，而 DeBERTa / LLM 裁判把「对助手的祈使句」
+                # 判成注入 —— system 提示按定义就是对助手的祈使句，于是每个 RAG 请求
+                # 都会被自己的系统提示拦下（实测良性 RAG 请求 block 率 0.5278 → 0.0833）。
+                # 规则层照跑，经典系统提示窃取照样抓得到。
+                skipped.append(detector.name)
+                continue
             if isinstance(detector, SemanticDetector) and detector.layer == 3:
                 preliminary = fuse(subscores, self.config.fusion)
                 if not detector.should_invoke(preliminary, grade(preliminary, self.config.fusion).value):

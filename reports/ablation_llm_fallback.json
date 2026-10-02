@@ -1,0 +1,98 @@
+{
+  "L1+L2+L3 (fallback 门禁)": {
+    "confusion": {
+      "precision": 0.9895,
+      "recall": 0.8091,
+      "f1": 0.8903,
+      "false_positive_rate": 0.0064,
+      "specificity": 0.9936,
+      "accuracy": 0.9143,
+      "tp": 284,
+      "fp": 3,
+      "tn": 463,
+      "fn": 67
+    },
+    "latency_ms": {
+      "mean": 1.688,
+      "p50": 1.106,
+      "p95": 4.028,
+      "p99": 7.461,
+      "max": 96.345
+    },
+    "semantic_calls": 561,
+    "semantic_call_rate": 0.6867,
+    "semantic": {
+      "backend": "llm_judge",
+      "model": "llm_judge",
+      "mode": "fallback",
+      "available": true,
+      "timeout_s": 45.0,
+      "calls": 561,
+      "timeouts": 0,
+      "errors": 0,
+      "avg_latency_ms": 14057.13,
+      "last_error": null
+    },
+    "reliability": {
+      "calls": 561,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 817,
+    "truncated": false,
+    "cache_hits": 561,
+    "by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.88,
+        "f1": 0.9362,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.9294,
+        "tp": 44,
+        "fp": 0,
+        "tn": 35,
+        "fn": 6
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.6167,
+        "f1": 0.7629,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.8017,
+        "tp": 37,
+        "fp": 0,
+        "tn": 56,
+        "fn": 23
+      },
+      "deepset_train": {
+        "precision": 0.994,
+        "recall": 0.8128,
+        "f1": 0.8943,
+        "false_positive_rate": 0.0029,
+        "specificity": 0.9971,
+        "accuracy": 0.9286,
+        "tp": 165,
+        "fp": 1,
+        "tn": 342,
+        "fn": 38
+      },
+      "garak": {
+        "precision": 0.95,
+        "recall": 1.0,
+        "f1": 0.9744,
+        "false_positive_rate": 0.0625,
+        "specificity": 0.9375,
+        "accuracy": 0.9714,
+        "tp": 38,
+        "fp": 2,
+        "tn": 30,
+        "fn": 0
+      }
+    }
+  }
+}

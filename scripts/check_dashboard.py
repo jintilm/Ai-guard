@@ -125,10 +125,26 @@ def main() -> int:
         "source-list": ("分数据源对比", lambda v: v.count("<li") >= 3),
         "rule-chips": ("规则库构成", lambda v: "chip" in v),
         "dataset-list": ("数据集构成", lambda v: v.count("<li") >= 2),
+        # 间接注入面卡片：数字必须真的渲染出来，而且不能是空的占位
+        "indirect-body": ("间接注入面", lambda v: v.count("<tr") >= 3 and "0.2583" in v),
+        "sampling-body": ("取样覆盖", lambda v: v.count("<tr") >= 3 and "%" in v),
+        "agent-body": ("agent 面", lambda v: v.count("<tr") >= 2 and "0.0000" in v),
+        "policy-body": ("分角色策略", lambda v: v.count("<tr") == 2 and "0.0833" in v),
+        "output-body": ("出站检测", lambda v: v.count("<tr") == 4 and "16/16" in v
+                      and "0 / 5449" in v),
+        "sweep-body": ("策略影响", lambda v: v.count("<tr") == 4 and "0.1694" in v),
+        "knee-body": ("阈值取舍", lambda v: v.count("<tr") == 3 and "43.02" in v),
     }
     ok = 0
     for key, (name, test) in checks.items():
         value = store.get(key, "")
+        # 卡片靠 reports/indirect.json 才出：没这个文件时区域本来就该是空的，
+        # 那不算失败（宁可少一张卡，也不要硬凑一个数字）。
+        optional = key in ("indirect-body", "sampling-body", "agent-body", "policy-body",
+                           "output-body", "sweep-body", "knee-body")
+        if optional and not value:
+            print(f"[SKIP ] {name:<12} reports/indirect.json 不存在，看板按设计不出这张卡")
+            continue
         passed = bool(value) and test(value)
         ok += passed
         print(f"[{'OK  ' if passed else 'FAIL'}] {name:<12} 长度 {len(value)}")
@@ -141,7 +157,9 @@ def main() -> int:
     print(f"[{'OK  ' if offline_ok else 'FAIL'}] {'检测台离线降级':<10} "
           f"panel={display.get('pg-panel')!r} offline={display.get('pg-offline')!r}")
 
-    total = len(checks) + 1
+    total = sum(1 for key in checks
+                if not (key in ("indirect-body", "sampling-body", "agent-body", "policy-body")
+                        and not store.get(key))) + 1
     print(f"\n{ok}/{total} 个区域渲染成功")
     if store.get("ablation-body"):
         first = re.sub(r"<[^>]+>", " ", store["ablation-body"]).split()

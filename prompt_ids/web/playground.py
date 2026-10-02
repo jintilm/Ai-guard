@@ -112,7 +112,9 @@ class Handler(BaseHTTPRequestHandler):
         # 检测台的友好别名，内部落到同一批处理器上
         path = {"/api/scan": "/v1/scan", "/api/providers": "/v1/providers",
                 "/api/rules": "/v1/rules", "/api/metrics": "/v1/metrics",
-                "/api/events": "/v1/events"}.get(parsed.path, parsed.path)
+                "/api/events": "/v1/events",
+                "/api/review": "/v1/review",
+                "/api/review/queue": "/v1/review/queue"}.get(parsed.path, parsed.path)
         handler = resolve(method, path)
         if handler is None:
             self._send_json(404, {

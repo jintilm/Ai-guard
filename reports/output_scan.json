@@ -1,0 +1,112 @@
+{
+  "synthetic": {
+    "n": 16,
+    "caught": 16,
+    "missed": []
+  },
+  "benign": {
+    "n": 5584,
+    "groups": {
+      "corpus": {
+        "n": 5449,
+        "flagged": 0
+      },
+      "repo": {
+        "n": 135,
+        "flagged": 3
+      }
+    },
+    "flagged": [
+      {
+        "source": "dashboard.py",
+        "group": "repo",
+        "kinds": [
+          "aws_access_key"
+        ],
+        "masked": [
+          "AKIA…LE",
+          "AKIA…LE"
+        ]
+      },
+      {
+        "source": "test_api.py",
+        "group": "repo",
+        "kinds": [
+          "aws_access_key"
+        ],
+        "masked": [
+          "AKIA…LE"
+        ]
+      },
+      {
+        "source": "test_output_secrets.py",
+        "group": "repo",
+        "kinds": [
+          "anthropic_key",
+          "aws_access_key",
+          "bearer_header",
+          "github_token",
+          "gitlab_token",
+          "google_api_key",
+          "openai_key",
+          "private_key",
+          "slack_token"
+        ],
+        "masked": [
+          "AKIA…LE",
+          "xoxb…Wx",
+          "AKIA…LE"
+        ]
+      }
+    ],
+    "by_source": {
+      "dashboard.py": {
+        "n": 1,
+        "fp": 1,
+        "group": "repo",
+        "kinds": {
+          "aws_access_key": 2
+        }
+      },
+      "test_api.py": {
+        "n": 1,
+        "fp": 1,
+        "group": "repo",
+        "kinds": {
+          "aws_access_key": 1
+        }
+      },
+      "test_output_secrets.py": {
+        "n": 1,
+        "fp": 1,
+        "group": "repo",
+        "kinds": {
+          "aws_access_key": 3,
+          "slack_token": 2,
+          "anthropic_key": 2,
+          "openai_key": 1,
+          "google_api_key": 1,
+          "github_token": 1,
+          "gitlab_token": 1,
+          "private_key": 1,
+          "bearer_header": 1
+        }
+      }
+    }
+  },
+  "self_detection": {
+    "file": "output_check.py",
+    "hits": 15,
+    "kinds": [
+      "anthropic_key",
+      "aws_access_key",
+      "bearer_header",
+      "github_token",
+      "gitlab_token",
+      "google_api_key",
+      "openai_key",
+      "private_key",
+      "slack_token"
+    ]
+  }
+}

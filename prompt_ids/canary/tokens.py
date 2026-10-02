@@ -144,6 +144,11 @@ class CanaryRegistry:
         max_decode_hops: int = 2,
     ):
         self._tokens: dict[str, CanaryToken] = {}
+        #: 签发顺序（单调递增）。**不能**只靠 issued_at 排序来定「最新」：
+        #: time.time() 在 Windows 上被粗化到 15.6ms（GetSystemTimeAsFileTime），
+        #: 同一 tick 内连发 issue()+rotate() 会拿到相同时间戳，此时 max() 会按字典顺序
+        #: 返回**旧**令牌 —— 表现为 rotate() 之后 current 仍是上一个，令牌轮换静默失效。
+        self._order: dict[str, int] = {}
         for token in tokens or []:
             self.register(token)
         self.normalizer = normalizer or Normalizer()
@@ -155,11 +160,16 @@ class CanaryRegistry:
     # ---------- 管理 ----------
     def register(self, token: CanaryToken) -> CanaryToken:
         self._tokens[token.value] = token
+        self._order.setdefault(token.value, len(self._order))
         return token
+
+    def _freshness(self, token: CanaryToken) -> tuple[float, int]:
+        """排序键：先按签发时间，再按签发顺序（时间戳并列时的确定性 tiebreaker）。"""
+        return (token.issued_at, self._order.get(token.value, -1))
 
     @property
     def current(self) -> CanaryToken:
-        return max(self._tokens.values(), key=lambda t: t.issued_at)
+        return max(self._tokens.values(), key=self._freshness)
 
     def issue(self, label: str = "", **kwargs) -> CanaryToken:
         return self.register(issue(label=label, **kwargs))
@@ -179,7 +189,7 @@ class CanaryRegistry:
         """在文本中查找任一已知令牌。返回首个命中，未命中返回 None。"""
         if not text:
             return None
-        for token in sorted(self._tokens.values(), key=lambda t: -t.issued_at):
+        for token in sorted(self._tokens.values(), key=self._freshness, reverse=True):
             match = self._match_one(token, text)
             if match:
                 self.leaks.append(match)

@@ -14,12 +14,132 @@ import time
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 from prompt_ids.eval.metrics import markdown_table
-from prompt_ids.audit.events import AuditEvent
+from prompt_ids.audit.events import REVIEW_LEVELS, AuditEvent
 
 BLOCK_ACTIONS = frozenset({"block", "sandbox"})
+
+
+def review_verdict(event: AuditEvent) -> str:
+    """复核事件的结论：attack / false_positive / 空（非复核事件）。"""
+    if event.kind != "review":
+        return ""
+    return str((event.extra or {}).get("verdict", ""))
+
+
+def review_stats(events: Iterable[AuditEvent]) -> dict:
+    """复核闭环的运营指标。
+
+    值得单独看的是 `confirmed_rate`：人工复核里「确实误杀」的比例。
+    它直接对应 Lakera / Calypso 那类产品强调的 *over-defense* 指标 ——
+    系统自己报的 FPR 只统计 high/critical，而人工复核会额外捞出
+    「停在 medium、需要人看一眼」的那部分，那才是真正伤用户的地方。
+    """
+    attacks = false_positives = 0
+    absorbed = 0
+    for event in events:
+        verdict = review_verdict(event)
+        if verdict == "attack":
+            attacks += 1
+        elif verdict == "false_positive":
+            false_positives += 1
+        if (event.extra or {}).get("memory_absorbed"):
+            absorbed += 1
+    total = attacks + false_positives
+    return {
+        "reviews": total,
+        "confirmed_attack": attacks,
+        "false_positive": false_positives,
+        "memory_absorbed": absorbed,
+        # 分母只有人工复核过的样本，不是全量流量，所以读作「复核样本里的误杀占比」
+        "false_positive_rate_on_reviewed": round(false_positives / total, 4) if total else 0.0,
+    }
+
+
+def rule_ledger(events: Iterable[AuditEvent]) -> dict[str, dict[str, int]]:
+    """每条规则在人工复核里的表现：判对多少次、误报多少次。
+
+    这是「反哺规则」的原料。注意口径：
+    - **分母是人工复核过的样本**，不是全量流量。所以这里的「误报率」只反映
+      「被人工看到的那些误报」，规则在没进队列的样本上什么表现，这里看不到。
+    - 一条复核事件可能同时归因多条规则（所有命中的都记），所以各行加起来
+      会大于复核总数 —— 这是有意的：一条误报里 PV-C001 和 PV-C003 都有责任。
+    - **按指纹去重**：同一条文本重复复核只计一次。不去重的话，
+      「把同一篇文档复核 5 次」就能凭空造出一个 100% 误报率的嫌疑规则 ——
+      而这个榜是要拿去指导改规则的，不能让人为刷分。
+    """
+    ledger: dict[str, dict[str, int]] = {}
+    seen: set[tuple[str, str]] = set()
+    for event in events:
+        verdict = review_verdict(event)
+        if not verdict:
+            continue
+        # patterns 缺失的老事件退回 top_pattern，保证账不断
+        names = list(getattr(event, "patterns", ()) or ())
+        if not names and event.top_pattern:
+            names = [event.top_pattern]
+        key_base = event.fp or f"ts:{event.ts:.3f}"
+        for name in names:
+            marker = (name, key_base)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            row = ledger.setdefault(name, {"attack": 0, "false_positive": 0, "total": 0})
+            row[verdict] += 1
+            row["total"] += 1
+    return ledger
+
+
+def rule_suspects(ledger: dict[str, dict[str, int]], *, min_reviews: int = 3,
+                  min_fp_rate: float = 0.8) -> list[dict[str, Any]]:
+    """误报嫌疑榜：被人工反复判为误报、却几乎没被确认过的规则。
+
+    **只出建议，不自动改规则。** 理由不是保守，是这套数据根本不够自动决策：
+    - 分母是「进过复核队列的样本」，偏向那些已经触发的规则，冷门规则天然样本少；
+    - 3 次误报不能证明规则有问题，只能证明有几条样本该改；
+    - 自动降权会让「可解释」这个规则层的核心优势当场消失，而且攻击者只要
+      知道哪条规则被降权就能专门打它 —— 这是安全上的净损失。
+    所以产出的是「带证据的候选」，动作由人做，做完用同样的脚本复跑看数字动没动。
+    """
+    out: list[dict[str, Any]] = []
+    for name, row in ledger.items():
+        total = row.get("total", 0)
+        fp = row.get("false_positive", 0)
+        if total < min_reviews or not fp:
+            continue
+        fp_rate = fp / total
+        if fp_rate < min_fp_rate:
+            continue
+        out.append({
+            "pattern_id": name,
+            "total": total,
+            "false_positive": fp,
+            "attack": row.get("attack", 0),
+            "fp_rate": round(fp_rate, 4),
+            "reason": "人工复核里以误报为主，建议人工核查该规则（或用 review_corpus 重跑）",
+        })
+    return sorted(out, key=lambda x: (-x["fp_rate"], -x["total"]))
+
+
+def pending_reviews(events: Sequence[AuditEvent], limit: int = 20) -> list[AuditEvent]:
+    """待复核队列：等级够高、且还没有人工结论的检测事件（按时间倒序）。
+
+    只给指纹与元信息 —— 审计层不存原文，所以队列**不是**内容列表，
+    而是一份「这些指纹需要人拿原文去 `/v1/review` 定性」的工单列表。
+    """
+    reviewed = {e.fp for e in events if e.kind == "review" and e.fp}
+    out: list[AuditEvent] = []
+    for event in reversed(events):
+        if event.kind != "scan" or event.level not in REVIEW_LEVELS:
+            continue
+        if not event.fp or event.fp in reviewed:
+            continue
+        out.append(event)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def decision_of(event: AuditEvent) -> str:

@@ -15,6 +15,7 @@ import base64
 import codecs
 import json
 import sys
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -23,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from prompt_ids.audit.query import decision_of, load  # noqa: E402
 from prompt_ids.canary.tokens import CanaryRegistry, issue  # noqa: E402
 from prompt_ids.eval.metrics import markdown_table  # noqa: E402
 from prompt_ids.proxy.server import ProxyConfig, create_server  # noqa: E402
@@ -112,9 +114,14 @@ def demo_proxy() -> None:
     upstream = ThreadingHTTPServer(("127.0.0.1", 0), LeakyUpstream)
     threading.Thread(target=upstream.serve_forever, daemon=True).start()
 
+    # 审计要落盘才看得到事件：不落盘的话「记了审计」这句演示就是空话
+    audit_path = Path(tempfile.gettempdir()) / "prompt_ids_canary_demo.jsonl"
+    audit_path.unlink(missing_ok=True)
+
     config = ProxyConfig(
         upstream=f"http://127.0.0.1:{upstream.server_address[1]}/v1",
         api_key="", port=0, canary=registry, redact_leak=True,
+        audit_path=str(audit_path),
     )
     server = create_server(config)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -139,7 +146,17 @@ def demo_proxy() -> None:
         print("\n✓ 含令牌的响应已被替换，原始内容没有到达客户端")
     else:
         print("\n✗ 泄漏内容未被拦截")
-    print("审计统计：", config.audit.summary())
+    config.audit.flush()
+    # 统一审计模型之后，统计读的是事件文件而不是 logger 上的方法
+    # （`AuditLogger.summary()` 在审计层统一到 AuditEvent 时就没了）。
+    events = load(audit_path)
+    leaks = [e for e in events if e.kind == "leak" or decision_of(e) == "leak"]
+    print(f"审计落盘：{audit_path}（{len(events)} 条事件，其中泄漏 {len(leaks)} 条）")
+    for event in leaks:
+        # 代理侧只记「怎么泄的」（exact/normalized/...），不记令牌本身；
+        # /v1/canary/check 走 log_leak 才会带上脱敏令牌。
+        print(f"  kind={event.kind} source={event.source} decision={decision_of(event)} "
+              f"note={event.note} token={(event.extra or {}).get('token', '（未落盘）')}")
     server.shutdown()
     upstream.shutdown()
 

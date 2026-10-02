@@ -2,15 +2,15 @@
   "engine_a": "re",
   "engine_b": "regex",
   "eq_method": "per-sample finding fingerprint",
-  "regex_version": "2026.9.10",
+  "regex_version": "2026.5.9",
   "dataset": "E:\\Code\\Ai-guard\\data\\full.jsonl",
   "sections": {
     "public_corpus": {
       "samples": 817,
       "rounds": 3,
-      "re_ms": 665.278,
-      "regex_ms": 578.049,
-      "speedup": 1.1509,
+      "re_ms": 1132.209,
+      "regex_ms": 923.736,
+      "speedup": 1.2257,
       "identical": true,
       "difference_count": 0
     },
@@ -18,17 +18,17 @@
       {
         "label": "中文为主",
         "chars": 8241,
-        "re_ms": 92.343,
-        "regex_ms": 18.238,
-        "speedup": 5.0632,
+        "re_ms": 132.629,
+        "regex_ms": 27.553,
+        "speedup": 4.8137,
         "identical": true
       },
       {
         "label": "英文为主",
         "chars": 24609,
-        "re_ms": 227.531,
-        "regex_ms": 163.465,
-        "speedup": 1.3919,
+        "re_ms": 410.769,
+        "regex_ms": 278.59,
+        "speedup": 1.4745,
         "identical": true
       }
     ],
@@ -36,17 +36,17 @@
       {
         "label": "中文为主",
         "chars": 16053,
-        "re_ms": 208.77,
-        "regex_ms": 63.748,
-        "speedup": 3.2749,
+        "re_ms": 286.901,
+        "regex_ms": 85.122,
+        "speedup": 3.3705,
         "identical": true
       },
       {
         "label": "英文为主",
         "chars": 47973,
-        "re_ms": 478.666,
-        "regex_ms": 342.411,
-        "speedup": 1.3979,
+        "re_ms": 818.964,
+        "regex_ms": 592.4,
+        "speedup": 1.3824,
         "identical": true
       }
     ]

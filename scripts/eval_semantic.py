@@ -54,6 +54,11 @@ from prompt_ids.rules.loader import RuleBook  # noqa: E402
 
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports"
 
+#: 一组里 LLM 调用失败（超时+错误）超过这个比例，就把该组标记为 degraded。
+#: 取 20%：低于它失败基本是零星；高于它，召回的差异更可能来自「谁先跑」
+#: 而不是配置本身 —— 跨组比较就不再有意义。详见 run_group 里的注释。
+DEGRADED_CALL_FAIL_SHARE = 0.20
+
 
 class CachedSemanticBackend(SemanticBackend):
     """跨组复用语义后端结果，可选落盘（`--cache FILE` 开启）。
@@ -326,12 +331,40 @@ def run_group(
     confusion = Confusion.from_pairs(y_true, y_pred)
     row = confusion.as_row()
     latency = latency_stats(latencies)
+
+    # ---- 可靠性：这一组的数字能不能当结论用 ----
+    # LLM 后端会超时，而超时是**弃票**（ok=False → contribution() 返回 None），
+    # 于是超时直接表现为「召回变低」。2026-10 那次重跑就踩了：fallback 组
+    # 超时率 87.2%（R=0.3305），紧邻的 always 组只有 10.5%（R=0.8091）——
+    # 差 0.48 看着像门禁退化，其实是网关在那一段时间里不健康，
+    # 而先跑的那组把失败全吃下了。不标记的话，这个数字会被当成「fallback 模式更差」。
+    calls = int(stats.get("calls", 0) or 0)
+    timeouts = int(stats.get("timeouts", 0) or 0)
+    errors = int(stats.get("errors", 0) or 0)
+    failed_share = round((timeouts + errors) / calls, 4) if calls else 0.0
+    degraded = failed_share > DEGRADED_CALL_FAIL_SHARE
+    reliability = {
+        "calls": calls,
+        "timeouts": timeouts,
+        "errors": errors,
+        "failed_share": failed_share,
+        "degraded": degraded,
+        "note": ("超时/错误按弃票处理，会直接压低召回。failed_share > "
+                 f"{DEGRADED_CALL_FAIL_SHARE:.0%} 时本组 P/R/F1 不可作为结论，"
+                 "请用 --semantic-timeout 调大后重跑这一组。"),
+    }
+    if degraded:
+        print(f"    [警告] {name}: LLM 调用失败率 {failed_share:.1%}"
+              f"（{timeouts} 超时 / {errors} 错误，共 {calls} 次）—— "
+              "本组数字不可作为结论，请调大 --semantic-timeout 重跑", flush=True)
+
     return {
         "confusion": row,
         "latency_ms": latency,
         "semantic_calls": semantic_calls,
         "semantic_call_rate": round(semantic_calls / max(scanned, 1), 4),
         "semantic": stats,
+        "reliability": reliability,
         # 实际扫描条数 / 是否因预算闸门提前停止 —— 截断的结果必须自证截断，
         # 否则以后有人把这个数字当成全量结论。
         "scanned": scanned,
@@ -449,6 +482,12 @@ def main() -> int:
         flag = "  ⚠截断" if outcome.get("truncated") else ""
         if outcome.get("cache_hits"):
             flag += f"  ⚠缓存命中{outcome['cache_hits']}（延迟列不可用）"
+        rel = outcome.get("reliability") or {}
+        if rel.get("degraded"):
+            # 这条必须和 P/R/F1 印在同一行：超时按弃票处理、直接压低召回，
+            # 不标出来就会把「网关不健康」读成「这个配置更差」。
+            flag += (f"  ⚠不可用：LLM 调用失败率 {rel['failed_share']:.0%}"
+                     f"（{rel['timeouts']} 超时/{rel['errors']} 错误）")
         print(
             f"[done] {name:<24} P={row['precision']:.3f} R={row['recall']:.3f} "
             f"F1={row['f1']:.3f} FPR={row['false_positive_rate']:.3f} "
@@ -470,12 +509,17 @@ def main() -> int:
 
     rows = []
     cache_affected = False
+    degraded_names: list[str] = []
     for name, outcome in results.items():
         row = outcome["confusion"]
         cached = bool(outcome.get("cache_hits"))
         cache_affected = cache_affected or cached
+        rel = outcome.get("reliability") or {}
+        degraded = bool(rel.get("degraded"))
+        if degraded:
+            degraded_names.append(name)
         rows.append([
-            name,
+            name + ("  ⚠不可用" if degraded else ""),
             f"{row['precision']:.4f}",
             f"{row['recall']:.4f}",
             f"{row['f1']:.4f}",
@@ -484,17 +528,28 @@ def main() -> int:
             "—" if cached else f"{outcome['latency_ms']['p50']:.1f}",
             "—" if cached else f"{outcome['latency_ms']['p95']:.1f}",
             str(outcome["semantic_calls"]),
+            "—" if not rel.get("calls") else f"{rel['failed_share']:.0%}",
         ])
     table = markdown_table(
-        ["配置", "Precision", "Recall", "F1", "误报率", "P50(ms)", "P95(ms)", "语义调用次数"],
+        ["配置", "Precision", "Recall", "F1", "误报率", "P50(ms)", "P95(ms)", "语义调用次数",
+         "调用失败率"],
         rows,
-        aligns="lrrrrrrr",
+        aligns="lrrrrrrrr",
     )
     print("\n" + table)
     if cache_affected:
         print(
             "> 标 `—` 的组复用了缓存结果：判定概率与真实调用一致，"
             "所以 P/R/F1 有效；但延迟列无意义（缓存命中没有真实等待）。"
+        )
+    if degraded_names:
+        # 超时按弃票处理，会直接压低召回；先跑的那组还会替后面的组吃掉失败。
+        # 所以失败率高的组，其 P/R/F1 **不能**和别的组相减。
+        print(
+            "> ⚠ 标「不可用」的组：LLM 调用失败率过高（超时按弃票处理，直接压低召回）。"
+            f"受影响组：{'、'.join(degraded_names)}。"
+            "请用 `--semantic-timeout` 调大后单独重跑这些组，"
+            "在此之前不要引用它们的 P/R/F1，也不要与其他组相减。"
         )
 
     sources = sorted({s for outcome in results.values() for s in outcome.get("by_source", {})})

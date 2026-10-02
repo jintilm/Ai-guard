@@ -18,6 +18,7 @@ from prompt_ids.audit.events import (
     KIND_LEAK,
     KIND_MEMORY,
     AuditEvent,
+    event_from_review,
     event_from_scan,
 )
 
@@ -76,6 +77,10 @@ class AuditLogger:
             note=f"Canary 泄漏({match.how})", extra={
                 "token": match.redacted_token(), "label": match.label, **extra},
         ))
+
+    def log_review(self, *, fp: str, is_attack: bool, **kwargs) -> None:
+        """人工复核结论。只落指纹与结论，text 由调用方自己持有（见 events.event_from_review）。"""
+        self.log(event_from_review(fp=fp, is_attack=is_attack, **kwargs))
 
     def log_memory(self, *, action: str, fp: str = "", label: int = 1,
                    source: str = "pipeline", **extra) -> None:

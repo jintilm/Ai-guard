@@ -2,39 +2,38 @@
   "L1 仅规则": {
     "confusion": {
       "precision": 1.0,
-      "recall": 0.2536,
-      "f1": 0.4045,
+      "recall": 0.2159,
+      "f1": 0.3552,
       "false_positive_rate": 0.0,
       "specificity": 1.0,
-      "accuracy": 0.6793,
-      "tp": 89,
+      "accuracy": 0.6776,
+      "tp": 65,
       "fp": 0,
-      "tn": 466,
-      "fn": 262
+      "tn": 431,
+      "fn": 236
     },
     "latency_ms": {
-      "mean": 0.898,
-      "p50": 0.521,
-      "p95": 2.2,
-      "p99": 4.349,
-      "max": 66.0
+      "mean": 1.552,
+      "p50": 0.947,
+      "p95": 3.952,
+      "p99": 7.264,
+      "max": 101.951
     },
     "semantic_calls": 0,
     "semantic_call_rate": 0.0,
     "semantic": {},
+    "reliability": {
+      "calls": 0,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 732,
+    "truncated": false,
+    "cache_hits": 0,
     "by_source": {
-      "builtin": {
-        "precision": 1.0,
-        "recall": 0.72,
-        "f1": 0.8372,
-        "false_positive_rate": 0.0,
-        "specificity": 1.0,
-        "accuracy": 0.8353,
-        "tp": 36,
-        "fp": 0,
-        "tn": 35,
-        "fn": 14
-      },
       "deepset_test": {
         "precision": 1.0,
         "recall": 0.1,
@@ -49,66 +48,65 @@
       },
       "deepset_train": {
         "precision": 1.0,
-        "recall": 0.2069,
-        "f1": 0.3429,
+        "recall": 0.2118,
+        "f1": 0.3496,
         "false_positive_rate": 0.0,
         "specificity": 1.0,
-        "accuracy": 0.7051,
-        "tp": 42,
+        "accuracy": 0.707,
+        "tp": 43,
         "fp": 0,
         "tn": 343,
-        "fn": 161
+        "fn": 160
       },
       "garak": {
         "precision": 1.0,
-        "recall": 0.1316,
-        "f1": 0.2326,
+        "recall": 0.4211,
+        "f1": 0.5926,
         "false_positive_rate": 0.0,
         "specificity": 1.0,
-        "accuracy": 0.5286,
-        "tp": 5,
+        "accuracy": 0.6857,
+        "tp": 16,
         "fp": 0,
         "tn": 32,
-        "fn": 33
+        "fn": 22
       }
     }
   },
   "L1+L2 规则+启发": {
     "confusion": {
       "precision": 1.0,
-      "recall": 0.2564,
-      "f1": 0.4082,
+      "recall": 0.2159,
+      "f1": 0.3552,
       "false_positive_rate": 0.0,
       "specificity": 1.0,
-      "accuracy": 0.6805,
-      "tp": 90,
+      "accuracy": 0.6776,
+      "tp": 65,
       "fp": 0,
-      "tn": 466,
-      "fn": 261
+      "tn": 431,
+      "fn": 236
     },
     "latency_ms": {
-      "mean": 0.92,
-      "p50": 0.58,
-      "p95": 2.362,
-      "p99": 4.875,
-      "max": 25.715
+      "mean": 1.473,
+      "p50": 0.927,
+      "p95": 3.854,
+      "p99": 7.522,
+      "max": 40.61
     },
     "semantic_calls": 0,
     "semantic_call_rate": 0.0,
     "semantic": {},
+    "reliability": {
+      "calls": 0,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 732,
+    "truncated": false,
+    "cache_hits": 0,
     "by_source": {
-      "builtin": {
-        "precision": 1.0,
-        "recall": 0.74,
-        "f1": 0.8506,
-        "false_positive_rate": 0.0,
-        "specificity": 1.0,
-        "accuracy": 0.8471,
-        "tp": 37,
-        "fp": 0,
-        "tn": 35,
-        "fn": 13
-      },
       "deepset_test": {
         "precision": 1.0,
         "recall": 0.1,
@@ -123,77 +121,76 @@
       },
       "deepset_train": {
         "precision": 1.0,
-        "recall": 0.2069,
-        "f1": 0.3429,
+        "recall": 0.2118,
+        "f1": 0.3496,
         "false_positive_rate": 0.0,
         "specificity": 1.0,
-        "accuracy": 0.7051,
-        "tp": 42,
+        "accuracy": 0.707,
+        "tp": 43,
         "fp": 0,
         "tn": 343,
-        "fn": 161
+        "fn": 160
       },
       "garak": {
         "precision": 1.0,
-        "recall": 0.1316,
-        "f1": 0.2326,
+        "recall": 0.4211,
+        "f1": 0.5926,
         "false_positive_rate": 0.0,
         "specificity": 1.0,
-        "accuracy": 0.5286,
-        "tp": 5,
+        "accuracy": 0.6857,
+        "tp": 16,
         "fp": 0,
         "tn": 32,
-        "fn": 33
+        "fn": 22
       }
     }
   },
   "L1+L2+L3 (fallback 门禁)": {
     "confusion": {
-      "precision": 0.9604,
-      "recall": 0.5527,
-      "f1": 0.7016,
-      "false_positive_rate": 0.0172,
-      "specificity": 0.9828,
-      "accuracy": 0.798,
-      "tp": 194,
-      "fp": 8,
-      "tn": 458,
-      "fn": 157
+      "precision": 0.9554,
+      "recall": 0.4983,
+      "f1": 0.655,
+      "false_positive_rate": 0.0162,
+      "specificity": 0.9838,
+      "accuracy": 0.7842,
+      "tp": 150,
+      "fp": 7,
+      "tn": 424,
+      "fn": 151
     },
     "latency_ms": {
-      "mean": 71.444,
-      "p50": 88.714,
-      "p95": 127.439,
-      "p99": 192.397,
-      "max": 543.951
+      "mean": 96.441,
+      "p50": 114.249,
+      "p95": 171.313,
+      "p99": 268.821,
+      "max": 585.22
     },
-    "semantic_calls": 575,
-    "semantic_call_rate": 0.7038,
+    "semantic_calls": 536,
+    "semantic_call_rate": 0.7322,
     "semantic": {
       "backend": "local_model",
       "model": "protectai/deberta-v3-base-prompt-injection-v2",
       "mode": "fallback",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 575,
+      "calls": 536,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 99.28,
+      "avg_latency_ms": 127.12,
       "last_error": null
     },
+    "reliability": {
+      "calls": 536,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 732,
+    "truncated": false,
+    "cache_hits": 0,
     "by_source": {
-      "builtin": {
-        "precision": 0.9778,
-        "recall": 0.88,
-        "f1": 0.9263,
-        "false_positive_rate": 0.0286,
-        "specificity": 0.9714,
-        "accuracy": 0.9176,
-        "tp": 44,
-        "fp": 1,
-        "tn": 34,
-        "fn": 6
-      },
       "deepset_test": {
         "precision": 1.0,
         "recall": 0.35,
@@ -234,25 +231,25 @@
   },
   "L1+L2+L3 (always 全量)": {
     "confusion": {
-      "precision": 0.9423,
-      "recall": 0.5584,
-      "f1": 0.7013,
-      "false_positive_rate": 0.0258,
-      "specificity": 0.9742,
-      "accuracy": 0.7956,
-      "tp": 196,
-      "fp": 12,
-      "tn": 454,
-      "fn": 155
+      "precision": 0.9548,
+      "recall": 0.4917,
+      "f1": 0.6491,
+      "false_positive_rate": 0.0162,
+      "specificity": 0.9838,
+      "accuracy": 0.7814,
+      "tp": 148,
+      "fp": 7,
+      "tn": 424,
+      "fn": 153
     },
     "latency_ms": {
-      "mean": 95.831,
-      "p50": 88.975,
-      "p95": 127.608,
-      "p99": 187.559,
-      "max": 492.421
+      "mean": 120.627,
+      "p50": 112.919,
+      "p95": 163.664,
+      "p99": 260.677,
+      "max": 619.778
     },
-    "semantic_calls": 817,
+    "semantic_calls": 732,
     "semantic_call_rate": 1.0,
     "semantic": {
       "backend": "local_model",
@@ -260,25 +257,24 @@
       "mode": "always",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 817,
+      "calls": 732,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 94.18,
+      "avg_latency_ms": 117.49,
       "last_error": null
     },
+    "reliability": {
+      "calls": 732,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 732,
+    "truncated": false,
+    "cache_hits": 0,
     "by_source": {
-      "builtin": {
-        "precision": 0.9057,
-        "recall": 0.96,
-        "f1": 0.932,
-        "false_positive_rate": 0.1429,
-        "specificity": 0.8571,
-        "accuracy": 0.9176,
-        "tp": 48,
-        "fp": 5,
-        "tn": 30,
-        "fn": 2
-      },
       "deepset_test": {
         "precision": 1.0,
         "recall": 0.3667,
@@ -319,25 +315,25 @@
   },
   "L3 仅语义": {
     "confusion": {
-      "precision": 0.9409,
-      "recall": 0.5442,
-      "f1": 0.6895,
-      "false_positive_rate": 0.0258,
-      "specificity": 0.9742,
-      "accuracy": 0.7895,
-      "tp": 191,
-      "fp": 12,
-      "tn": 454,
-      "fn": 160
+      "precision": 0.9542,
+      "recall": 0.485,
+      "f1": 0.6432,
+      "false_positive_rate": 0.0162,
+      "specificity": 0.9838,
+      "accuracy": 0.7787,
+      "tp": 146,
+      "fp": 7,
+      "tn": 424,
+      "fn": 155
     },
     "latency_ms": {
-      "mean": 109.725,
-      "p50": 104.612,
-      "p95": 149.803,
-      "p99": 222.066,
-      "max": 558.995
+      "mean": 101.37,
+      "p50": 94.102,
+      "p95": 135.644,
+      "p99": 194.831,
+      "max": 465.808
     },
-    "semantic_calls": 817,
+    "semantic_calls": 732,
     "semantic_call_rate": 1.0,
     "semantic": {
       "backend": "local_model",
@@ -345,25 +341,24 @@
       "mode": "always",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 817,
+      "calls": 732,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 109.22,
+      "avg_latency_ms": 100.92,
       "last_error": null
     },
+    "reliability": {
+      "calls": 732,
+      "timeouts": 0,
+      "errors": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+    },
+    "scanned": 732,
+    "truncated": false,
+    "cache_hits": 0,
     "by_source": {
-      "builtin": {
-        "precision": 0.9,
-        "recall": 0.9,
-        "f1": 0.9,
-        "false_positive_rate": 0.1429,
-        "specificity": 0.8571,
-        "accuracy": 0.8824,
-        "tp": 45,
-        "fp": 5,
-        "tn": 30,
-        "fn": 5
-      },
       "deepset_test": {
         "precision": 1.0,
         "recall": 0.3667,

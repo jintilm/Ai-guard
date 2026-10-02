@@ -198,3 +198,49 @@ rules:
     confidence: 0.82
     description: 要求扮演越权角色（evil AI / 无道德约束的人格）
     pattern: '(?i)(act\s*as|pretend\s*(to\s*be|you\s*(are|re))|you\s*are\s*now|扮演|假装你是|请你扮演)\s*(a\s*|an\s*|the\s*)?[^.\n]{0,24}?(evil|immoral|unethical|amoral|criminal|hacker|nazi|hitler|dictator|terrorist|恶意|邪恶|无道德|没有道德|犯罪)'
+
+  # ---- 2026-10 新增：PINT 形状基准漏检分析（只看 data/pint_shape_train.jsonl）。
+  # 这三类在 train 侧整体漏检，且都不是「换个措辞」的问题，而是整类缺失：
+  # 规则库里没有任何「调用内部工具」「工具参数指向系统」「开发者模式+服从」的模式。
+  - id: PV-H029
+    category: tool_injection
+    weight: 7
+    confidence: 0.85
+    description: 指使模型调用内部/管理工具（多语种，含中文「调用内部管理工具」）
+    pattern: '(?i)\b(call|invoke|execute|run|use|trigger)\b[\s\S]{0,28}\b(internal|admin|hidden|system|privileged|intern)\b[\s_-]*(tool|function|api|command|endpoint|module|herramienta|outil|werkzeug|commande|工具|工具函数|函数|函数|ツール)\b|(回答前|回复前|回覆前|在回答之前|先调用|先呼叫|调用内部|呼叫内部)[^。\n]{0,14}(工具|接口|函数|ツール)'
+
+  - id: PV-H030
+    category: tool_injection
+    weight: 7
+    confidence: 0.85
+    description: 工具调用参数直指系统配置/外泄（JSON 风格的 action/cmd 载荷）
+    pattern: '(?i)"?\b(action|cmd|command|op|tool|target|scope|payload)\b"?\s*[:=]\s*"?(dump[_-]?config|dumpconfig|exfiltrat\w+|system[_-]?prompt|systemprompt|reveal[_-]?all|admin|root|internal[_-]?config)'
+
+  - id: PV-H031
+    category: privilege_escalation
+    weight: 7
+    confidence: 0.85
+    description: 开发者模式 + 「一定服从/永不拒绝」（两种语序 + 德语复合词 + 中日文，多语种）
+    pattern: '(?i)((developer|dev|debug|entwickler|d[éè]veloppeur|desarrollador)[\s_-]*mode|mode\s+(?:de\s+|du\s+)?(?:d[éè]veloppeur|desarrollador|developer)|entwicklermodus|開発者モード|开发者模式|開發者模式)[\s\S]{0,90}?(never\s+refus\w+|always\s+compl\w+|never\s+say\s+no|lehn\w*\s+nie\s+ab|erf[üu]llst\s+alles|ne\s+refuse\w*|nunca\s+te\s+niegas|refuse\w*\s+jamais|ob[ée]is\s+toujours|拒(ま|否)し|拒绝|拒絕|照做|服从|從命|従い)|(never\s+refus\w+|always\s+compl\w+|ne\s+refuse\w*|nunca\s+te\s+niegas|ob[ée]is\s+toujours|拒(ま|否)し|拒绝|拒絕|照做|服从|從命)[^.\n]{0,40}(developer|dev|debug|entwickler|d[éè]veloppeur|desarrollador)[\s_-]*mode'
+
+  - id: PV-H032
+    category: system_prompt_extraction
+    weight: 7
+    confidence: 0.82
+    description: 虚构叙事包装（写故事/小说，让叙述者逐字引用自己的配置；每个分支都以字面量开头）
+    pattern: '(?i)(story|stories|short\s+story|novel|nouvelle|r[ée]cit|histoire|geschichte|erz[äa]hlung|kurzgeschichte|物語|小説|短篇|故事|小说)[\s\S]{0,80}?(quotes?\s+its\s+own|quote\w*\s+(his|her|their|its)\s+own|cite\w*\s+(sa|its|his|her|their|the)|zitier\w*|引用自己的|一字一句|逐字)'
+
+  - id: PV-H033
+    category: privilege_escalation
+    weight: 7
+    confidence: 0.82
+    description: 社工索取凭据并要求原样输出（passphrase / 口令 / 合言葉）
+    pattern: '(?i)(pass\s?phrase|password|passwort|contrase[ñn]a|senha|口令|密码|密碼|合言葉|パスワード|비밀번호|秘密)[\s\S]{0,40}?(verbatim|w[öo]rtlich|literalmente|literamente|原样|原樣|逐字|一字一句|そのまま出力|そのまま出力して)|(verbatim|w[öo]rtlich|literalmente|原样|逐字|一字一句)[\s\S]{0,24}?(pass\s?phrase|password|passwort|contrase[ñn]a|口令|密码|密碼|合言葉|パスワード)'
+
+  - id: PV-H034
+    category: obfuscation
+    weight: 6
+    confidence: 0.8
+    description: 指向「逐字母拼出」的指令（letter by letter / 1文字ずつ 繋げ 等）
+    description: 指向「逐字母拼出」的指令（letter by letter / 逐字拼 等；两种语序都覆盖）
+    pattern: '(?i)(letter\s*[- ]?\s*by\s*[- ]?\s*letter|char\w*\s*[- ]?\s*by\s*[- ]?\s*char|buchstabenweise|ausgeschrieben\s+k[üu]nstlich|[ée]pelet\w*|deletread\w*|lettre\s*par\s*lettre|letra\s+por\s+letra|逐字母|逐字拼|1\s*文字|一字\s*ず\s*つ|ずつ\s*[繋つ]げ)[\s\S]{0,40}?(directive|instruction|anweisung|richtlinie|consign\w*|命令|指令|指示)|(directive|instruction|anweisung|richtlinie|consign\w*|命令|指令|指示)[\s\S]{0,40}?(letter\s*[- ]?\s*by\s*[- ]?\s*letter|char\w*\s*[- ]?\s*by\s*[- ]?\s*char|buchstabenweise|[ée]pelet\w*|deletread\w*|lettre\s*par\s*lettre|letra\s+por\s+letra|逐字母|逐字拼|1\s*文字|一字\s*ず\s*つ)'

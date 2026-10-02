@@ -120,8 +120,8 @@ rules:
     category: instruction_override
     weight: 8
     confidence: 0.88
-    description: 德语「忽略上述指令，改为输出…」
-    pattern: '(?i)(ignorier(en|e)?|vergiss|missachte|überspring)\s*(sie\s*)?(?:die|alle|deine|bisherigen|obigen|vorherigen)?[\s\S]{0,40}(stattdessen|anstatt|und\s*(gib|geben\s*sie|schreib(e|en)?|sag(e|en)?|zeig(e|en)?|nenn(en|e)?))'
+    description: 德语「忽略上述指令，改为输出…」（排除「忘掉某份文档」这类正常编辑指令）
+    pattern: '(?i)(ignorier(en|e)?|vergiss|missachte|überspring)\s*(sie\s*)?(?!\s*(?:der|die|den|dem|das)?\s*(?:entwurf|entwurfs|version|versionen|text|texte|abschnitt|kapitel|nachricht|nachrichten|dokument|dokumente|notiz|notizen|mail|emails?|liste|listen|fassung|fassung|entwurfskizze|skizze|uebersetzung|übersetzung|antwort|antworten))(?:die|alle|deine|bisherigen|obigen|vorherigen)?[\s\S]{0,40}(stattdessen|anstatt|und\s*(gib|geben\s*sie|schreib(e|en)?|sag(e|en)?|zeig(e|en)?|nenn(en|e)?))'
 
   - id: PV-C016
     category: system_prompt_extraction
@@ -136,3 +136,57 @@ rules:
     confidence: 0.85
     description: 上下文重置 + 新任务接管（"forget everything, new task:" 类）
     pattern: '(?i)(forget|disregard)\s*(all|everything|about)?[\s\S]{0,30}?(start\s*over|new\s*task|following\s*task|neue\s*aufgabe|konzentriere\s*dich)'
+
+  # ---- 2026-10 新增：PINT 形状基准（data/pint_shape_train.jsonl，175 条攻击）漏检分析得出。
+  # 线索只取自 train 侧；pint_shape_test 与 gandalf 全程未参与本轮设计。
+  # 共性缺口：西/法/德语的语序是「动词 + 所有/定冠词 + 名词 + 形容词」
+  #（Ignora todas las instrucciones anteriores / Ignore toutes les instructions précédentes），
+  # 而 PV-C001~C003 的骨架是「动词 + (限定词) + (形容词) + 名词」，因此整类漏检。
+  - id: PV-C021
+    category: instruction_override
+    weight: 8
+    confidence: 0.9
+    description: 忽略先前指令（西/法/德语语序：限定词在中间、形容词后置）
+    pattern: '(?i)\b(ignora\w*|ignor\w*|olvid\w*|vergiss|desconsidera\w*|despreci\w*)\b[\s\S]{0,24}?\b(instruccion\w*|instruction\w*|anweisung\w*|befehl\w*|richtlinie\w*|consign\w*)\b|(指示|命令|指令|指示書|ルール|規則|약관|지시)[^。\n]{0,10}(無視|무시|忘れ|破棄)|(これまでの|以前の|上記の|すべての|全ての|全部의|全部の|상위의)[^。\n]{0,6}(指示|命令|指令|ルール|規則)'
+
+  - id: PV-C022
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.9
+    description: 逐字复述「你收到的指令」（多语种 verbatim 副词 + 指令名词；窗口 48 字符是按 train 侧定的，勿按留出集放宽）
+    pattern: '(?i)\b(repeat|reproduce|recite|print|output|write|display|show|liste\w*|repite\w*|repetir|reproduis|reproduc\w*|wiederhol\w*|r[éè]p[éè]te\w*)\b[\s\S]{0,48}?\b(word\s*for\s*word|mot\s*pour\s*mot|palabra\s*por\s*palabra|verbatim|w[öo]rtlich|wort\s*f[üu]r\s*wort|literalmente|literal)\b'
+
+  - id: PV-C023
+    category: system_prompt_extraction
+    weight: 8
+    confidence: 0.88
+    description: 中日文「原样/逐字输出系统指令或配置」（两种语序都覆盖）
+    pattern: '((原样|逐字|一字一句|一字不差|原封不动|完整)[^。\n]{0,14}(指示|命令|指令|系统提示|系统设定|提示词|设定)|(指示|命令|指令|系统提示|系统设定|提示词|设定|設定)[^。\n]{0,18}(原样|逐字|一字一句|一字不差|原封不动|書き出|そのまま書き出|全文))'
+
+  - id: PV-C024
+    category: role_tag_escape
+    weight: 8
+    confidence: 0.88
+    description: 退出「受规则约束的助手」身份（多语种；法语 d''être 用 d.?[eê]tre 覆盖省音写法）
+    pattern: '(?i)((stop|quit|cease|halt|leave)\s+(being|acting|playing)?\s*\w*\s*(assistant|assistente|assistent|chatbot|ai\b|r[oô]le)|(cess\w+|deja\w*|dejar|lass\s+auf|h[öo]r\s+auf)\s+(de\s+ser|de\s+actuar|d.?[eê]tre|zu\s+sein|a\s+ser)|(不要再|不再|不要)\s*(再)?\s*(做|当|扮演|是)\s*(一个|一個)?\s*(守|受)?\s*(规则|規則|约束|約束)?\s*(的)?\s*(助手|助理|智能体|智能體|ai|角色))'
+
+  - id: PV-C025
+    category: role_tag_escape
+    weight: 8
+    confidence: 0.88
+    description: 宣称「不受任何限制」的人格（越狱通用话术，多语种）
+    pattern: '(?i)(sans\s+(aucune\s+|toute\s+|la\s+)?restriction|sin\s+(ninguna\s+|alguna\s+|la\s+)?restricci|unbeschr[äa]nkt|keinerlei\s+(beschr[äa]nkung|einschr[äa]nkung)|ohne\s+(jede\s+|irgendeine\s+)?einschr[äa]nkung|不受\s*(任何)?\s*限制|没有(任何)?\s*限制|没有任何\s*约束|制限のない|制約のない|制限の\s*ない)'
+
+  - id: PV-C026
+    category: privilege_escalation
+    weight: 8
+    confidence: 0.88
+    description: 宣称获得 root / 管理员权限（多语种；含「权限在前、身份在后」的语序，如 les privilèges administrateur）
+    pattern: '(?i)(\b(root|admin|administrator|superuser|sysadmin|Administratoren|超级管理员|超級管理員)\b[\s-]*(privileges?|permissions?|rights?|rechte|droits?|privilegios?|autorisations?|权限|权限|權限|特権|特權)|(privileges?|privileg\w+|privilèges|droits?|rechte|权限|權限|特権|特權)\s*(de\s+|d.?|du\s+|of\s+)?(root|admin\w*|administrator\w*|superuser))'
+
+  - id: PV-C027
+    category: privilege_escalation
+    weight: 8
+    confidence: 0.85
+    description: 宣称「不受内容/安全策略约束」（两种语序：形容词前置 / 策略在前内容在后）
+    pattern: '(?i)(keiner?\s+|keine\s+|aucune\s+|ninguna\s+|ohne\s+|sans\s+|sin\s+|no\s+|without\s+)[a-z\u00c0-\u024f]*\s*(content|safety|security|contenu|contenido|inhalt)\s*(polic\w*|polit\w*|richtlinie\w*|directive\w*|r[èe]gle\w*)|(aucune|ninguna|keiner?|keine|sans|sin|ohne|no|without)\s+\S*\s*(polic\w*|polit\w*|richtlinie\w*|directive\w*|策略|方針)\s+(de\s+|du\s+|of\s+|des\s+)?(contenu|contenido|inhalt|content|seguridad|s[ée]curit[ée]|安全|内容|內容)|(内容|安全|內容|安全)策略|コンテンツポリシー|安全ポリシー|安全策略|无视\s*(任何)?\s*(内容|安全)(策略|规则)|(不受|不受任何)\s*(内容|安全)\s*(策略|规则|限制)'

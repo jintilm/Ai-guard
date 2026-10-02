@@ -15,6 +15,7 @@ from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
 from prompt_ids.memory.detector import MemoryDetector
+from prompt_ids.output import redact, scan_secrets, summary
 
 MAX_TEXT_CHARS = 50_000
 MAX_BATCH = 200
@@ -43,6 +44,8 @@ class ApiContext:
         memory_dir: str = "",
         audit: AuditLogger | None = None,
         audit_path: str = "",
+        review_corpus: Any | None = None,
+        review_corpus_path: str = "",
     ):
         self.pipeline = pipeline or create_pipeline(
             config=PipelineConfig(
@@ -56,6 +59,14 @@ class ApiContext:
         )
         self.canary = canary
         self.audit = audit or (AuditLogger(audit_path) if audit_path else None)
+        if review_corpus is not None:
+            self.review_corpus = review_corpus
+        elif review_corpus_path:
+            from prompt_ids.audit.review_corpus import ReviewCorpus
+
+            self.review_corpus = ReviewCorpus(review_corpus_path)
+        else:
+            self.review_corpus = None
         self.started_at = time.time()
         self._lock = threading.Lock()
         self.stats: dict[str, Any] = {
@@ -65,6 +76,8 @@ class ApiContext:
             "blocked": 0,
             "canary_checks": 0,
             "canary_leaks": 0,
+            "output_checks": 0,
+            "output_secret_hits": 0,
         }
 
     def record(self, result) -> None:
@@ -82,6 +95,35 @@ class ApiContext:
             self.stats["canary_checks"] += 1
             if leaked:
                 self.stats["canary_leaks"] += 1
+
+    def record_output_scan(self, hits: int) -> None:
+        with self._lock:
+            self.stats["output_checks"] += 1
+            if hits:
+                self.stats["output_secret_hits"] += int(hits)
+
+    def record_review(self, is_attack: bool) -> None:
+        with self._lock:
+            self.stats["reviews"] = self.stats.get("reviews", 0) + 1
+            key = "reviews_confirmed" if is_attack else "reviews_false_positive"
+            self.stats[key] = self.stats.get(key, 0) + 1
+
+    def review_stats(self) -> dict[str, Any]:
+        """进程内的复核计数（与审计文件里的统计口径一致，数字不同是因为范围不同）。
+
+        这里数的是**本次进程启动以来**的复核；`/v1/review/queue` 里的那份从
+        审计文件读，能跨进程、含重启前的记录。
+        """
+        with self._lock:
+            total = int(self.stats.get("reviews", 0))
+            fp = int(self.stats.get("reviews_false_positive", 0))
+            return {
+                "reviews": total,
+                "confirmed_attack": int(self.stats.get("reviews_confirmed", 0)),
+                "false_positive": fp,
+                "false_positive_rate_on_reviewed": round(fp / total, 4) if total else 0.0,
+                "scope": "process",
+            }
 
     @property
     def rule_detector(self):
@@ -202,6 +244,25 @@ def handle_canary_check(ctx: ApiContext, payload: Any, params: dict) -> tuple[in
     }
 
 
+def handle_output_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """出站扫描：把模型输出交上来，看里面有没有第三方凭据。
+
+    代理会在转发路径上自动做这件事（`ProxyConfig.scan_secrets`）；
+    这个端点给**不经过代理**的调用方用 —— 自己接 LLM SDK 的应用、离线批处理、
+    以及检测台里手贴一段输出试阈值。
+    """
+    text = _require_text(payload)
+    hits = scan_secrets(text)
+    ctx.record_output_scan(len(hits))
+    return 200, {
+        "found": len(hits),
+        "by_kind": summary(hits),
+        # 只回脱敏形态与类别：把完整凭据回吐给调用方等于凭空多一个泄露面
+        "secrets": [h.as_dict() for h in hits],
+        "redacted": redact(text, hits),
+    }
+
+
 def _require_memory(ctx: ApiContext):
     if ctx.memory is None or not ctx.memory.enabled:
         raise ApiError(404, "not_enabled", "向量记忆库未启用，启动时加 --memory")
@@ -283,6 +344,151 @@ def handle_events(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
     }
 
 
+def handle_review(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """提交人工复核结论：定性一条文本，并把结论喂回记忆层。
+
+    为什么要有这个接口：检测层只能给建议，`medium` 这一档在生产里是
+    「放行但记一笔」还是「进人工队列」由业务决定。同类系统（Lakera 的
+    Detect/Enforce 两档、Calypso 的可解释检测）都把这条人工回路当标配 ——
+    没有它，误报只能靠用户投诉发现，而投诉不会告诉你「哪条规则该改」。
+
+    两处刻意的设计：
+    - **原文由调用方提供**，服务端不试图从日志里还原（审计层压根不存原文）。
+    - **审计只记指纹与结论**，与所有其他入口同一套字段，不新增日志格式。
+    """
+    if not isinstance(payload, dict):
+        raise ApiError(400, "bad_request", "请求体必须是 JSON 对象")
+    text = _require_text(payload)
+    if "is_attack" not in payload:
+        raise ApiError(400, "bad_request", "缺少 is_attack 字段（true=确认攻击，false=误报）")
+    is_attack = bool(payload["is_attack"])
+    reviewer = str(payload.get("reviewer") or "api")
+    note = str(payload.get("note") or "")
+
+    try:
+        outcome = ctx.pipeline.review(text, is_attack=is_attack, reviewer=reviewer, note=note)
+    except ValueError as exc:
+        raise ApiError(400, "bad_request", str(exc)) from exc
+
+    if ctx.audit is not None:
+        ctx.audit.log_review(
+            fp=outcome["fingerprint"], is_attack=is_attack, reviewer=reviewer,
+            level=outcome["level"], score=outcome["score"],
+            patterns=tuple(outcome.get("patterns") or ()),
+            top_pattern=outcome.get("top_pattern", ""),
+            note=note or outcome["verdict"], memory_absorbed=outcome["memory_absorbed"],
+            source="api",
+        )
+    # 复核语料（含原文，刻意与审计层分开的第二个数据面）。
+    # 显式配置了才写；写了要能看见写没写成 —— 静默失败会让「反哺」看起来是通的。
+    corpus_written = None
+    corpus_error = ""
+    if ctx.review_corpus is not None:
+        corpus_written = ctx.review_corpus.add(
+            text=text, is_attack=is_attack, fp=outcome["fingerprint"],
+            patterns=tuple(outcome.get("patterns") or ()),
+            top_pattern=outcome.get("top_pattern", ""),
+            level=outcome["level"], score=outcome["score"],
+            reviewer=reviewer, note=note)
+        errors = ctx.review_corpus.stats().get("errors") or []
+        if errors and not corpus_written:
+            corpus_error = errors[-1]
+    ctx.record_review(is_attack)
+    body = dict(outcome)
+    body["reviewer"] = reviewer
+    body["note"] = note
+    body["reviews"] = ctx.review_stats()
+    body["corpus"] = {
+        "enabled": ctx.review_corpus is not None,
+        "written": corpus_written,
+        "error": corpus_error,
+    }
+    return 200, body
+
+
+def handle_review_patterns(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """规则级复核台账：每条规则判对多少次、误报多少次，以及误报嫌疑榜。
+
+    这是「反哺规则」的读数端 —— 有了它，「PV-C001 是不是在乱杀人」才有答案。
+    只读，不改任何规则：候选只给建议，动作由人做（理由见 `query.rule_suspects`）。
+    """
+    logger = ctx.audit
+    base: dict[str, Any] = {
+        "corpus": ctx.review_corpus.stats() if ctx.review_corpus is not None
+        else {"enabled": False},
+    }
+    if logger is None or not logger.enabled or logger.path is None:
+        return 200, {**base, "enabled": False, "ledger": {}, "suspects": [],
+                     "reason": "未配置审计日志，启动时加 --audit"}
+    logger.flush()
+    from prompt_ids.audit.logger import tail_events
+    from prompt_ids.audit.query import rule_ledger, rule_suspects
+
+    events = tail_events(logger.path, limit=5000)
+    ledger = rule_ledger(events)
+    suspects = rule_suspects(ledger)
+    return 200, {
+        **base,
+        "enabled": True,
+        "ledger": dict(sorted(ledger.items(), key=lambda kv: -kv[1]["total"])),
+        "suspects": suspects,
+        "note": "分母是人工复核过的样本；一条复核可归因多条规则，所以各行之和大于复核总数。"
+                "候选只给建议 —— 系统不会自动改规则。",
+    }
+
+
+def handle_review_queue(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
+    """待复核队列 + 复核统计（只含指纹，不含原文）。
+
+    读的是审计文件尾部 —— 与 `tail -f`、离线报表看到的是同一份数据，
+    不会出现「页面显示的和服务记录的不一致」。
+    """
+    logger = ctx.audit
+    stats = ctx.review_stats()
+    if logger is None or not logger.enabled or logger.path is None:
+        return 200, {"enabled": False, "count": 0, "items": [], "stats": stats,
+                     "reason": "未配置审计日志，启动时加 --audit"}
+    try:
+        limit = max(1, min(200, int(params.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+    logger.flush()  # 缓冲写模式下先落盘，保证读到的是最新
+    from prompt_ids.audit.logger import tail_events
+    from prompt_ids.audit.query import review_stats as _review_stats
+
+    events = tail_events(logger.path, limit=max(limit * 20, 200))
+    from prompt_ids.audit.query import pending_reviews, rule_ledger, rule_suspects
+
+    pending = pending_reviews(events, limit=limit)
+    ledger = rule_ledger(events)
+    return 200, {
+        "enabled": True,
+        "count": len(pending),
+        "path": str(logger.path),
+        "stats": _review_stats(events),
+        # 台账一起返回：复核页不用再发一次请求就能显示「哪条规则在乱杀人」
+        "ledger": dict(sorted(ledger.items(), key=lambda kv: -kv[1]["total"])[:12]),
+        "suspects": rule_suspects(ledger),
+        "corpus": ctx.review_corpus.stats() if ctx.review_corpus is not None
+        else {"enabled": False},
+        "items": [
+            {
+                "fp": e.fp[:12],
+                "ts": round(e.ts, 3),
+                "level": e.level,
+                "score": round(e.score, 2),
+                "action": e.action,
+                "findings": e.findings,
+                "top_pattern": e.top_pattern,
+                "source": e.source,
+            }
+            for e in pending
+        ],
+        "note": "队列只含指纹。原文需由调用方自行提供（审计层不存原文），"
+                "拿到原文后 POST /v1/review 定性。",
+    }
+
+
 def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     det = ctx.rule_detector
     book = det.rulebook if det and hasattr(det, "rulebook") else None
@@ -297,6 +503,7 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
             "info": ctx.pipeline.semantic_detector.stats() if ctx.pipeline.semantic_detector else {},
         },
         "canary": ctx.canary.stats() if ctx.canary else None,
+        "reviews": ctx.review_stats(),
     }
 
 
@@ -332,7 +539,7 @@ def handle_providers(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, 
 
 
 def handle_openapi(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
-    return 200, OPENAPI
+    return 200, API_SPEC
 
 
 # ---------------------------------------------------------------- 路由表
@@ -341,6 +548,7 @@ Handler = Callable[[ApiContext, Any, dict], tuple[int, dict]]
 ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/v1/scan", handle_scan),
     ("POST", "/v1/scan/batch", handle_scan_batch),
+    ("POST", "/v1/scan/output", handle_output_scan),
     ("GET", "/v1/rules", handle_rules),
     ("POST", "/v1/canary/issue", handle_canary_issue),
     ("POST", "/v1/canary/check", handle_canary_check),
@@ -348,6 +556,9 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/v1/memory/search", handle_memory_search),
     ("POST", "/v1/memory/feedback", handle_memory_feedback),
     ("GET", "/v1/memory/stats", handle_memory_stats),
+    ("POST", "/v1/review", handle_review),
+    ("GET", "/v1/review/queue", handle_review_queue),
+    ("GET", "/v1/review/patterns", handle_review_patterns),
     ("GET", "/v1/providers", handle_providers),
     ("GET", "/v1/metrics", handle_metrics),
     ("GET", "/v1/events", handle_events),
@@ -365,6 +576,30 @@ OPENAPI = {
     },
     "paths": {},
 }
+
+
+def _build_openapi() -> dict[str, Any]:
+    """从 ROUTES 生成 paths。
+
+    `/v1/openapi.json` 原先返回的是空 paths —— 一个宣称自己是 OpenAPI 文档、
+    却不列任何端点的接口，比没有这个接口更糟（客户端会当成「就这些」）。
+    """
+    spec = dict(OPENAPI)
+    paths: dict[str, Any] = {}
+    for verb, route, handler in ROUTES:
+        if route == "/v1/openapi.json":
+            continue
+        operation = handler.__doc__ or ""
+        summary = operation.strip().splitlines()[0] if operation.strip() else route
+        paths.setdefault(route, {})[verb.lower()] = {
+            "summary": summary,
+            "responses": {"200": {"description": "成功"}},
+        }
+    spec["paths"] = paths
+    return spec
+
+
+API_SPEC = _build_openapi()
 
 
 def resolve(method: str, path: str) -> Handler | None:

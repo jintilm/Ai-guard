@@ -1,0 +1,211 @@
+{
+  "seed": 20261001,
+  "profile": "recall",
+  "languages": [
+    "en",
+    "zh",
+    "de",
+    "fr",
+    "es",
+    "ja"
+  ],
+  "pallms": {
+    "train": 21,
+    "test": 7
+  },
+  "composition": {
+    "all": {
+      "pint_benign_input": {
+        "n": 48,
+        "attack": 0,
+        "benign": 48,
+        "langs": {
+          "de": 8,
+          "en": 8,
+          "es": 8,
+          "fr": 8,
+          "ja": 8,
+          "zh": 8
+        },
+        "attack_ratio": 0.0
+      },
+      "pint_chat": {
+        "n": 96,
+        "attack": 0,
+        "benign": 96,
+        "langs": {
+          "de": 16,
+          "en": 16,
+          "es": 16,
+          "fr": 16,
+          "ja": 16,
+          "zh": 16
+        },
+        "attack_ratio": 0.0
+      },
+      "pint_external_pallms": {
+        "n": 28,
+        "attack": 28,
+        "benign": 0,
+        "langs": {
+          "en": 28
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_hard_negatives": {
+        "n": 72,
+        "attack": 0,
+        "benign": 72,
+        "langs": {
+          "de": 12,
+          "en": 12,
+          "es": 12,
+          "fr": 12,
+          "ja": 12,
+          "zh": 12
+        },
+        "attack_ratio": 0.0
+      },
+      "pint_instruction_override": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_jailbreak_developer_mode": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_jailbreak_fiction_wrapper": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_jailbreak_grandma_sleeper": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_obfuscation": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_privilege_escalation": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_role_tag_escape": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_short_input": {
+        "n": 36,
+        "attack": 0,
+        "benign": 36,
+        "langs": {
+          "de": 6,
+          "en": 6,
+          "es": 6,
+          "fr": 6,
+          "ja": 6,
+          "zh": 6
+        },
+        "attack_ratio": 0.0
+      },
+      "pint_system_prompt_extraction": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      },
+      "pint_tool_injection": {
+        "n": 30,
+        "attack": 30,
+        "benign": 0,
+        "langs": {
+          "de": 5,
+          "en": 5,
+          "es": 5,
+          "fr": 5,
+          "ja": 5,
+          "zh": 5
+        },
+        "attack_ratio": 1.0
+      }
+    }
+  }
+}

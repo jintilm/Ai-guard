@@ -3,6 +3,7 @@
     python -m prompt_ids.api --port 8790
 """
 from prompt_ids.api.app import (
+    API_SPEC,
     ApiContext,
     ApiError,
     OPENAPI,
@@ -10,6 +11,7 @@ from prompt_ids.api.app import (
     handle_canary_check,
     handle_canary_issue,
     handle_metrics,
+    handle_output_scan,
     handle_rules,
     handle_scan,
     handle_scan_batch,
@@ -24,6 +26,7 @@ from prompt_ids.api.server import (
 )
 
 __all__ = [
+    "API_SPEC",
     "DEFAULT_PORT",
     "OPENAPI",
     "ROUTES",
@@ -35,6 +38,7 @@ __all__ = [
     "handle_canary_check",
     "handle_canary_issue",
     "handle_metrics",
+    "handle_output_scan",
     "handle_rules",
     "handle_scan",
     "handle_scan_batch",

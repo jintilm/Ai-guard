@@ -11,23 +11,46 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-# 事件类型：检测 / Canary 泄漏 / 记忆写入 / API 请求 / 代理转发 / 自定义
+# 事件类型：检测 / Canary 泄漏 / 记忆写入 / API 请求 / 代理转发 / 人工复核 / 自定义
 KIND_SCAN = "scan"
 KIND_LEAK = "leak"
 KIND_MEMORY = "memory"
 KIND_API = "api"
 KIND_PROXY = "proxy"
+KIND_REVIEW = "review"
 KIND_CUSTOM = "custom"
 
-EVENT_KINDS = (KIND_SCAN, KIND_LEAK, KIND_MEMORY, KIND_API, KIND_PROXY, KIND_CUSTOM)
+EVENT_KINDS = (KIND_SCAN, KIND_LEAK, KIND_MEMORY, KIND_API, KIND_PROXY, KIND_REVIEW, KIND_CUSTOM)
 
-MAX_PATTERNS = 5  # 只留前几个命中规则的 ID，够排查又不臃肿
+# 复核事件特有字段（收进 extra，与代理同款做法：不另起一套记录类型）
+REVIEW_EXTRA_FIELDS = ("verdict", "reviewer", "memory_absorbed", "linked_level", "top_pattern")
+
+#: 需要人工看一眼的等级。低于 medium 的（low / safe）不进复核队列 —— 否则队列
+#: 会被大量「只有一个弱特征」的样本淹掉，真正需要判断的反而被埋掉。
+REVIEW_LEVELS = frozenset({"medium", "high", "critical"})
+
+MAX_PATTERNS = 5  # 只留前几个命中规则的 ID，够排查又不臃端
+
+#: `note` 是**调用方自填的自由文本**，是原文唯一还能进审计文件的通道
+#: （审计其余字段都由系统生成，都不含原文）。note 本该是一句备注，
+#: 不是一段文档 —— 所以按长度截断，挡住「顺手把整段文本粘进备注」。
+#: 注意这挡不住刻意粘贴：真要泄露，调用方有 1000 种办法。所以这只是
+#: 缩小意外面，不是安全边界 —— 边界是「别往 note 里贴原文」。
+MAX_NOTE_CHARS = 200
+
+
+def _clip_note(note: str) -> str:
+    text = " ".join(str(note or "").split())
+    if len(text) <= MAX_NOTE_CHARS:
+        return text
+    return text[:MAX_NOTE_CHARS] + f"…[截断，原 {len(text)} 字符]"
 
 # 代理特有字段：统一收入 AuditEvent.extra，不再另起一套记录类型。
 # 通用字段（kind/level/action/score/fp/findings/patterns/detect_ms）与
 # CLI / API / pipeline 三个入口**逐字段一致**，因此 `prompt-ids-audit summary`
 # 不需要知道日志是哪个入口产生的。
-PROXY_EXTRA_FIELDS = ("decision", "status", "client", "path", "stream", "upstream_ms")
+PROXY_EXTRA_FIELDS = ("decision", "status", "client", "path", "stream", "upstream_ms",
+                      "segments", "trigger", "truncated", "dropped", "scanned_chars")
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,15 +140,58 @@ def event_from_scan(result, *, text: str = "", user: str = "",
         detect_ms=result.latency_ms.get("total", 0.0),
         user=user,
         source=source,
-        note=note,
+        note=_clip_note(note),
         extra=extra,
+    )
+
+
+def event_from_review(*, fp: str, is_attack: bool, reviewer: str = "",
+                      level: str = "", score: float = 0.0, top_pattern: str = "",
+                      patterns: tuple[str, ...] = (),
+                      note: str = "", memory_absorbed: bool = False,
+                      source: str = "review") -> AuditEvent:
+    """人工复核结论 -> 统一 AuditEvent。
+
+    为什么复核记录里**也没有原文**：审计层一旦存了原文，它就变成业务数据的副本，
+    代理/网关场景下等于凭空多一个泄露面。复核队列只给「指纹 + 等级 + 命中规则」，
+    判定与放行需要原文的场景（比如写入负向记忆）走独立接口，由调用方自己提供文本。
+
+    `action` 刻意留空：人工结论不是检测层的动作，填进 action 会污染
+    `by_action` 聚合，让「系统自己判了多少次阻断」这个数字失真。
+
+    `patterns` 是**归因**：这条人工结论背后是哪些规则判的。反哺规则迭代全靠它 ——
+    没有它，「PV-C001 的误报率是多少」根本无从回答，只能凭印象改规则。
+    """
+    return AuditEvent(
+        ts=time.time(),
+        kind=KIND_REVIEW,
+        level=level,
+        action="",
+        score=score,
+        fp=fp,
+        findings=len(patterns),
+        patterns=tuple(patterns[:MAX_PATTERNS]),
+        top_pattern=top_pattern,
+        user=reviewer,
+        source=source,
+        note=_clip_note(note or ("人工确认攻击" if is_attack else "人工标记误报")),
+        extra={
+            "verdict": "attack" if is_attack else "false_positive",
+            "reviewer": reviewer,
+            "memory_absorbed": bool(memory_absorbed),
+            "linked_level": level,
+            "top_pattern": top_pattern,
+        },
     )
 
 
 def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                      client: str = "", stream: bool = False,
                      upstream_ms: float = 0.0, detect_ms: float = 0.0,
-                     status: int = 200, note: str = "", text: str = "") -> AuditEvent:
+                     status: int = 200, note: str = "", text: str = "",
+                     segments: int = 0, trigger: str = "",
+                     truncated: int = 0, dropped: int = 0,
+                     scanned_chars: int = 0, secret_kinds: dict | None = None) -> AuditEvent:
     """代理转发事件 -> 统一 AuditEvent。
 
     代理侧历史上另有一套 AuditRecord。现在统一到同一个事件模型：
@@ -156,7 +222,7 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
         detect_ms=detect_ms,
         user=client,
         source="proxy",
-        note=note,
+        note=_clip_note(note),
         extra={
             "decision": decision,
             "status": status,
@@ -164,5 +230,16 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
             "path": path,
             "stream": bool(stream),
             "upstream_ms": round(upstream_ms, 2),
+            # 分段检测的覆盖账：扫了几段、命中哪一段、取样了几段、丢了几段、扫了多少字符。
+            # `truncated > 0` 或 `dropped > 0` 表示**这次检测没有覆盖全文** ——
+            # 不记下来就等于让运维以为长文档被完整查过了。
+            "segments": int(segments),
+            "trigger": trigger,
+            "truncated": int(truncated),
+            "dropped": int(dropped),
+            "scanned_chars": int(scanned_chars),
+            # 出站密钥扫描命中的类别与计数：**只落类别，不落原文**。
+            # 密钥的脱敏形态（首尾几个字符）只出现在给客户端的告警体里，不进审计文件。
+            "secret_kinds": dict(secret_kinds or {}),
         },
     )

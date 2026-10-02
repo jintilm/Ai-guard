@@ -14,8 +14,15 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .coverage
+
+# 工作笔记与评测缓存（本机状态，不入库）
+# 注意：tests/ 曾被误列在这里，导致全部单测不在版本库内 ——
+# 回归测试是本项目唯一的改动安全网，缺了它任何重构都不可验证。已移除该行。
 .workbuddy
-tests
 
 # 运行期产物（审计日志等）
 logs/
+data/review_corpus.jsonl
+# 复核语料含原文，刻意不入库
+data/review_mined.jsonl
+# 复核语料含原文，刻意不入库

@@ -77,8 +77,50 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--audit", default="", help="审计日志路径（JSONL，只记指纹不记原文）")
     p.add_argument("--policy", default="",
                    help="策略名：default / strict / permissive / log-only")
-    p.add_argument("--version", action="version", version=f"prompt-ids {__version__}")
+    out = p.add_argument_group("出站扫描（扫模型输出，不是扫输入）")
+    out.add_argument("--scan-output", action="store_true",
+                     help="把输入当作**模型输出**扫描：找第三方凭据并脱敏后退出")
+    out.add_argument("--version", action="version", version=f"prompt-ids {__version__}")
     return p
+
+
+def _run_output_scan(args: argparse.Namespace) -> int:
+    """出站扫描：不建流水线、不跑规则层，只看凭据。
+
+    刻意与请求侧检测分开：输入是「用户说的话」，输出是「模型生成的话」，
+    混在一个开关里会让运维以为两侧覆盖面相同。
+    """
+    from prompt_ids.output import redact, scan_secrets, summary
+
+    texts = _split(_read_input(args), args.lines)
+    if args.jsonl or (args.json and len(texts) > 1):
+        for text in texts:
+            hits = scan_secrets(text)
+            print(json.dumps({"found": len(hits), "by_kind": summary(hits),
+                              "secrets": [h.as_dict() for h in hits],
+                              "redacted": redact(text, hits)}, ensure_ascii=False))
+    elif args.json:
+        hits = scan_secrets(texts[0])
+        print(json.dumps({"found": len(hits), "by_kind": summary(hits),
+                          "secrets": [h.as_dict() for h in hits],
+                          "redacted": redact(texts[0], hits)}, ensure_ascii=False, indent=2))
+    elif args.quiet:
+        for text in texts:
+            print(f"secrets\t{len(scan_secrets(text))}")
+    else:
+        for i, text in enumerate(texts, 1):
+            hits = scan_secrets(text)
+            if len(texts) > 1:
+                print(f"\n----- 样本 {i} -----")
+            if not hits:
+                print("未发现凭据")
+                continue
+            print(f"发现 {len(hits)} 处凭据：{summary(hits)}")
+            for hit in hits:
+                print(f"  - {hit.kind} @ {hit.start}  {hit.masked()}")
+            print("\n脱敏后：")
+            print(redact(text, hits))
+    return EXIT_BLOCK if any(scan_secrets(t) for t in texts) else EXIT_PASS
 
 
 def _read_input(args: argparse.Namespace) -> str:
@@ -227,6 +269,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list_models is not None:
         return _print_models(args.list_models or "")
+
+    if args.scan_output:
+        return _run_output_scan(args)
 
     pipeline = _make_pipeline(args)
     if args.semantic:
