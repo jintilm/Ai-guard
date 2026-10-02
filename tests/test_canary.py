@@ -15,7 +15,6 @@ import pytest
 
 from prompt_ids.canary.tokens import (
     CanaryRegistry,
-    CanaryToken,
     issue,
 )
 from prompt_ids.proxy.server import ProxyConfig, create_server

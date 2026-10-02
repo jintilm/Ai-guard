@@ -70,17 +70,23 @@ jobs:
         #   没装 transformers/torch 时 LocalModelBackend.is_available() 返回 False，
         #   这正是测试要断言的那种「静默降级」路径，所以缺依赖反而测到了真东西。
 
-      - name: ruff 静态检查（暂不作为闸门）
+      - name: ruff 静态检查（闸门）
         run: python -m ruff check prompt_ids scripts tests --output-format=github
-        continue-on-error: true
-        # ⚠ 这一条**故意**是 continue-on-error，不是忘了配。
-        #   首次运行实测基线债务 85 条（42×F401 未用导入 · 18×E741 · 11×F841 ·
-        #   6×E702 · 5×F541 · 3×F811），绝大多数是历史遗留，与任何一次改动无关。
-        #   把它当闸门的话，CI 从第一天起就是红的 —— 那不是保护，是噪声，
-        #   而噪声会让人习惯性忽略红灯（比没有 CI 更糟）。
-        #   债务还清之后：删掉这一行 continue-on-error，并考虑 `--fix` 一次性收掉 50 条。
-        #   顺带：F821 报告的 prompt_ids/web/dashboard.py:1665 `ApiContext` 未定义
-        #   是**真问题**（不是风格），已在下面的 job summary 里单独点出来。
+        # **真闸门**。基线债务已于 2026-10 清零：85 → 0
+        # （42×F401 未用导入 · 18×E741 · 11×F841 · 6×E702 · 5×F541 · 3×F811）。
+        #
+        # 期间这一条**故意**挂过 continue-on-error，理由值得留着：
+        # 85 条历史告警当闸门的话 CI 从第一天起就是红的 —— 那不是保护，是噪声，
+        # 而噪声会训练人习惯性忽略红灯（比没有 CI 更糟）。
+        #
+        # 清零的方式（下次再加规则时照此办理）：
+        #   F401 / F541 用 `--fix`（50 条，机械且安全）；
+        #   E741 / E702 / F841 **逐处人工读上下文**后改 —— `l` 出现在元组解包
+        #   （`for s, l, m in rows`）与推导式里，正则硬改极易改错位置或漏改，
+        #   而「E741 变 0」与「代码还能跑」是两件事，必须都成立（每次改完跑全量 pytest）。
+        #   期间真查出两个不是风格问题的：F811（core/pipeline.py 重复导入
+        #   SemanticDetector）与 F841（proxy 直通路径算了 `text` 却没用 ——
+        #   说明那条路径**没有把文本传给审计**，指纹与 chat 路径不同源）。
         #
         # 只查 prompt_ids scripts tests，不查 data/：data/raw/ 是下载来的第三方语料，
         # 对它跑 lint 只会产出与本项目无关的噪声。

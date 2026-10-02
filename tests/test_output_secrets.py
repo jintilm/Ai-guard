@@ -97,8 +97,12 @@ def test_redact_bytes_keeps_the_json_valid():
 
 
 def test_redact_skips_a_hit_whose_offset_no_longer_applies():
-    """文本被上层改过之后，旧的偏移量不能硬切（否则会削掉正常内容）。"""
-    text = "12345 " + AWS
+    """文本被上层改过之后，旧的偏移量不能硬切（否则会削掉正常内容）。
+
+    `hit` 的区间 [6, 6+len(AWS)) 来自**另一段字符串**（"12345 " + AWS），
+    而这里 redact 的是 "12345 abcdefghij" —— 偏移仍然落在范围内，
+    守护的是「内容对不上就不动」这一条（见 `redact` 自身的偏移校验）。
+    """
     hit = SecretHit("aws_access_key", 6, 6 + len(AWS), AWS)
     assert redact("12345 abcdefghij", [hit]) == "12345 abcdefghij"
 
@@ -414,7 +418,7 @@ def test_cli_output_scan_exits_three_and_redacts():
 
 def test_cli_output_scan_is_a_separate_mode_from_input_scanning():
     """同一个字符串当输入是良性的，当输出才判 —— 两侧覆盖面不同，别混。"""
-    text = f"文档里的示例密钥 AKIAIOSFODNN7EXAMPLE 是公开的样例"
+    text = "文档里的示例密钥 AKIAIOSFODNN7EXAMPLE 是公开的样例"
     code_out, out = _run_cli("--scan-output", "--quiet", text)
     assert code_out == 3
     code_in, _ = _run_cli(text)

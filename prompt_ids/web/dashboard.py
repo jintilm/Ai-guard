@@ -153,7 +153,8 @@ def collect(ablation_path: Path, audit_path: Path | None) -> dict:
         }
 
     if audit_path and audit_path.exists():
-        rows = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()]
         data["proxy"] = {
             "total": len(rows),
             "by_decision": _tally(rows, "decision"),
@@ -1247,7 +1248,6 @@ PG_JS = """
 def render_html(data: dict) -> str:
     payload = json.dumps(data, ensure_ascii=False)
     rules = data.get("rules", {})
-    ds = (data.get("datasets") or {}).get("full") or {}
     best = ""
     if data.get("ablation"):
         best = max(data["ablation"].items(), key=lambda kv: kv[1]["confusion"]["f1"])[0]
@@ -1730,7 +1730,6 @@ def serve(out: Path, port: int, refresh_s: int, ablation: Path, audit: Path | No
           semantic_local_only: bool = False, memory: bool = False,
           review_corpus_path: str = "",
           open_browser: bool = True) -> None:  # pragma: no cover - 需要真实端口
-    import webbrowser
 
     from prompt_ids.web.playground import serve as serve_playground
 

@@ -10,7 +10,6 @@ import binascii
 import codecs
 import html
 import re
-from html.entities import html5
 from typing import Callable, NamedTuple
 
 from prompt_ids.core.types import Variant

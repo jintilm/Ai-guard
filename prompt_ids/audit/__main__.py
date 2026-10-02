@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from prompt_ids.audit.events import LEGACY_OUTBOUND_DECISIONS, AuditEvent
+from prompt_ids.audit.events import LEGACY_OUTBOUND_DECISIONS
 from prompt_ids.audit.logger import disk_usage, file_size
 from prompt_ids.audit.query import (
     last_hours,
@@ -26,7 +26,6 @@ from prompt_ids.audit.query import (
     rule_suspects,
     summarize,
     top_patterns,
-    within,
 )
 
 

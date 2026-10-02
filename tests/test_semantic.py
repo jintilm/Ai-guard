@@ -340,7 +340,6 @@ def test_lightweight_default_model_path_matches_trainer_output():
 
 
 def test_lightweight_loads_shipped_model():
-    from pathlib import Path
 
     from prompt_ids.detectors.semantic.lightweight import DEFAULT_MODEL_PATH, LightweightBackend
 

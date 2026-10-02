@@ -209,7 +209,8 @@ def test_review_corpus_writes_header_and_rows(tmp_path):
     assert corpus.add(text="原文在这里", is_attack=False, fp="fp1",
                       patterns=("PV-C001",), top_pattern="PV-C001",
                       level="critical", score=90.0) is True
-    lines = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+             if line.strip()]
     head, row = lines[0], lines[1]
     assert head["type"] == "prompt-ids-review-corpus"
     assert "原文" in head["warning"], "文件头必须写明它含原文"
@@ -268,7 +269,6 @@ def test_review_patterns_endpoint_exposes_ledger_and_suspects(tmp_path):
     """读数端：台账 + 嫌疑榜 + 语料状态，一次返回。"""
     from prompt_ids.api.app import ApiContext, handle_review_patterns
     from prompt_ids.api.app import resolve
-    from prompt_ids.audit.events import KIND_REVIEW
     from prompt_ids.audit.logger import AuditLogger
 
     assert resolve("GET", "/v1/review/patterns") is handle_review_patterns
@@ -340,7 +340,8 @@ def test_mined_script_output_is_dataset_shaped(tmp_path):
         cwd=str(Path(__file__).resolve().parents[1]), env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()
+            if line.strip()]
     assert {r["label"] for r in rows} == {0, 1}
     for row in rows:
         assert {"text", "label", "source", "category"} <= set(row)

@@ -12,13 +12,12 @@ from __future__ import annotations
 
 import json
 import socket
-import threading
 import urllib.error
 import urllib.request
 
 import pytest
 
-from prompt_ids.api.app import ApiContext, ApiError
+from prompt_ids.api.app import ApiContext
 from prompt_ids.core.pipeline import PipelineConfig, create_pipeline
 from prompt_ids.web.playground import MAX_BODY_BYTES, Handler, PlaygroundState, attach, serve
 

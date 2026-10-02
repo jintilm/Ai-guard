@@ -33,7 +33,7 @@ from prompt_ids.audit.events import (
 )
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
-from prompt_ids.preprocess.guard import RateLimiter
+from prompt_ids.preprocess.guard import RateLimiter, fingerprint
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, ScanResult, level_rank
 from prompt_ids.net import warn_if_exposed
@@ -1096,12 +1096,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
                              budget_chars=self.config.max_total_scan_chars)
         detect_ms = (time.perf_counter() - started) * 1000
         decision, status, why = decide(scan.result, self.config, scan.trigger)
-        text = "\n".join(seg.text for seg in segments)
 
         if decision == "block":
             self._audit_passthrough(
                 path, scan, note, status=status, scanned=True, detect_ms=detect_ms,
-                decision=decision, reason=why, segments=len(segments))
+                decision=decision, reason=why, segments=len(segments),
+                text="\n".join(seg.text for seg in segments))
             self._send_json(403, {
                 "error": {
                     "message": f"{why}（{note}）",
@@ -1122,12 +1122,17 @@ class ProxyHandler(BaseHTTPRequestHandler):
         status_code, _data = self._relay_passthrough("POST", body)
         self._audit_passthrough(
             path, scan, note, status=status_code or status, scanned=True,
-            detect_ms=detect_ms, decision=decision, reason=why, segments=len(segments))
+            detect_ms=detect_ms, decision=decision, reason=why,
+            segments=len(segments),
+            # 指纹必须覆盖**实际扫过的文本**，否则同一条攻击从 chat 走和从
+            # embeddings 走会算出两个指纹，`by_fp` 聚合把它们当成两次事件。
+            # 此前这里漏了（ruff F841 顺带查出来的：text 算了却没用）。
+            text="\n".join(seg.text for seg in segments))
 
     def _audit_passthrough(self, path: str, scan, note: str, *, status: int,
                            scanned: bool, detect_ms: float = 0.0,
                            decision: str = "allow", reason: str = "",
-                           segments: int = 0) -> None:
+                           segments: int = 0, text: str = "") -> None:
         """直通路径也落审计。
 
         此前直通请求**一条事件都不写** —— 于是「请求总数」只统计被检测的调用，
@@ -1149,6 +1154,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
             level=(scan.result.level.value if scan is not None else "info"),
             action=(scan.result.action.value if scan is not None else "pass"),
             detect_ms=round(detect_ms, 2), note=(reason or note)[:200],
+            # 指纹覆盖**实际扫过**的文本（与 chat 路径同源）。`text` 只用来算
+            # 指纹，绝不写入日志 —— 审计层「只落指纹」这条边界对直通路径同样成立。
+            fp=fingerprint(text) if text else "",
             extra={"decision": decision, "path": path, "status": status,
                    "client": self.client_address[0], **extra},
         ))

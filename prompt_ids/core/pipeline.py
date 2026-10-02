@@ -5,7 +5,7 @@ import copy
 import time
 from dataclasses import dataclass
 
-from prompt_ids.core.policy import Policy, PolicyEngine
+from prompt_ids.core.policy import PolicyEngine
 from prompt_ids.core.types import Action, Finding, Level, ScanResult
 from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
 from prompt_ids.detectors import (
@@ -17,7 +17,6 @@ from prompt_ids.detectors import (
 )
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.detectors.base import Detector
-from prompt_ids.detectors.semantic.detector import SemanticDetector
 from prompt_ids.memory.detector import MemoryDetector
 from prompt_ids.preprocess import Preprocessor
 from prompt_ids.preprocess.guard import Guard, GuardConfig, LengthRejected, fingerprint

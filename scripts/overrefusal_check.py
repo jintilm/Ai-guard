@@ -346,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
               f"（{result['latency_ms']['per_sample_ms']}ms/条）")
         print(f"  FP@level  >=medium {level['ge_medium_review_or_worse']:.4f}"
               f"  >=high {level['ge_high']:.4f}  >=critical {level['ge_critical']:.4f}")
-        print(f"  FP@action " + "  ".join(
+        print("  FP@action " + "  ".join(
             f"{k} {action[k]:.4f}" for k in ("block", "review", "sandbox", "log", "pass")
             if k in action))
         rel = result["reliability"]

@@ -86,7 +86,6 @@ def test_action_rates_sum_to_one():
 
 def test_both_readings_are_reported():
     """level 口径与 action 口径都要在报告里，缺一个就等于没测全。"""
-    module = _load_script()
     report_path = ROOT / "reports" / "overrefusal.json"
     if not report_path.exists():
         pytest.skip("需先跑 python scripts/overrefusal_check.py")
@@ -186,7 +185,6 @@ def test_examples_are_labelled_as_public_benchmark_text():
     if not report_path.exists():
         pytest.skip("需先跑 python scripts/overrefusal_check.py")
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    method = report["method"]
     assert "公开基准" in json.dumps(report, ensure_ascii=False) or \
         "examples_fp" in report["configs"]["rules_only"], "样例字段缺失"
     # 样例里必须有 source/category，否则看到误判也不知道属于哪一类

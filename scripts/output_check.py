@@ -97,9 +97,7 @@ def main() -> int:
 
     missed: list[dict] = []
     for kind, text in SYNTHETIC:
-        hits = scan_secrets(text)
-        kinds = {h.kind for h in hits}
-        if not hits:
+        if not scan_secrets(text):
             missed.append({"expect": kind, "text": text[:40]})
     report["synthetic"] = {
         "n": len(SYNTHETIC),

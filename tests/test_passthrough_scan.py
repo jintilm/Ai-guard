@@ -96,7 +96,8 @@ class _Upstream(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(length)
+        if length:
+            self.rfile.read(length)          # 读干净，避免客户端看到 BrokenPipe
         type(self).seen.append(self.path)
         payload = json.dumps({"data": [{"embedding": [0.1, 0.2]}],
                               "path": self.path}).encode()
@@ -114,6 +115,55 @@ class _Upstream(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+
+
+def test_passthrough_audit_fingerprint_covers_the_scanned_text(tmp_path):
+    """**指纹必须覆盖实际扫过的文本。**
+
+    ruff 的 F841 顺带查出来的：直通路径算了 `text` 却没用，于是这条审计事件的
+    `fp` 恒为空。后果不是「少一个字段」，而是**同一条攻击从 chat 走和从
+    `/v1/embeddings` 走会算出两个指纹**（一个真实、一个空），
+    `by_fp` 聚合把它们当成两次不同事件，跨入口的去重与统计全错。
+    """
+    from prompt_ids.audit import query
+    from prompt_ids.preprocess.guard import fingerprint
+    from prompt_ids.proxy.server import ProxyConfig, create_server
+
+    segments = extract_passthrough_segments(
+        "/v1/embeddings", {"input": INJECTION})[0]
+    assert segments, "没抽出文本段，这条守护就测不到东西"
+    # 预期指纹按「代理实际扫的文本」算：分段文本以换行连接。
+    # 不在这里先跑一次 scan —— 断言要的是**端到端**结果（真起服务、真发请求、
+    # 读审计文件），先本地算一遍反而会把「代理算错了」也算成通过。
+
+    # 真起一个代理、真的发一次请求，然后读审计文件
+    config = ProxyConfig(audit_path=str(tmp_path / "fp.jsonl"))
+    server = create_server(config)
+    import threading
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        body = json.dumps({"input": INJECTION}).encode()
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_address[1]}/v1/embeddings",
+            data=body, method="POST",
+            headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(request, timeout=5)
+        except urllib.error.HTTPError:
+            pass          # 403（拦下）或 502（上游不存在）都无所谓，要的是审计
+    finally:
+        server.shutdown()
+        server.server_close()
+    config.audit.flush()
+
+    raw = (tmp_path / "fp.jsonl").read_text(encoding="utf-8")
+    expected = fingerprint("\n".join(seg.text for seg in segments))
+    assert expected in raw, "**指纹没落进直通路径的审计事件**（F841 那个坑）"
+    assert INJECTION not in raw, "原文漏进审计文件"
+    events = query.load(tmp_path / "fp.jsonl")
+    assert events and events[-1].fp == expected
 
 
 def _proxy(tmp_path: Path, *, budget: int = 0):

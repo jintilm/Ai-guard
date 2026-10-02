@@ -14,7 +14,6 @@
 """
 from __future__ import annotations
 
-import pytest
 
 from prompt_ids.detectors.semantic import (
     AUTO_PREFERENCE,

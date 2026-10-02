@@ -17,11 +17,10 @@ from typing import Any
 from prompt_ids.api.app import (
     ApiContext,
     ApiError,
-    MAX_BATCH,
     resolve,
 )
 from prompt_ids.net import warn_if_exposed
-from prompt_ids.preprocess.guard import GuardConfig, RateLimiter
+from prompt_ids.preprocess.guard import RateLimiter
 
 DEFAULT_PORT = 8790
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 2MB
@@ -173,7 +172,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ApiError as exc:
             self._error(exc.status, exc.code, exc.message)
             return
-        except Exception as exc:  # 兜底：不让任何异常把服务打挂
+        except Exception:  # 兜底：不让任何异常把服务打挂
             # **不回显异常文本**：FileNotFoundError 会带绝对路径，第三方 SDK 的异常
             # 可能带 base_url（内网网关地址，URL 里甚至可能内嵌凭据），而本服务默认不鉴权。
             # 完整栈写到服务端 stderr（否则就等于把异常静默吞了 —— 「详见日志」不能是空话），

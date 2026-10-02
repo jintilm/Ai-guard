@@ -17,7 +17,6 @@ from __future__ import annotations
 import base64
 import time
 
-import pytest
 
 from prompt_ids.canary.tokens import CanaryRegistry
 

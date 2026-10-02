@@ -14,7 +14,6 @@ from typing import Any, Callable
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
-from prompt_ids.memory.detector import MemoryDetector
 from prompt_ids.output import MAX_HITS, redact, scan_text
 
 MAX_TEXT_CHARS = 50_000

@@ -99,14 +99,14 @@ def main() -> int:
             kind_note += "（同一攻击的表面变体）"
         print(f"{label:<22}{similarity:>9.4f}{hit:>8}{dedup:>8}   {kind_note}")
 
-    malicious = [(s, l) for s, l, m in rows if m]
-    benign = [(s, l) for s, l, m in rows if not m]
+    malicious = [(sim, text) for sim, text, is_malicious in rows if is_malicious]
+    benign = [(sim, text) for sim, text, is_malicious in rows if not is_malicious]
     if not malicious or not benign:
         print("\n样本不足，无法计算可分性。")
         return 0
 
     # 去掉 anchor 自身与它的表面变体，剩下的才是"另一条攻击"
-    distinct = [(s, l) for s, l in malicious if l not in SAME_SAMPLE]
+    distinct = [(sim, text) for sim, text in malicious if text not in SAME_SAMPLE]
     benign_max, benign_worst = max(benign)
 
     print()
@@ -120,12 +120,12 @@ def main() -> int:
     if distinct:
         print(f"  → 攻击簇与正常簇的间隔   {min(distinct)[0] - benign_max:+.4f}")
 
-    swallowed = [(s, l) for s, l in distinct if s >= args.dedup]
+    swallowed = [(sim, text) for sim, text in distinct if sim >= args.dedup]
     print()
     if swallowed:
         print(f"去重线 {args.dedup} 落在攻击簇内部 —— 下列**不同**攻击会被当成重复丢掉：")
-        for s, l in sorted(swallowed, reverse=True):
-            print(f"  {s:.4f}  {l}")
+        for sim, text in sorted(swallowed, reverse=True):
+            print(f"  {sim:.4f}  {text}")
         print(f"  共 {len(swallowed)}/{len(distinct)} 条。自进化会静默失效（无报错、库不再增长）。")
     elif distinct:
         print(f"去重线 {args.dedup} 低于所有不同攻击的相似度，不会丢样本。")

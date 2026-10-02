@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import threading
 
-import pytest
 
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
 from prompt_ids.detectors.semantic.detector import SemanticDetector

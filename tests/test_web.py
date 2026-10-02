@@ -271,7 +271,6 @@ def test_collect_reads_audit_log(tmp_path):
 
 def test_serve_exposes_dashboard(tmp_path, ablation_file):
     """起真实服务，确认根路径返回的就是那份看板，且 /v1/scan 可用。"""
-    import urllib.request
 
     from prompt_ids.web import dashboard as dash
 

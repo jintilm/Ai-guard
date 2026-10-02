@@ -216,9 +216,12 @@ def main() -> int:
                                        "rtp": 0, "rtn": 0, "langs": set()})
         b, r = info["block"], info["review"]
         bucket["n"] += info["n"]
-        bucket["btp"] += b["tp"]; bucket["bfn"] += b["fn"]
-        bucket["bn"] += b["fp"] + b["tn"]; bucket["bfp"] += b["fp"]
-        bucket["rtp"] += r["tp"]; bucket["rtn"] += r["tp"] + r["fn"]
+        bucket["btp"] += b["tp"]
+        bucket["bfn"] += b["fn"]
+        bucket["bn"] += b["fp"] + b["tn"]
+        bucket["bfp"] += b["fp"]
+        bucket["rtp"] += r["tp"]
+        bucket["rtn"] += r["tp"] + r["fn"]
         bucket["langs"].add(info["lang"])
 
     attack_rows = []
@@ -245,7 +248,7 @@ def main() -> int:
             cat, str(b["bn"]), f"{b['bfp'] / b['bn']:.4f}",
             f"{(b['rtp'] - b['btp']) / b['bn']:.4f}", tops,
         ])
-    print(f"\n## 良性类别的过防御（block FPR 与 review-only FPR 分开；后者是人工复核队列的入口）")
+    print("\n## 良性类别的过防御（block FPR 与 review-only FPR 分开；后者是人工复核队列的入口）")
     print(markdown_table(["类别", "n", "FPR(block)", "FPR(review only)", "命中规则 TopN"],
                          benign_rows, "lrrrr"))
 
@@ -254,9 +257,12 @@ def main() -> int:
         lang = info["lang"]
         bucket = lang_agg.setdefault(lang, {"atk": 0, "btp": 0, "ben": 0, "bfp": 0, "rtp": 0, "flag": 0})
         b, r = info["block"], info["review"]
-        bucket["atk"] += b["tp"] + b["fn"]; bucket["btp"] += b["tp"]
-        bucket["ben"] += b["fp"] + b["tn"]; bucket["bfp"] += b["fp"]
-        bucket["rtp"] += r["tp"]; bucket["flag"] += r["tp"] + r["fp"]
+        bucket["atk"] += b["tp"] + b["fn"]
+        bucket["btp"] += b["tp"]
+        bucket["ben"] += b["fp"] + b["tn"]
+        bucket["bfp"] += b["fp"]
+        bucket["rtp"] += r["tp"]
+        bucket["flag"] += r["tp"] + r["fp"]
     lang_rows = []
     for lang, b in sorted(lang_agg.items()):
         n_atk, n_ben = b["atk"], b["ben"]

@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from prompt_ids.audit.query import decision_of, load, outbound_of  # noqa: E402
-from prompt_ids.canary.tokens import CanaryRegistry, issue  # noqa: E402
+from prompt_ids.canary.tokens import CanaryRegistry  # noqa: E402
 from prompt_ids.eval.metrics import markdown_table  # noqa: E402
 from prompt_ids.proxy.server import ProxyConfig, create_server  # noqa: E402
 

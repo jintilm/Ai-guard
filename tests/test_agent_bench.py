@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _rows() -> list[dict]:
-    return [json.loads(l) for l in io.open(BENCH, encoding="utf-8") if l.strip()]
+    return [json.loads(line) for line in io.open(BENCH, encoding="utf-8") if line.strip()]
 
 
 def test_bench_has_both_labels_and_real_size():

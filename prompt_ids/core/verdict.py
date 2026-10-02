@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from prompt_ids.core.types import DETECTOR_MEMORY, DETECTOR_SEMANTIC, DETECTOR_RULE, Action, Finding, Level
-from prompt_ids.detectors import saturate
+from prompt_ids.core.types import DETECTOR_MEMORY, DETECTOR_SEMANTIC, DETECTOR_RULE, Finding, Level
 
 # 默认权重：规则层负责可解释，启发层负责补漏，语义层负责泛化
 DEFAULT_WEIGHTS: dict[str, float] = {

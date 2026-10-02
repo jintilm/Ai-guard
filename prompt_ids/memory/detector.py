@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import threading
-import time
 from typing import Any
 
 from prompt_ids.core.types import DETECTOR_MEMORY, Finding
@@ -22,7 +21,6 @@ from prompt_ids.memory.encoder import TextEncoder, build_encoder
 from prompt_ids.memory.store import (
     ATTACK,
     FALSE_POSITIVE,
-    MemoryItem,
     VectorStore,
     make_item,
 )

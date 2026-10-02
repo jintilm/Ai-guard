@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig  # noqa: E402
 from prompt_ids.core.verdict import FusionConfig  # noqa: E402
-from prompt_ids.detectors import DetectorContext, DetectorRegistry, HeuristicDetector, RuleDetector  # noqa: E402
+from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector  # noqa: E402
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend  # noqa: E402
 from prompt_ids.detectors.semantic.detector import SemanticDetector  # noqa: E402
 from prompt_ids.detectors.semantic.factory import build_backend  # noqa: E402

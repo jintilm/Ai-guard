@@ -70,7 +70,6 @@ def test_no_text_leak_between_splits(build):
 
 def test_pint_profile_ratio_is_benign_heavy(build, tmp_path):
     """pint profile 的攻击占比要真的落在 PINT 那个量级（良性占绝大多数）。"""
-    import json
     import random as _random
 
     module = build

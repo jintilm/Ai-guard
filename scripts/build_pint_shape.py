@@ -802,7 +802,7 @@ def main() -> int:
         print()
         summary("pint_recall.jsonl", train + test)
 
-    meta_path = out / (f"pint_shape_meta.json" if args.profile == "pint" else "pint_recall_meta.json")
+    meta_path = out / ("pint_shape_meta.json" if args.profile == "pint" else "pint_recall_meta.json")
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n构成明细 -> {meta_path}")
     print("评测：")

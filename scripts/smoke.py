@@ -63,7 +63,6 @@ def main() -> int:
             print(f"        findings: {[(f.pattern_id, f.variant, f.evidence[:40]) for f in r.findings]}")
 
     print()
-    total = len(ATTACKS) + len(BENIGN)
     failed = len(missed) + len(false_pos)
     print(f"检出 {len(ATTACKS) - len(missed)}/{len(ATTACKS)}，误报 {len(false_pos)}/{len(BENIGN)}")
     if missed:

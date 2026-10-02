@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -211,7 +210,6 @@ def test_llm_backend_unavailable_without_key(monkeypatch):
 def test_llm_backend_degrades_through_detector(monkeypatch):
     """不可用的后端不能拖垮调用方 —— 这是贯穿全项目的降级契约。"""
     _clear_llm_env(monkeypatch)
-    from prompt_ids.core.pipeline import PipelineConfig, create_pipeline
     from prompt_ids.detectors.semantic.llm import LLMJudgeBackend
 
     detector = __import__(

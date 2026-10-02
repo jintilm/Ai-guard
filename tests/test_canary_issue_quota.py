@@ -16,10 +16,8 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-import pytest
 
 from prompt_ids.api.app import ApiContext, handle_canary_issue, handle_metrics
 from prompt_ids.audit.logger import AuditLogger

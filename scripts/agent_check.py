@@ -51,7 +51,7 @@ def load(path: Path) -> list[dict[str, Any]]:
         print(f"语料不存在：{path}\n先跑 python -X utf8 scripts/build_agent_bench.py",
               file=sys.stderr)
         raise SystemExit(2)
-    return [json.loads(l) for l in io.open(path, encoding="utf-8") if l.strip()]
+    return [json.loads(line) for line in io.open(path, encoding="utf-8") if line.strip()]
 
 
 def deliver(row: dict[str, Any], role: str, author: str) -> dict[str, Any]:
@@ -131,7 +131,7 @@ def report(rows: list[dict], label: str, result: dict[str, Any]) -> None:
     print(f"  平均 {result['ms_per_text']}ms/条 · 命中最多的规则 "
           f"{list(result['top_patterns'])[:4]}")
     worst = [(k, v) for k, v in result["levels"].items() if k.startswith("attack_")]
-    print(f"  攻击等级分布: " + " · ".join(f"{k.split('_', 1)[1]}={v}" for k, v in sorted(worst)))
+    print("  攻击等级分布: " + " · ".join(f"{k.split('_', 1)[1]}={v}" for k, v in sorted(worst)))
 
 
 #: 诊断探针（**自拟**，不是评测集）：典型的 RAG / agent 系统提示。

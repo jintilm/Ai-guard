@@ -26,7 +26,6 @@ from prompt_ids.memory.encoder import (
 from prompt_ids.memory.store import (
     ATTACK,
     FALSE_POSITIVE,
-    MemoryItem,
     VectorStore,
     faiss_available,
     make_item,

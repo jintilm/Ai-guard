@@ -177,7 +177,8 @@ class _WeirdUpstream(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
-        body = self.rfile.read(length) if length else b""
+        if length:
+            self.rfile.read(length)      # 必须读干净，否则客户端会看到 BrokenPipe
         _WeirdUpstream.last_path = self.path
         if _WeirdUpstream.mode == "oversized":
             payload = b'{"choices":[{"message":{"content":"' + b"a" * 40_000 + b'"}}]}'
@@ -338,7 +339,6 @@ def test_integrity_headers_are_stripped_after_redaction(weird_upstream, tmp_path
 def test_stream_warning_frame_precedes_done(weird_upstream, tmp_path):
     """告警帧必须插在 `data: [DONE]` 之前：官方 SDK 读到 [DONE] 就停止消费，
     追加在后面的帧会被丢弃 —— 也就是最常见的用法收不到告警。"""
-    from prompt_ids.canary.tokens import CanaryRegistry
 
     class _StreamLeaky(_WeirdUpstream):
         def do_POST(self):
@@ -376,8 +376,8 @@ def test_stream_warning_frame_precedes_done(weird_upstream, tmp_path):
         done_at = text.index("data: [DONE]")
         assert warn_at < done_at, "告警帧排在 [DONE] 之后，真实 SDK 读不到"
         # 密钥被拆成两个 delta，仍要被认出来（逐帧拼回）
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert any(e["extra"].get("secret_kinds") for e in events), \
             "跨 delta 的密钥没被检出"
     finally:
@@ -421,8 +421,8 @@ def test_stream_canary_leak_is_audited(weird_upstream, tmp_path):
     try:
         _proxy_post(httpd.server_address[1], {
             "messages": [{"role": "user", "content": "你好"}], "stream": True})
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert any(e["extra"].get("outbound") == "warned" and "Canary" in
                    e["extra"].get("outbound_detail", "") for e in events), \
             f"流式 Canary 泄漏没有落审计：{[e['extra'].get('outbound') for e in events]}"
@@ -441,8 +441,8 @@ def test_outbound_scan_budget_is_accounted_in_audit(weird_upstream, tmp_path):
     try:
         _proxy_post(httpd.server_address[1], {
             "messages": [{"role": "user", "content": "你好"}]})
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         secret_events = [e for e in events if "secret_scanned_chars" in e["extra"]]
         # 没有命中时也要有这条字段（恒为 0/false），否则「没记账」与「没扫」无法区分
         assert secret_events, "出站扫描的覆盖账没落进主事件"
@@ -642,8 +642,8 @@ def test_one_request_writes_exactly_one_audit_event(weird_upstream, tmp_path):
         for _ in range(3):
             _proxy_post(httpd.server_address[1], {
                 "messages": [{"role": "user", "content": "你好"}]})
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert len(events) == 3, f"3 次请求应落 3 条事件，实得 {len(events)}"
         from collections import Counter
 
@@ -701,8 +701,8 @@ def test_rate_limited_requests_leave_a_trace(weird_upstream, tmp_path):
         codes = [_proxy_post(httpd.server_address[1], {
             "messages": [{"role": "user", "content": "你好"}]})[0] for _ in range(4)]
         assert codes == [200, 200, 429, 429], codes
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert len(events) == 4, f"4 次请求应落 4 条事件，实得 {len(events)}"
         limited = [e for e in events if e["extra"]["decision"] == "rate_limited"]
         assert len(limited) == 2, "被限流的请求没有留痕"
@@ -726,7 +726,7 @@ def test_review_patterns_limit_is_parameterised(tmp_path):
         logger.log_review(fp=f"fp{i}", is_attack=False, patterns=("PV-C001",),
                           top_pattern="PV-C001")
     logger.flush()
-    from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
+    from prompt_ids.core.pipeline import PipelineConfig, create_pipeline
 
     pipeline = create_pipeline(config=PipelineConfig())
     ctx = ApiContext(pipeline=pipeline, audit=logger)
@@ -761,8 +761,8 @@ def test_client_disconnect_still_writes_audit(weird_upstream, tmp_path):
             pass
         _time.sleep(0.3)
         assert audit_path.exists()
-        events = [json.loads(l) for l in audit_path.read_text(encoding="utf-8").splitlines()
-                  if l.strip()]
+        events = [json.loads(line) for line
+                  in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert events, "正常请求也应有审计（对照组）"
     finally:
         httpd.shutdown()
