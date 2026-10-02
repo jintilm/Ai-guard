@@ -929,21 +929,72 @@ TLS · `X-Forwarded-For`（缺它则按 IP 限流把**所有人**算成一个桶
 ⚠ **反代与内置鉴权是两道独立门，不要只配一道**：反代给了 TLS 但忘了透传
 `X-API-Key` ⇒ 服务侧鉴权等于没开；只配服务侧鉴权不给反代 ⇒ Key 走明文。
 
-### ⑤ 仍未修（当前只剩这 4 项）
+### 5. 流式 SSE 推送面板 ✅
+
+`prompt_ids/web/playground.py` 的 `/v1/stream` + 看板实时流面板。
+
+- **不能用 `EventSource`** —— 它无法自定义请求头，客户端 Key 只能塞进 query，
+  于是凭据会进 **nginx access log / 浏览器历史 / Referer**。
+  改用 `fetch` + `ReadableStream` 手动解析 SSE 分帧（多 30 行 JS）。
+- 事件环 50 条 + **心跳 15s**（不是装饰：反代与浏览器都会掐空闲连接，
+  而没有心跳的 SSE **看起来一切正常，直到某天开始静默停止推送**）+
+  连接存活上限 900s（让前端自己重连，而不是静默卡死）。
+- `last_seq` 重连**补发**错过的事件。
+- 事件**不含原文**（审计/遥测/看板之后是**第四处**边界，而它最容易被忘）。
+
+⚠ 实现时踩到三个坑，每一个都是「静默」形态：
+
+1. **`_lock` 必须 `RLock`**：SSE 等待方在 `with self.changed:` 里调
+   `events_since()`，而 Condition 用的就是这把锁 ⇒ 普通 Lock **自死锁**，
+   现象是「hello 帧正常、之后一个事件都不推」，**零报错**。
+2. **推送延迟**：初版拿心跳间隔当轮询间隔 ⇒ 一次检测最坏等 15 秒才出现，
+   **那不叫实时**。改成事件驱动（Condition `notify_all`）。
+3. **流式面板只能在服务可用时启动**：无条件启动的无限重连循环会让
+   `check_dashboard.py` 的 node **无法退出**（实测超时 90s）。
+   ⚠ 这不是测试环境问题 —— 任何离线场景都会挂着一个不结束的循环。
+
+### 6. 转写/翻译的响应侧文本 ✅
+
+`prompt_ids/proxy/passthrough_out.py`。`/v1/audio/transcriptions`、
+`/v1/audio/translations` 的**输出**是模型生成的文本，而此前**只扫输入**
+（输入是音频字节，没有文本）⇒ 那段文本从未被检查。而**音频注入是已知的弱面**
+（Whisper 类模型对抗样本），不是理论风险。
+
+- 判定复用 `scan_segments`（不写第二套），角色名 `transcript`。
+- **不修改响应体**：内容已经发出去了，悄悄改写会让调用方拿到
+  一句「用户没说过的……」而毫无察觉。只判定、只记账。
+- 结论落 `extra["transcript_scan"]`，与请求侧 `decision` **正交**
+  —— 请求放行了但转写被判注入，只看 decision 会漏掉。
+
+⚠ 同样抓到两个「静默」形态：
+
+1. 音频转写的请求体**就是 multipart**（不是 JSON）⇒ 总是走
+   `if not payload` 分支。第一版在那里 `return` 了 ⇒ **响应侧检查永远没机会跑**，
+   被 `tests/test_transcript_scan.py` 当场抓到。
+2. **审计必须早于响应落盘**：先回响应再落审计 ⇒ 客户端可能先看到 200
+   而审计还没写进文件。拆出 `_fetch_passthrough()`（只取回不写），
+   顺序改成 取回 → 检查 → 落审计 → 再回客户端。
+
+### 7. token id 形态的 `input` ✅
+
+`extract_passthrough_segments` 现在返回第四项 `input_kind`
+（`text` / `token_ids` / `mixed` / `empty` / `no_text_field` / `not_json`），
+落进审计 `extra["input_kind"]`。
+
+- 扫不了是事实，但**必须可查** —— 否则「全是 token id 所以没扫」
+  与「扫了没命中」在统计上长得一样，运维看到「没有命中」会以为那段内容干净。
+- **`mixed` 最容易骗人**：`scanned: true`、「扫了 1 段」看起来一切正常，
+  而另一半内容根本没人看过 ⇒ 即使扫过也必须记形态。
+- 顺带把 `PASSTHROUGH_NO_TEXT` 里「未覆盖」这种**半承诺**改掉了
+  —— 要么说清为什么扫不到，要么给出**已经做完**的配套动作。
+
+### 8. 仍未修
 
 1. **Linux CI 腿未实跑** —— 本机无 docker，双平台都没跑过。CI 会替我们回答。
-2. **流式 SSE 推送面板**（第 3 项的一半）—— 出站结论已落审计、
-   看板 4s 轮询可见，但没有推送。做的时候：`PlaygroundState` 加订阅环 +
-   `/v1/stream`，前端登记进 `check_dashboard.py` 的 `checks`。
-   ⚠ **新加鉴权后 SSE 要带 Key**（`fetch` 不能自定义头 ⇒ 用 `EventSource`
-   的话只能走 query 参数，那时要把 Key 挡在 URL 里 —— 别这么做，
-   改成用 `fetch` + `ReadableStream` 手动解析 SSE）。
-3. **转写/翻译的结果文本**（`/v1/audio/transcriptions`、`/v1/audio/translations`
-   的**响应**）不在出站扫描里 —— 那两个端点的输出是模型生成的文本，
-   与 `choices[].message.content` 的路径不同。
-4. **token id 形态的 `input`**（embeddings 的非文本输入）不扫 ——
-   那不是文本，无法用规则扫；正确做法是**记审计说明「输入不是文本、未扫」**，
-   而不是静默跳过。
+2. **流式转写（`stream: true`）的响应侧未覆盖** —— 逐帧 delta 走 SSE 通路，
+   与「拿到整个响应体再扫」是两套代码。已在 `passthrough_out.py` 的
+   docstring 里**明写 `not_checked`**（守护
+   `test_streaming_transcription_is_declared_as_unchecked` 钉的就是这一条）。
 
 - **CI 已补**（双平台矩阵）。⚠ Linux 腿未验证。
 - ⚠ **`AGENTS.md` 现在入库了**（用户 2026-10 决定）⇒ 引用纪律与方法学

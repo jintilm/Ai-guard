@@ -19,6 +19,10 @@ from pathlib import Path
 import pytest
 
 from prompt_ids.proxy.passthrough import (
+    INPUT_KIND_MIXED,
+    INPUT_KIND_NO_TEXT_FIELD,
+    INPUT_KIND_TEXT,
+    INPUT_KIND_TOKEN_IDS,
     PASSTHROUGH_NO_TEXT,
     PASSTHROUGH_TEXT_FIELDS,
     extract_passthrough_segments,
@@ -33,7 +37,7 @@ BENIGN = "公司年会在下个月的 15 号召开，请准备季度报告"
 def test_every_registered_field_is_actually_extracted(path, fields):
     """登记表与提取器不许脱节 —— 加了字段名却提取不到，等于登记了个摆设。"""
     payload = {name: BENIGN for name in fields}
-    segments, used, note = extract_passthrough_segments(path, payload)
+    segments, used, note, kind = extract_passthrough_segments(path, payload)
     assert segments, f"{path} 的 {fields} 没提到文本"
     assert used == list(fields)
     assert note
@@ -46,17 +50,56 @@ def test_string_and_array_shapes():
         ({"input": []}, 0),
         ({"input": "   "}, 0),               # 纯空白不算文本
     ):
-        segments, _used, _note = extract_passthrough_segments("/v1/embeddings", payload)
+        segments, _used, _note, _kind = extract_passthrough_segments(
+            "/v1/embeddings", payload)
         assert len(segments) == expected, payload
 
 
 def test_token_id_arrays_are_not_treated_as_text():
-    """`input: [1,2,3]` 是 token id，不是文本 —— 硬扫只会扫到数字噪声。"""
-    segments, used, note = extract_passthrough_segments(
+    """`input: [1,2,3]` 是 token id，不是文本 —— 硬扫只会扫到数字噪声。
+
+    ⚠ 但更关键的是 `kind`：它必须被记成 `token_ids` 并落进审计，
+    否则「扫不了」与「扫了没命中」在统计上长得一样 —— 运维看到「没有命中」
+    会以为那段内容干净，而真实情况是**根本没看**。
+    """
+    segments, used, note, kind = extract_passthrough_segments(
         "/v1/embeddings", {"input": [101, 7592, 3186]})
     assert segments == []
     assert used == []
-    assert "token id" in note or "没有可扫的文本" in note
+    assert kind == INPUT_KIND_TOKEN_IDS
+    assert "token id" in note and "未检测" in note, \
+        "note 必须说清「扫不了」而不是「没命中」"
+
+
+def test_mixed_input_is_reported_as_only_partially_scanned():
+    """同一字段里混着文本与 token id ⇒ **只有文本部分被检测**。
+
+    这是最容易骗人的一种形态：日志里 `scanned: true`、
+    「扫了 1 段」，看起来一切正常 —— 而另一半内容根本没人看过。
+    """
+    segments, _used, note, kind = extract_passthrough_segments(
+        "/v1/embeddings", {"input": [101, 7592, {"type": "text", "text": INJECTION}]})
+    assert len(segments) == 1, "文本部分必须仍然被扫到"
+    assert kind == INPUT_KIND_MIXED
+    assert "只有文本部分被检测" in note
+    assert "部分覆盖" in note or "混有" in note
+
+
+def test_plain_text_input_kind_is_text():
+    _segments, _used, _note, kind = extract_passthrough_segments(
+        "/v1/embeddings", {"input": BENIGN})
+    assert kind == INPUT_KIND_TEXT
+
+
+def test_missing_field_is_not_the_same_as_token_ids():
+    """字段根本没给 ≠ 给了 token id —— 前者是调用方的问题，后者是本服务看不见。"""
+    _s1, _u1, note1, kind1 = extract_passthrough_segments("/v1/embeddings", {"model": "x"})
+    _s2, _u2, _n2, kind2 = extract_passthrough_segments(
+        "/v1/embeddings", {"input": [1, 2, 3]})
+    assert kind1 != kind2, "两种「没扫到」必须能区分"
+    assert kind1 == INPUT_KIND_NO_TEXT_FIELD
+    assert kind2 == INPUT_KIND_TOKEN_IDS
+    assert "token id" not in note1
 
 
 def test_multimodal_container_shapes():
@@ -67,7 +110,7 @@ def test_multimodal_container_shapes():
         {"prompt": [{"type": "text", "text": INJECTION}]},
     ):
         path = "/v1/images/generations" if "prompt" in payload else "/v1/embeddings"
-        segments, _used, _note = extract_passthrough_segments(path, payload)
+        segments, _used, _note, _kind = extract_passthrough_segments(path, payload)
         assert len(segments) == 1, payload
         assert INJECTION in segments[0].text
 
@@ -75,13 +118,29 @@ def test_multimodal_container_shapes():
 def test_paths_without_text_say_so_explicitly():
     """音频转写是**字节**，没有文本可扫 —— 必须说清，不能看起来像「扫过了」。"""
     for path, reason in PASSTHROUGH_NO_TEXT.items():
-        segments, _used, note = extract_passthrough_segments(path, {"input": "x"})
+        segments, _used, note, kind = extract_passthrough_segments(
+            path, {"input": "x"})
         assert segments == []
         assert note == reason, f"{path} 的说明必须写明为什么扫不到"
+        assert kind == INPUT_KIND_NO_TEXT_FIELD
+
+
+def test_no_text_notes_do_not_promise_something_unbuilt():
+    """note 里不许出现「未覆盖」这种半承诺。
+
+    留「未覆盖」等于给未来的自己埋一句「说了会做但没做」，
+    而读的人看不出它是个承诺 —— 这正是本项目反复在修的那类缺陷
+    （docstring 声称「不读全量」、note 写「未覆盖」）。
+    """
+    for path, reason in PASSTHROUGH_NO_TEXT.items():
+        assert "未覆盖" not in reason, f"{path} 的 note 还在承诺一件没做的事"
+        if "响应侧" in reason:
+            assert "已由" in reason, "提到响应侧就必须说清那里**已经**由谁覆盖"
 
 
 def test_unknown_passthrough_path_is_not_claimed_to_be_scanned():
-    segments, _used, note = extract_passthrough_segments("/v1/does-not-exist", {"input": "x"})
+    segments, _used, note, _kind = extract_passthrough_segments(
+        "/v1/does-not-exist", {"input": "x"})
     assert segments == []
     assert note == "", "不在白名单里的路径不该由这个提取器表态"
 

@@ -26,6 +26,7 @@ LLM Guard 的 playground）都把「能当场试一条」当标配，而本项�
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
 import threading
@@ -39,6 +40,17 @@ from prompt_ids.auth import authorized
 from prompt_ids.net import warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
+
+#: SSE 事件环保留多少条。重连时补发「错过的那些」，所以环不能太小 ——
+#: 但也不能太大：每条都常驻内存，而环的消费者是浏览器标签页。
+STREAM_RING = 50
+#: SSE 心跳间隔秒。心跳不是装饰：反代与浏览器都会因空闲而掐断长连接，
+#: 而**没有心跳的 SSE 看起来一切正常，直到某天开始静默停止推送**。
+STREAM_HEARTBEAT_S = 15
+#: 单条 SSE 连接的存活上限。到点后主动收尾，让前端自己重连 ——
+#: 无限长连接在浏览器/反代/负载均衡三层各有一份超时策略，
+#: 自己控制上限才能保证「重连」而不是「静默卡死」。
+STREAM_MAX_S = 900
 
 
 class PlaygroundState:
@@ -54,7 +66,37 @@ class PlaygroundState:
         #: `/v1/scan`（让本机替别人跑检测）与 `/v1/canary/issue`（领令牌），
         #: 复用同一个变量名会让「我给 API 开了鉴权」被误读成检测台也开了。
         self.client_key = client_key
-        self._lock = threading.Lock()
+        # ⚠ **必须是 RLock**：SSE 的等待方在 `with self.changed:` 里调
+        # `events_since()`，而 Condition 用的就是这把锁 ⇒ 普通 Lock 会在
+        # 这里**自死锁**，表现是「hello 帧正常、之后一个事件都不推」，
+        # **没有任何报错**（线程只是永远等下去）。
+        # 踩过一次：事件环、`events_since`、`publish` 三处都用了普通 Lock。
+        self._lock = threading.RLock()
+        #: SSE 推送用的事件环（**只含判定与指纹，不含原文** —— 与审计同一条边界）。
+        #: `seq` 单调递增，让前端能判断「这是新事件」还是「重连后补的历史」。
+        self.recent: collections.deque[dict[str, Any]] = collections.deque(
+            maxlen=STREAM_RING)
+        self.seq = 0
+        #: 新事件的通知器。用它而不是「定时轮询」——轮询的推送延迟等于轮询间隔，
+        #: 拿心跳间隔当轮询间隔的话，一次检测最坏要等 15 秒才出现在面板上，
+        #: 那不叫实时。实测：改成事件驱动后推送是即时的，而 15 秒只用于心跳。
+        self.changed = threading.Condition(self._lock)
+
+    def publish(self, event: dict[str, Any]) -> None:
+        """把一次判定挂进事件环。**调用方必须已经做完脱敏**（这里不设防）。"""
+        with self.changed:
+            self.seq += 1
+            self.recent.append({"seq": self.seq, **event})
+            self.changed.notify_all()
+
+    def events_since(self, last_seq: int) -> list[dict[str, Any]]:
+        """`seq > last_seq` 的事件。
+
+        ⚠ 调用方**可能已经持有** `self.changed`（SSE 等待方就是），
+        所以 `_lock` 必须是 `RLock` —— 见 `__init__` 里的说明。
+        """
+        with self._lock:
+            return [e for e in self.recent if e["seq"] > last_seq]
 
     def scan(self, text: str, user: str = "playground", policy: str | None = None) -> dict[str, Any]:
         result = self.ctx.pipeline.scan(text, user=user, policy_name=policy)
@@ -62,6 +104,22 @@ class PlaygroundState:
             self.ctx.record(result)
             if self.ctx.audit is not None:
                 self.ctx.audit.log_scan(result, text=text, user=user, source="playground")
+        # 推送出去的是**判定摘要**：level / score / action / pattern_id / 指纹 / 字数。
+        # ⚠ 绝不含 `text` —— 那条边界在审计、遥测、看板三处都守着，
+        #   SSE 是第四处；而 SSE 恰好是最容易被忘的一处（它是「顺手加的」功能）。
+        self.publish({
+            "ts": time.time(),
+            "level": result.level.value,
+            "action": result.action.value,
+            "score": round(result.score, 1),
+            "patterns": [f.pattern_id for f in result.findings][:8],
+            "fingerprint": result.fingerprint,
+            "chars": len(text),
+            "detect_ms": round(float(result.latency_ms.get("total", 0.0)), 2),
+            "cached": bool(result.cached),
+            "skipped": list(result.skipped),
+            "source": "playground",
+        })
         return result
 
 
@@ -185,10 +243,74 @@ class Handler(BaseHTTPRequestHandler):
         if self._is_dashboard_path(parsed.path):
             self._send_html()
             return
+        if parsed.path in ("/v1/stream", "/api/stream"):
+            # 鉴权与其它 /v1 路由同一套。⚠ 客户端**不能**用 `EventSource`：
+            #   它无法自定义请求头，于是 Key 只能塞进 query 参数 —— 那会让凭据
+            #   出现在 nginx 的 access log、浏览器历史与 Referer 里。
+            #   前端因此必须用 `fetch` + `ReadableStream`（见 dashboard.py）。
+            if self._needs_key(parsed.path) and not authorized(
+                    self.headers, self.state.client_key):
+                self._send_json(401, {"error": "缺少或错误的客户端 Key（X-API-Key）"})
+                return
+            self._stream_events(parsed)
+            return
         if parsed.path.startswith(("/v1/", "/api/", "/healthz", "/health")):
             self._dispatch("GET", None)
             return
         self._send_json(404, {"error": "not_found", "path": parsed.path})
+
+    def _stream_events(self, parsed) -> None:  # pragma: no cover - 长连接
+        """SSE 推送：先补发错过的事件，再持续推新的。
+
+        长连接用 `Connection: close` 收尾（而不是 keep-alive 复用）：
+        `BaseHTTPRequestHandler` 的 keep-alive 与 SSE 共存时，
+        第一个长连接会占住 `self.wfile` 直到超时，后续请求排队 ——
+        现象是「面板打开了但整个服务卡住」。
+        """
+        try:
+            last_seq = int(parse_qs(parsed.query).get("last_seq", ["0"])[0] or 0)
+        except (TypeError, ValueError):
+            last_seq = 0
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")   # 别让反代缓冲住这条流
+        self.send_header("Connection", "close")
+        self.end_headers()
+        try:
+            self._write_sse({"type": "hello", "seq": self.state.seq,
+                             "ring": STREAM_RING,
+                             "heartbeat_s": STREAM_HEARTBEAT_S})
+            for event in self.state.events_since(last_seq):
+                self._write_sse(event)
+            sent = self.state.seq
+            deadline = time.time() + STREAM_MAX_S
+            while time.time() < deadline:
+                # 事件驱动地等：有新事件立刻醒，没新事件到点发心跳。
+                # ⚠ 用同一个 Condition（而不是另开一把锁）—— 否则会出现
+                #   「事件已被记进环、但等待方没被唤醒」的窗口，
+                #   现象是「偶尔漏推一条」，且只在负载高时出现。
+                with self.state.changed:
+                    if self.state.seq == sent:
+                        self.state.changed.wait(timeout=STREAM_HEARTBEAT_S)
+                    fresh = self.state.events_since(sent)
+                    sent = self.state.seq
+                for event in fresh:
+                    self._write_sse(event)
+                if not fresh:
+                    self._write_sse({"type": "heartbeat", "seq": sent})
+        except (BrokenPipeError, ConnectionResetError):
+            pass          # 浏览器关掉标签页 —— 正常路径，不是错误
+        finally:
+            try:
+                self.close_connection = True
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _write_sse(self, event: dict[str, Any]) -> None:
+        payload = json.dumps(event, ensure_ascii=False)
+        self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+        self.wfile.flush()
 
     def _needs_key(self, path: str) -> bool:
         """这个路径是否需要客户端鉴权。

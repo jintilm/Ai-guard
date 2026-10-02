@@ -1078,29 +1078,45 @@ class ProxyHandler(BaseHTTPRequestHandler):
         """非检测路径（如 /v1/models 的 GET）原样转发。路径先规范化。"""
         self._relay_passthrough(method, body)
 
-    def _relay_passthrough(self, method: str, body: bytes) -> tuple[int, bytes]:
-        """转发并返回 (状态码, 响应体)，供调用方决定要不要落审计。"""
+    def _fetch_passthrough(self, method: str, body: bytes) -> tuple[int, dict, bytes]:
+        """只取回上游响应，**不写给客户端**。返回 (状态码, 头, 体)。
+
+        与 `_relay_passthrough` 的差别就是「不写」—— 调用方需要在回给客户端
+        **之前**先检查响应内容（转写文本注入）并落审计。
+        状态码 0 = 上游不可达（调用方自己回 502）。
+        """
         url = self._upstream_url(self._upstream_path())
         headers = self._build_headers()
-        request = urllib.request.Request(url, data=body or None, headers=headers, method=method)
+        request = urllib.request.Request(url, data=body or None, headers=headers,
+                                         method=method)
         try:
             with urllib.request.urlopen(request, timeout=self.config.timeout_s) as response:
                 data = response.read(self.config.max_response_bytes + 1)
                 if len(data) > self.config.max_response_bytes:
-                    self._send_json(502, {"error": "上游响应体过大，已拒收"})
-                    return 502, b""
-                self._relay_response(response.status, dict(response.headers))
-                self.wfile.write(data)
-                return response.status, data
+                    return 413, {}, b""      # 上游体过大：调用方按 502 拒收
+                return response.status, dict(response.headers), data
         except urllib.error.HTTPError as exc:
-            self._send_json(exc.code, {"error": f"上游返回 {exc.code}"})
-            return exc.code, b""
+            return exc.code, {}, b""
         except (urllib.error.URLError, TimeoutError):
+            return 0, {}, b""
+        except http.client.HTTPException:
+            return 0, {}, b""
+
+    def _relay_passthrough(self, method: str, body: bytes) -> tuple[int, bytes]:
+        """转发并返回 (状态码, 响应体)，供调用方决定要不要落审计。"""
+        status, response_headers, data = self._fetch_passthrough(method, body)
+        if status == 0:
             self._send_json(502, {"error": "上游不可达"})
             return 502, b""
-        except http.client.HTTPException as exc:
-            self._send_json(502, {"error": f"上游响应不完整：{type(exc).__name__}"})
+        if status == 413:
+            self._send_json(502, {"error": "上游响应体过大，已拒收"})
             return 502, b""
+        if status >= 400:
+            self._send_json(status, {"error": f"上游返回 {status}"})
+            return status, b""
+        self._relay_response(status, response_headers)
+        self.wfile.write(data)
+        return status, data
 
     # ---------- 直通路径的输入侧扫描 ----------
     def _passthrough_post(self, path: str, body: bytes) -> None:
@@ -1127,18 +1143,24 @@ class ProxyHandler(BaseHTTPRequestHandler):
             except (ValueError, TypeError):
                 payload = {}
         if not payload:
-            # 不是 JSON 对象（如 multipart 音频）：没有可扫的文本，直通并留痕。
+            # 不是 JSON 对象（如 multipart 音频）：**输入**没有可扫的文本，直通并留痕。
             # ⚠ 说明要取**该路径专属**的那条（音频转写写明「输入是音频字节」），
             # 而不是笼统的「非 JSON 请求体」—— 后者读起来像是代理坏了。
             note = PASSTHROUGH_NO_TEXT.get(path) or "非 JSON 请求体，无文本可扫"
-            self._audit_passthrough(path, None, note, status=0, scanned=False)
-            self._passthrough("POST", body)
+            # ⚠⚠ **但不能就此返回**：音频转写的请求体**就是** multipart，
+            #   提前返回会让**响应侧**检查永远没机会跑 ——
+            #   而音频里的注入恰恰只能从响应侧抓到。
+            #   （第一版就是这里 return 了，被 `test_transcript_scan.py` 抓到。）
+            self._relay_and_audit_no_input_text(path, body, note, input_kind="not_json")
             return
 
-        segments, _fields, note = extract_passthrough_segments(path, payload)
+        segments, _fields, note, input_kind = extract_passthrough_segments(path, payload)
         if not segments:
-            self._audit_passthrough(path, None, note or "无文本可扫", status=0, scanned=False)
-            self._passthrough("POST", body)
+            # ⚠ `input_kind` 必须一起落审计：「全是 token id 所以扫不了」与
+            # 「扫了没命中」在 note 之外必须**结构化可查** —— 否则统计上两者
+            # 长得一样，运维看到「没有命中」会以为那段内容干净。
+            self._relay_and_audit_no_input_text(path, body, note or "无文本可扫",
+                                                input_kind=input_kind)
             return
 
         pipeline = self.config.pipeline_instance
@@ -1152,6 +1174,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self._audit_passthrough(
                 path, scan, note, status=status, scanned=True, detect_ms=detect_ms,
                 decision=decision, reason=why, segments=len(segments),
+                input_kind=input_kind,
                 text="\n".join(seg.text for seg in segments))
             self._send_json(403, {
                 "error": {
@@ -1170,20 +1193,116 @@ class ProxyHandler(BaseHTTPRequestHandler):
             })
             return
 
-        status_code, _data = self._relay_passthrough("POST", body)
+        status_code, data = self._relay_passthrough("POST", body)
+        # 转写/翻译端点：**输入**是音频字节（没有文本可扫），但**输出**是
+        # 模型生成的文本，而那段文本会被应用方当成可信用户输入、或被后续检索拼进
+        # 另一个 prompt —— 那正是 RAG 间接注入链，只是起点是音频。
+        # ⚠ 音频注入（Whisper 类模型对抗样本）是**已知的弱面**，不是理论风险。
+        transcript_scan = self._scan_transcript_response(path, data, body)
         self._audit_passthrough(
             path, scan, note, status=status_code or status, scanned=True,
             detect_ms=detect_ms, decision=decision, reason=why,
             segments=len(segments),
+            input_kind=input_kind,
+            **({"transcript_scan": transcript_scan} if transcript_scan else {}),
             # 指纹必须覆盖**实际扫过的文本**，否则同一条攻击从 chat 走和从
             # embeddings 走会算出两个指纹，`by_fp` 聚合把它们当成两次事件。
             # 此前这里漏了（ruff F841 顺带查出来的：text 算了却没用）。
             text="\n".join(seg.text for seg in segments))
 
+    def _relay_and_audit_no_input_text(self, path: str, body: bytes, note: str,
+                                       *, input_kind: str) -> None:
+        """**输入**侧无文本可扫时的通路：**取回响应 → 检查 → 落审计 → 再回给客户端**。
+
+        两个顺序问题，都是被 `tests/test_transcript_scan.py` 抓出来的：
+
+        1. **不能「审计完就 return」**：音频转写/翻译的请求体**就是 multipart**
+           （不是 JSON），所以它们**总是**走这条路。若在这里提前返回，
+           响应侧检查永远不会跑 —— 而音频里的注入恰恰只能从响应侧抓到
+           （输入侧是字节，没有文本可扫）。第一版就是这么写的。
+        2. **审计必须早于响应落盘**：先回响应再落审计的话，客户端可能先看到 200，
+           而审计记录还没写进文件 —— 于是「请求已处理」与「已留痕」之间有一个窗口。
+           审计日志的价值恰恰在于事后追责，那个窗口里出的事查不出来。
+           所以这里先缓冲响应体、检查、落审计，最后才回给客户端。
+           （转写响应体很小，缓冲它没有代价；流式响应不走这条路径。）
+        """
+        status_code, headers, data = self._fetch_passthrough("POST", body)
+        if status_code == 0:
+            self._audit_passthrough(path, None, note, status=0, scanned=False,
+                                    input_kind=input_kind)
+            self._send_json(502, {"error": "上游不可达"})
+            return
+        if status_code == 413:
+            self._audit_passthrough(path, None, note, status=502, scanned=False,
+                                    input_kind=input_kind)
+            self._send_json(502, {"error": "上游响应体过大，已拒收"})
+            return
+        transcript_scan = self._scan_transcript_response(path, data, body)
+        self._audit_passthrough(
+            path, None, note, status=status_code, scanned=False,
+            input_kind=input_kind,
+            **({"transcript_scan": transcript_scan} if transcript_scan else {}))
+        self._relay_response(status_code, headers)
+        self.wfile.write(data)
+
+    def _scan_transcript_response(self, path: str, body: bytes,
+                                  _request_body: bytes) -> dict[str, Any]:
+        """转写/翻译响应里的文本要不要再过一次检测。返回审计用的 dict。
+
+        **不修改响应**：内容已经发出去了（`redact()` 那种就地脱敏在这里不可能），
+        悄悄改写模型输出会让调用方拿到一句「用户没说过的���」而毫无察觉。
+        所以这里只判定、只记账 —— 拦不拦由 `extra` 告诉调用方。
+
+        ⚠ `stream: true` 的流式转写**不在这里**：它的 delta 逐帧到达，
+        要在 SSE 通路里处理。本函数在流式情况下明确记 `streamed: not_checked`
+        而不是假装检查过 —— 「没扫」必须与「扫了没命中」分得开。
+        """
+        from prompt_ids.proxy.passthrough_out import (
+            extract_transcript_segments,
+            is_transcript_path,
+        )
+
+        if not is_transcript_path(path):
+            return {}
+        record: dict[str, Any] = {"enabled": True}
+        try:
+            payload = json.loads((body or b"").decode("utf-8", "replace"))
+        except (ValueError, UnicodeDecodeError):
+            record["error"] = "响应体不是合法 JSON"
+            return record
+        if not isinstance(payload, dict):
+            record["error"] = "响应体不是 JSON 对象"
+            return record
+        segments, note = extract_transcript_segments(payload)
+        if not segments:
+            record.update({"segments": 0, "note": note})
+            return record
+        pipeline = self.config.pipeline_instance
+        started = time.perf_counter()
+        scan = scan_segments(pipeline, segments,
+                             budget_chars=self.config.max_total_scan_chars)
+        record.update({
+            "segments": len(segments),
+            "chars": scan.scanned_chars,
+            "truncated": scan.truncated,
+            "dropped": scan.dropped,
+            "level": scan.result.level.value,
+            "action": scan.result.action.value,
+            "score": round(scan.result.score, 2),
+            "patterns": [f.pattern_id for f in scan.result.findings][:10],
+            "detect_ms": round((time.perf_counter() - started) * 1000, 2),
+            "note": note,
+        })
+        # 触发规则与阈值都记下来，调用方可据此决定要不要拒收这次转写
+        record["flagged"] = record["action"] != "pass"
+        return record
+
     def _audit_passthrough(self, path: str, scan, note: str, *, status: int,
                            scanned: bool, detect_ms: float = 0.0,
                            decision: str = "allow", reason: str = "",
-                           segments: int = 0, text: str = "") -> None:
+                           segments: int = 0, text: str = "",
+                           input_kind: str = "",
+                           transcript_scan: dict[str, Any] | None = None) -> None:
         """直通路径也落审计。
 
         此前直通请求**一条事件都不写** —— 于是「请求总数」只统计被检测的调用，
@@ -1192,6 +1311,16 @@ class ProxyHandler(BaseHTTPRequestHandler):
         「没扫」与「扫了没命中」才分得开。
         """
         extra = {"scanned": bool(scanned), "passthrough": True}
+        # ⚠ **扫过**也要记形态：`mixed` 意味着只有文本部分被检测，
+        # 说成「已扫描」是误导（token id 部分根本没看）。
+        # 空字符串 = 聊天路径那种分段检测，没有「单一 input」可言。
+        if input_kind:
+            extra["input_kind"] = input_kind
+        # 转写/译文的**响应侧**判定。⚠ 它与 `decision`（请求处置）是两件事：
+        # 请求放行了、但响应里的转写文本被判有注入 —— 只看 decision 会漏掉。
+        # 这与「decision / outbound 两个正交维度」是同一个教训的第三次应用。
+        if transcript_scan:
+            extra["transcript_scan"] = dict(transcript_scan)
         if scan is not None:
             extra.update({
                 "segments": segments,

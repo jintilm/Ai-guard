@@ -1232,12 +1232,68 @@ PG_JS = """
         renderLive(m, e);
       } catch(err){ /* 服务短暂不可用时保持上一帧 */ }
     }
+
+    /* ===== SSE 实时流 =====
+       ⚠ 用 `fetch` + `ReadableStream` 而**不是** `EventSource`：EventSource
+       无法自定义请求头，客户端 Key 只能塞进 query 参数 ——
+       那会让凭据出现在 nginx 的 access log、浏览器历史与 Referer 里。
+       代价是要自己解析 SSE 分帧（下面 30 行），换来的是 Key 只存在于请求头。
+    */
+    function liveStream(){
+      if (typeof ReadableStream === 'undefined') return;      // 老浏览器：跳过
+      var box = document.getElementById('live-stream');
+      if (!box) return;
+      // ⚠ 只在「服务确实可用」时才起流（由调用方放在 metrics 成功之后）：
+      //   静态打开时它没有意义，而且**一个永不返回的重连循环会让
+      //   `scripts/check_dashboard.py` 的 node 进程无法退出**（实测超时 90s）。
+      //   这不是测试环境问题 —— 任何离线场景都会挂着一个永不结束的循环。
+      var lastSeq = 0, stop = false;
+      function line(text){
+        var itms = [];
+        try { itms = JSON.parse(text); } catch(e){ return; }
+        if (itms.type === 'heartbeat' || itms.type === 'hello') return;
+        lastSeq = itms.seq || lastSeq;
+        var tag = 'live-row ' + (itms.level || 'safe');
+        var pat = (itms.patterns && itms.patterns.length) ? itms.patterns.join(', ') : '无命中';
+        var el = document.createElement('li');
+        el.className = tag;
+        el.textContent = new Date(itms.ts * 1000).toLocaleTimeString('zh-CN', {hour12:false})
+          + '  ' + (itms.level || '') + '  ' + (itms.score || 0)
+          + '  ' + pat + '  ' + (itms.detect_ms || 0) + 'ms';
+        box.insertBefore(el, box.firstChild);
+        while (box.children.length > 20) box.removeChild(box.lastChild);
+      }
+      async function run(){
+        while (!stop){
+          try {
+            var r = await fetch('/v1/stream?last_seq=' + lastSeq);
+            if (!r.ok || !r.body) throw new Error('stream');
+            box.setAttribute('data-state', 'on');
+            var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
+            for(;;){
+              var chunk = await reader.read();
+              if (chunk.done) break;
+              buf += dec.decode(chunk.value, {stream:true});
+              var parts = buf.split('\\n\\n'); buf = parts.pop();
+              for (var i=0;i<parts.length;i++){
+                var t = parts[i].replace(/^data: /, '');
+                if (t) line(t);
+              }
+            }
+          } catch(err){ /* 断了就重连；状态留在页面上，不静默 */ }
+          box.setAttribute('data-state', 'off');
+          if (!stop) await new Promise(function(r2){ setTimeout(r2, 3000); });
+        }
+      }
+      run();
+    }
     fetch('/v1/metrics').then(function(r){ return r.ok ? r.json() : Promise.reject(); })
       .then(function(){
         card.style.display = '';
         started = true;
         tick();
         setInterval(function(){ if(started) tick(); }, 4000);
+        liveStream();
       })
       .catch(function(){ card.style.display = 'none'; });
   }
@@ -1615,6 +1671,10 @@ def render_html(data: dict) -> str:
   <p class="hint">来自本地服务 <code>/v1/metrics</code> 与 <code>/v1/events</code>（只含指纹，不含原文），
   随每次检测自动滚动。静态打开时本卡片不显示。</p>
   <div id="live-body"></div>
+  <h2 style="margin-top:14px">实时流（SSE）</h2>
+  <p class="hint">来自 <code>/v1/stream</code> 的服务端推送：检测一发生就出现，不等 4 秒轮询。
+  断线会自动重连（<code>data-state</code> 显示当前状态）；事件只含判定与指纹，<b>不含原文</b>。</p>
+  <ul class="live-list" id="live-stream" data-state="off"></ul>
 </section>
 
 <footer>

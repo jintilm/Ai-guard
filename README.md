@@ -1479,8 +1479,22 @@ agent_bench 10 · rules_redos 9 · preprocess 8 · engine 7 · decoder 6 · pint
 看板实时面板显示 `↳ tool#2`（注入从哪一条进来）。**纯索引、不含原文** ——
 一条消息由 `(role, index)` 唯一定位，所以不需要「第二个数据面」那套落盘开关。
 
-**流式 SSE 推送面板** ❌ 未做。代理侧的流式出站结论（告警帧排在 `[DONE]` 之前、
-脱敏、「无法撤回」）已全部落审计，看板 4s 轮询能看到。
+**流式实时面板** ✅ `/v1/stream`（SSE）。检测一发生就出现，不等 4 秒轮询；
+断线自动重连并补发错过的事件。
+⚠ 用 `fetch` + `ReadableStream` 而**不是** `EventSource` —— 后者不能自定义
+请求头，客户端 Key 只能进 query，那会让凭据出现在 nginx access log、
+浏览器历史与 Referer 里。
+
+**转写/译文的响应侧文本** ✅ `prompt_ids/proxy/passthrough_out.py`。
+`/v1/audio/transcriptions`、`/v1/audio/translations` 的输入是音频字节
+（扫不到），但**输出是模型生成的文本** —— 音频注入是已知的弱面。
+只判定不改写（改写会让调用方拿到「用户没说过的…」），结论落审计
+`extra["transcript_scan"]`，与请求侧 `decision` 正交。
+⚠ 流式转写（`stream: true`）未覆盖，已在 docstring 里明写。
+
+**token id 形态的 `input`** ✅ 不再静默跳过：审计记 `extra["input_kind"]`
+（`text` / `token_ids` / `mixed` / `empty` / `no_text_field` / `not_json`）。
+⚠ `mixed` 最容易骗人 —— `scanned: true` 看起来正常，而另一半内容没人看过。
 
 **容器化与 CI** ✅ Dockerfile（三阶段，含纯规则层的 slim 镜像）/ compose /
 Makefile / GitHub Actions 双平台。⚠ Linux 腿未实跑。
