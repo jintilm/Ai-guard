@@ -150,6 +150,36 @@ def test_report_declares_it_cannot_measure_recall():
     assert "从未" in method["rule_iteration"], "必须写明本集合没参与过规则迭代"
 
 
+def test_per_category_rates_use_the_group_total_as_denominator():
+    """分母必须是该类别/来源的**总样本数**。
+
+    踩过：早先只在 `rank >= medium` 时才给 `_n` 加一，于是分母就是「被标记的
+    那些」⇒ 每个有命中的类别 `ge_high` 恒等于 1.0，读起来像「该类别 100% 被
+    误杀」，实际是同义反复。
+    """
+    report_path = ROOT / "reports" / "overrefusal.json"
+    if not report_path.exists():
+        pytest.skip("需先跑 python scripts/overrefusal_check.py")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    for name, config in report["configs"].items():
+        for group in ("per_category", "per_source"):
+            for key, row in config[group].items():
+                assert row["n"] > 0, f"{name}.{group}.{key} 的分母是 0"
+                assert row["flagged"] <= row["n"], \
+                    f"{name}.{group}.{key}: flagged({row['flagged']}) > n({row['n']})"
+                rate = row["ge_medium"]        # 两个分组都有这个键
+                # 1.0 只在「该组全部被标记」时才合法；否则就是分母算错了
+                if rate == 1.0:
+                    assert row["flagged"] == row["n"], \
+                        f"{name}.{group}.{key}: ge_medium=1.0 但只标记了 " \
+                        f"{row['flagged']}/{row['n']} —— 分母疑似只统计了命中样本"
+    # 汇总的自洽性：各来源的 flagged 之和应等于总 flagged
+    for name, config in report["configs"].items():
+        sources = sum(row["flagged"] for row in config["per_source"].values())
+        assert sources == sum(row["flagged"] for row in config["per_category"].values()), \
+            f"{name}: 来源与类别的 flagged 总数不一致"
+
+
 def test_examples_are_labelled_as_public_benchmark_text():
     """`examples_fp` 带原文（公开基准语料，排障必需）—— 报告里必须说明。"""
     report_path = ROOT / "reports" / "overrefusal.json"

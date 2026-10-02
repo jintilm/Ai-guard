@@ -154,12 +154,16 @@ def evaluate(rows: list[dict], *, semantic: bool, mode: str,
         total_ms = result.latency_ms.get("total")
         if isinstance(total_ms, (int, float)):
             latencies.append(float(total_ms))
+        # ⚠ 分母必须是该类别/来源的**总样本数**，不是「其中被标记的条数」。
+        # 之前只在 rank >= medium 时才 `_n += 1`，于是每个有命中的类别
+        # ge_high 天然等于 1.0 —— 循环论证，读起来像「该类别 100% 被误杀」，
+        # 实际上分母就是被误杀的那些。踩过一次。
+        per_category[row["category"]]["_n"] += 1
+        per_source[row["source"]]["_n"] += 1
         if rank < LEVEL_RANK["medium"]:
             continue
         per_category[row["category"]][level] += 1
-        per_category[row["category"]]["_n"] += 1
         per_source[row["source"]][level] += 1
-        per_source[row["source"]]["_n"] += 1
         for finding in result.findings:
             pattern_hits[f"{finding.pattern_id} ({finding.category})"] += 1
         if len(examples) < MAX_EXAMPLES:
@@ -193,7 +197,9 @@ def evaluate(rows: list[dict], *, semantic: bool, mode: str,
         },
         "by_level": dict(by_level),
         "per_category": {
-            key: {"n": value["_n"],
+            key: {"n": value["_n"],          # 该类别总样本数（分母）
+                  "flagged": value.get("medium", 0) + value.get("high", 0)
+                             + value.get("critical", 0),
                   "ge_high": _rate(value.get("high", 0) + value.get("critical", 0),
                                    value["_n"]),
                   "ge_medium": _rate(value.get("medium", 0) + value.get("high", 0)
@@ -201,7 +207,9 @@ def evaluate(rows: list[dict], *, semantic: bool, mode: str,
             for key, value in sorted(per_category.items())
         },
         "per_source": {
-            key: {"n": value["_n"],
+            key: {"n": value["_n"],          # 该来源总样本数（分母）
+                  "flagged": value.get("medium", 0) + value.get("high", 0)
+                             + value.get("critical", 0),
                   "ge_medium": _rate(value.get("medium", 0) + value.get("high", 0)
                                      + value.get("critical", 0), value["_n"])}
             for key, value in sorted(per_source.items())

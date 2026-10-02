@@ -1,6 +1,6 @@
 {
   "generated_by": "scripts/overrefusal_check.py",
-  "generated_at": "2026-10-02 18:36:24",
+  "generated_at": "2026-10-02 18:53:12",
   "dataset": {
     "path": "data\\overrefusal.jsonl",
     "samples": 1533,
@@ -68,49 +68,136 @@
       },
       "per_category": {
         "deception": {
-          "n": 1,
+          "n": 72,
+          "flagged": 1,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.0139
+        },
+        "definitions": {
+          "n": 25,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "figurative_language": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "harassment": {
-          "n": 1,
+          "n": 41,
+          "flagged": 1,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.0244
         },
         "harmful": {
-          "n": 2,
+          "n": 106,
+          "flagged": 2,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.0189
+        },
+        "hate": {
+          "n": 54,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "historical_events": {
-          "n": 3,
+          "n": 25,
+          "flagged": 3,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.12
+        },
+        "homonyms": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "illegal": {
-          "n": 1,
+          "n": 527,
+          "flagged": 1,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.0019
+        },
+        "nons_group_real_discr": {
+          "n": 18,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "privacy": {
-          "n": 1,
+          "n": 199,
+          "flagged": 1,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.005
+        },
+        "privacy_fictional": {
+          "n": 21,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "privacy_public": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "real_group_nons_discr": {
+          "n": 8,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "safe_contexts": {
-          "n": 1,
+          "n": 22,
+          "flagged": 1,
           "ge_high": 0.0,
-          "ge_medium": 1.0
+          "ge_medium": 0.0455
+        },
+        "safe_targets": {
+          "n": 23,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "self-harm": {
+          "n": 63,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "sexual": {
+          "n": 66,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "unethical": {
+          "n": 125,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "violence": {
+          "n": 66,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         }
       },
       "per_source": {
         "orbench_hard1k": {
-          "n": 6,
-          "ge_medium": 1.0
+          "n": 1319,
+          "flagged": 6,
+          "ge_medium": 0.0045
         },
         "xstest_safe": {
-          "n": 4,
-          "ge_medium": 1.0
+          "n": 214,
+          "flagged": 4,
+          "ge_medium": 0.0187
         }
       },
       "top_patterns": {
@@ -252,10 +339,10 @@
         }
       ],
       "latency_ms": {
-        "total_s": 2.17,
-        "per_sample_ms": 1.42,
-        "per_sample_p50_ms": 1.35,
-        "per_sample_p95_ms": 2.06
+        "total_s": 2.0,
+        "per_sample_ms": 1.31,
+        "per_sample_p50_ms": 1.24,
+        "per_sample_p95_ms": 1.85
       },
       "reliability": {
         "semantic_backend": "",
@@ -297,51 +384,137 @@
         "high": 8
       },
       "per_category": {
+        "deception": {
+          "n": 72,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "definitions": {
+          "n": 25,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "figurative_language": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "harassment": {
+          "n": 41,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
         "harmful": {
-          "n": 7,
-          "ge_high": 0.8571,
-          "ge_medium": 1.0
+          "n": 106,
+          "flagged": 7,
+          "ge_high": 0.0566,
+          "ge_medium": 0.066
         },
         "hate": {
-          "n": 1,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 54,
+          "flagged": 1,
+          "ge_high": 0.0185,
+          "ge_medium": 0.0185
+        },
+        "historical_events": {
+          "n": 25,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "homonyms": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "illegal": {
-          "n": 34,
-          "ge_high": 0.9706,
-          "ge_medium": 1.0
+          "n": 527,
+          "flagged": 34,
+          "ge_high": 0.0626,
+          "ge_medium": 0.0645
+        },
+        "nons_group_real_discr": {
+          "n": 18,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "privacy": {
-          "n": 15,
-          "ge_high": 0.9333,
-          "ge_medium": 1.0
+          "n": 199,
+          "flagged": 15,
+          "ge_high": 0.0704,
+          "ge_medium": 0.0754
+        },
+        "privacy_fictional": {
+          "n": 21,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "privacy_public": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "real_group_nons_discr": {
+          "n": 8,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "safe_contexts": {
+          "n": 22,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "safe_targets": {
+          "n": 23,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "self-harm": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 63,
+          "flagged": 2,
+          "ge_high": 0.0317,
+          "ge_medium": 0.0317
         },
         "sexual": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 66,
+          "flagged": 2,
+          "ge_high": 0.0303,
+          "ge_medium": 0.0303
         },
         "unethical": {
-          "n": 12,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 125,
+          "flagged": 12,
+          "ge_high": 0.096,
+          "ge_medium": 0.096
         },
         "violence": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 66,
+          "flagged": 2,
+          "ge_high": 0.0303,
+          "ge_medium": 0.0303
         }
       },
       "per_source": {
         "orbench_hard1k": {
-          "n": 75,
-          "ge_medium": 1.0
+          "n": 1319,
+          "flagged": 75,
+          "ge_medium": 0.0569
+        },
+        "xstest_safe": {
+          "n": 214,
+          "flagged": 0,
+          "ge_medium": 0.0
         }
       },
       "top_patterns": {
@@ -615,10 +788,10 @@
         }
       ],
       "latency_ms": {
-        "total_s": 132.13,
-        "per_sample_ms": 86.19,
-        "per_sample_p50_ms": 99.81,
-        "per_sample_p95_ms": 112.59
+        "total_s": 127.12,
+        "per_sample_ms": 82.92,
+        "per_sample_p50_ms": 96.46,
+        "per_sample_p95_ms": 105.59
       },
       "reliability": {
         "semantic_backend": "local_model",
@@ -660,51 +833,137 @@
         "high": 10
       },
       "per_category": {
+        "deception": {
+          "n": 72,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "definitions": {
+          "n": 25,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "figurative_language": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "harassment": {
+          "n": 41,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
         "harmful": {
-          "n": 9,
-          "ge_high": 0.8889,
-          "ge_medium": 1.0
+          "n": 106,
+          "flagged": 9,
+          "ge_high": 0.0755,
+          "ge_medium": 0.0849
         },
         "hate": {
-          "n": 1,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 54,
+          "flagged": 1,
+          "ge_high": 0.0185,
+          "ge_medium": 0.0185
+        },
+        "historical_events": {
+          "n": 25,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "homonyms": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "illegal": {
-          "n": 38,
-          "ge_high": 0.9737,
-          "ge_medium": 1.0
+          "n": 527,
+          "flagged": 38,
+          "ge_high": 0.0702,
+          "ge_medium": 0.0721
+        },
+        "nons_group_real_discr": {
+          "n": 18,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "privacy": {
-          "n": 18,
-          "ge_high": 0.9444,
-          "ge_medium": 1.0
+          "n": 199,
+          "flagged": 18,
+          "ge_high": 0.0854,
+          "ge_medium": 0.0905
+        },
+        "privacy_fictional": {
+          "n": 21,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "privacy_public": {
+          "n": 24,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "real_group_nons_discr": {
+          "n": 8,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "safe_contexts": {
+          "n": 22,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
+        },
+        "safe_targets": {
+          "n": 23,
+          "flagged": 0,
+          "ge_high": 0.0,
+          "ge_medium": 0.0
         },
         "self-harm": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 63,
+          "flagged": 2,
+          "ge_high": 0.0317,
+          "ge_medium": 0.0317
         },
         "sexual": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 66,
+          "flagged": 2,
+          "ge_high": 0.0303,
+          "ge_medium": 0.0303
         },
         "unethical": {
-          "n": 15,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 125,
+          "flagged": 15,
+          "ge_high": 0.12,
+          "ge_medium": 0.12
         },
         "violence": {
-          "n": 2,
-          "ge_high": 1.0,
-          "ge_medium": 1.0
+          "n": 66,
+          "flagged": 2,
+          "ge_high": 0.0303,
+          "ge_medium": 0.0303
         }
       },
       "per_source": {
         "orbench_hard1k": {
-          "n": 87,
-          "ge_medium": 1.0
+          "n": 1319,
+          "flagged": 87,
+          "ge_medium": 0.066
+        },
+        "xstest_safe": {
+          "n": 214,
+          "flagged": 0,
+          "ge_medium": 0.0
         }
       },
       "top_patterns": {
@@ -972,10 +1231,10 @@
         }
       ],
       "latency_ms": {
-        "total_s": 151.84,
-        "per_sample_ms": 99.05,
-        "per_sample_p50_ms": 98.8,
-        "per_sample_p95_ms": 108.0
+        "total_s": 183.76,
+        "per_sample_ms": 119.87,
+        "per_sample_p50_ms": 118.86,
+        "per_sample_p95_ms": 136.46
       },
       "reliability": {
         "semantic_backend": "local_model",
