@@ -20,6 +20,7 @@ from prompt_ids.api.app import (
     MAX_BATCH,
     resolve,
 )
+from prompt_ids.net import warn_if_exposed
 from prompt_ids.preprocess.guard import GuardConfig, RateLimiter
 
 DEFAULT_PORT = 8790
@@ -292,6 +293,9 @@ class ApiHandler(BaseHTTPRequestHandler):
 
 
 def create_api_server(ctx: ApiContext, config: ApiServerConfig) -> ThreadingHTTPServer:
+    # API 是三个入口里**唯一有客户端鉴权**的（PROMPT_IDS_API_KEY / --api-key）。
+    # 所以只有「对外监听 + 没配 Key」这一种组合才需要告警。
+    warn_if_exposed(config.host, service="REST API", authenticated=config.auth_required)
     handler = type("BoundApiHandler", (ApiHandler,), {"ctx": ctx, "config": config})
     return ThreadingHTTPServer((config.host, config.port), handler)
 

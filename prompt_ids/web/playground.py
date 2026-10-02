@@ -16,7 +16,11 @@ LLM Guard 的 playground）都把「能当场试一条」当标配，而本项�
    这叫渐进增强：离线有离线的好，联网有联网的好。
 
 安全边界（本地服务也要守）：
-  * 只绑 127.0.0.1，不对外监听
+  * **默认**只绑 127.0.0.1。这只是**默认值，不是保证** —— `--host` 是自由字符串，
+    改了就对外监听，而本服务**没有任何客户端鉴权**（api 那套 `PROMPT_IDS_API_KEY`
+    不在这里）。因此绑非回环地址时由 `prompt_ids.net.warn_if_exposed` 往 stderr
+    打一段告警，说明暴露了什么、正确姿势是什么。
+    ⚠ 别把这一行改写成「不对外监听」：那是把默认值说成保证，本模块正是为此存在。
   * 请求体上限 2MB，文本长度上限沿用 API 的校验
   * 服务端异常统一转成 JSON 错误，不把 traceback 吐给前端
 """
@@ -31,6 +35,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
+from prompt_ids.net import warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 
@@ -183,6 +188,10 @@ def serve(
     这样「实验数字」和「在线检测」在同一个页面上都是最新的。
     """
     state = PlaygroundState(ctx, dashboard_path, refresh_s)
+    # 检测台**完全没有鉴权概念**（api 那套 PROMPT_IDS_API_KEY 不在这里）：
+    # 暴露的是 /v1/scan、/v1/review、/v1/canary/issue、/v1/events。
+    # 绑非回环地址必须显式告警，否则「让同事看看看板」就等于开了一个无鉴权服务。
+    warn_if_exposed(host, service="检测台", authenticated=False)
     server = ThreadingHTTPServer((host, port), attach(state))
     threading.Thread(target=server.serve_forever, daemon=True).start()
 

@@ -36,6 +36,7 @@ from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
 from prompt_ids.preprocess.guard import RateLimiter
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, ScanResult, level_rank
+from prompt_ids.net import warn_if_exposed
 from prompt_ids.proxy.forward import UpstreamError, forward_headers, post_json, post_stream
 
 DEFAULT_PORT = 8787
@@ -1233,6 +1234,10 @@ def _leak_event(leak) -> bytes:
 
 
 def create_server(config: ProxyConfig) -> ThreadingHTTPServer:
+    # 代理**没有客户端鉴权**：config.api_key 是给上游用的凭据，而客户端的
+    # Authorization 头被原样透传（见 `_upstream_headers`）。按 IP 的限流与
+    # canary 签发配额都不是鉴权。所以绑非回环地址必须显式告警。
+    warn_if_exposed(config.host, service="透明代理", authenticated=False)
     handler = type("BoundProxyHandler", (ProxyHandler,), {"config": config})
     return ThreadingHTTPServer((config.host, config.port), handler)
 
