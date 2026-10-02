@@ -196,6 +196,22 @@ def _require_str(payload: Any, name: str, default: str = "", *, choices=None) ->
     return value
 
 
+def _clamp_int(value: Any, *, default: int, low: int, high: int) -> int:
+    """查询参数里的整数：解析不了就用默认值，**不因为一个 ?limit=abc 就 500**。
+
+    这些是 GET 端点的分页参数，调用方拼错一个字符不该让整个请求失败；
+    也不该让「解析失败」变成静默的默认值（那会让调用方以为 limit 生效了）。
+    返回值同时用于响应里的回显。
+    """
+    if value is None or value == "":
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))
+
+
 # ---------------------------------------------------------------- 处理器
 def handle_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     text = _require_text(payload)
@@ -392,10 +408,7 @@ def handle_events(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
     读的是审计文件尾部，不额外维护一份内存缓冲 —— 与命令行 `tail -f`、
     离线分析看到的完全是同一份数据，不会出现「页面显示的和服务记录的不一致」。
     """
-    try:
-        limit = max(1, min(200, int(params.get("limit", 50))))
-    except (TypeError, ValueError):
-        limit = 50
+    limit = _clamp_int(params.get("limit"), default=50, low=1, high=200)
     logger = ctx.audit
     if logger is None or not logger.enabled or logger.path is None:
         return 200, {"enabled": False, "count": 0, "events": []}
@@ -493,16 +506,23 @@ def handle_review_patterns(ctx: ApiContext, payload: Any, params: dict) -> tuple
     from prompt_ids.audit.logger import tail_events
     from prompt_ids.audit.query import rule_ledger, rule_suspects
 
-    events = tail_events(logger.path, limit=5000)
+    # limit 可调（此前写死 5000）：读尾成本与 limit 成正比（实测 9MB 审计文件
+    # limit=50 是 0.8ms、limit=5000 是 42.9ms），而这个端点默认无鉴权、
+    # 无默认限流，写死 5000 等于每次未认证 GET 都固定付 ~48ms。
+    limit = _clamp_int(params.get("limit"), default=1000, low=1, high=20000)
+    events = tail_events(logger.path, limit=limit)
     ledger = rule_ledger(events)
     suspects = rule_suspects(ledger)
     return 200, {
         **base,
         "enabled": True,
+        "limit": limit,
+        "scanned_events": len(events),
         "ledger": dict(sorted(ledger.items(), key=lambda kv: -kv[1]["total"])),
         "suspects": suspects,
         "note": "分母是人工复核过的样本；一条复核可归因多条规则，所以各行之和大于复核总数。"
-                "候选只给建议 —— 系统不会自动改规则。",
+                "候选只给建议 —— 系统不会自动改规则。"
+                "统计范围是审计文件末尾的最近 N 条（?limit=，默认 1000，上限 20000）。",
     }
 
 
@@ -517,10 +537,7 @@ def handle_review_queue(ctx: ApiContext, payload: Any, params: dict) -> tuple[in
     if logger is None or not logger.enabled or logger.path is None:
         return 200, {"enabled": False, "count": 0, "items": [], "stats": stats,
                      "reason": "未配置审计日志，启动时加 --audit"}
-    try:
-        limit = max(1, min(200, int(params.get("limit", 20))))
-    except (TypeError, ValueError):
-        limit = 20
+    limit = _clamp_int(params.get("limit"), default=20, low=1, high=200)
     logger.flush()  # 缓冲写模式下先落盘，保证读到的是最新
     from prompt_ids.audit.logger import tail_events
     from prompt_ids.audit.query import review_stats as _review_stats

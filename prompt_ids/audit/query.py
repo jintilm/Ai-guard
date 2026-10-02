@@ -17,7 +17,14 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from prompt_ids.eval.metrics import markdown_table
-from prompt_ids.audit.events import REVIEW_LEVELS, AuditEvent
+from prompt_ids.audit.events import (
+    LEGACY_OUTBOUND_DECISIONS,
+    OUTBOUND_NONE,
+    OUTBOUND_REDACTED,
+    OUTBOUND_REPLACED,
+    REVIEW_LEVELS,
+    AuditEvent,
+)
 
 #: 「算拦截」的动作集合。**不含 sandbox** ——
 #: 代理对 sandbox 是**放行 + 记审计**（HTTP 200，见 proxy/server.py 的 decide()），
@@ -151,13 +158,34 @@ def pending_reviews(events: Sequence[AuditEvent], limit: int = 20) -> list[Audit
 def decision_of(event: AuditEvent) -> str:
     """统一读取「放行 / 拦截」语义。
 
-    代理入口把放行结论写在 extra["decision"]（allow/review/sandbox/block/leak），
+    代理入口把放行结论写在 extra["decision"]（allow/review/sandbox/block），
     CLI / API / pipeline 没有这个字段，回退到 action。这样两套来源可以用同一段
     聚合逻辑分析，不需要调用方知道日志是哪个入口产生的。
+
+    ⚠ 出站结论**不在**这里：它是另一个维度（`outbound_of`）。历史上曾经用
+    decision="leak"/"redact_secrets"/"secret_leak" 表达，于是
+    「同一个请求出现两个 decision」—— 一次请求在 by_decision 里被数成两次。
     """
     extra = event.extra or {}
     value = extra.get("decision")
     return str(value) if value else event.action
+
+
+def outbound_of(event: AuditEvent) -> str:
+    """出站处置：none / redacted / replaced / warned / rejected。
+
+    旧日志里没有这个字段，而是把出站结论塞进 decision
+    （leak / redact_secrets / secret_leak）—— 读的时候按 `LEGACY_OUTBOUND_DECISIONS`
+    映射过去，这样历史文件与新文件能用同一段聚合逻辑。
+    """
+    extra = event.extra or {}
+    value = extra.get("outbound")
+    if value:
+        return str(value)
+    legacy = LEGACY_OUTBOUND_DECISIONS.get(str(extra.get("decision") or ""))
+    if legacy:
+        return legacy
+    return OUTBOUND_NONE
 
 
 def load(path: str | Path) -> list[AuditEvent]:
@@ -199,6 +227,7 @@ class AuditSummary:
     by_level: dict[str, int] = None  # type: ignore[assignment]
     by_action: dict[str, int] = None  # type: ignore[assignment]
     by_decision: dict[str, int] = None  # type: ignore[assignment]
+    by_outbound: dict[str, int] = None  # type: ignore[assignment]
     by_source: dict[str, int] = None  # type: ignore[assignment]
     blocked: int = 0
     noticed: int = 0
@@ -213,6 +242,7 @@ class AuditSummary:
             "by_level": dict(self.by_level or {}),
             "by_action": dict(self.by_action or {}),
             "by_decision": dict(self.by_decision or {}),
+            "by_outbound": dict(self.by_outbound or {}),
             "by_source": dict(self.by_source or {}),
             "blocked": self.blocked,
             # 放行但被标记（sandbox / review）：不算拦截，但要看得到
@@ -245,6 +275,7 @@ def summarize(events: Sequence[AuditEvent]) -> AuditSummary:
         by_level=_tally(events, lambda e: e.level),
         by_action=_tally(events, lambda e: e.action),
         by_decision=_tally(events, decision_of),
+        by_outbound=_tally(events, outbound_of),
         by_source=_tally(events, lambda e: e.source),
         blocked=sum(
             1 for e in events if decision_of(e) in BLOCK_ACTIONS or e.kind == "leak"
@@ -281,6 +312,8 @@ def render_report(events: Sequence[AuditEvent], title: str = "审计摘要") -> 
         lines.append(f"- 时间跨度 {summary.span_s / 3600:.1f} 小时")
     lines.append("")
 
+    if summary.by_outbound:
+        lines.append(f"- 出站处置：{summary.by_outbound}")
     if summary.by_kind:
         lines.append("按事件类型：")
         lines.append(markdown_table(

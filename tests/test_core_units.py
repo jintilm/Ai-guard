@@ -338,6 +338,7 @@ def test_env_example_documents_deepseek_key():
     for optional in ("PROMPT_IDS_UPSTREAM", "PROMPT_IDS_API_KEY", "PROMPT_IDS_LLM_PROVIDER",
                      "PROMPT_IDS_PROXY_SCAN_SECRETS", "PROMPT_IDS_PROXY_MAX_TOTAL_SCAN_CHARS",
                      "PROMPT_IDS_PROXY_MAX_RESPONSE_SCAN_CHARS",
+                     "PROMPT_IDS_PROXY_RATE_LIMIT",
                      "PROMPT_IDS_PROXY_SEMANTIC_SYSTEM"):
         assert optional in text, f"模板未说明 {optional}"
 

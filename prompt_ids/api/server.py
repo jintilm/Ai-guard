@@ -181,10 +181,41 @@ class ApiHandler(BaseHTTPRequestHandler):
                 break
             remaining -= len(chunk)
 
+    def _drain_chunked(self, *, max_bytes: int = MAX_BODY_BYTES) -> tuple[bool, int]:
+        """丢弃 chunked 请求体，返回 (是否读完, 字节数)。与超长 body 同一个理由：
+        不读干净就回错误 ⇒ 客户端收到 RST 而不是 411。"""
+        total = 0
+        while True:
+            line = self.rfile.readline(1024)
+            if not line:
+                return False, total
+            try:
+                size = int(line.split(b";", 1)[0].strip() or b"0", 16)
+            except ValueError:
+                return False, total
+            if size == 0:
+                while True:
+                    trailer = self.rfile.readline(1024)
+                    if not trailer or trailer in (b"\r\n", b"\n"):
+                        break
+                return True, total
+            remaining = size
+            total += size
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 65536))
+                if not chunk:
+                    return False, total
+                remaining -= len(chunk)
+            self.rfile.read(2)
+            if total > max_bytes:
+                return False, total
+
     def _read_json(self) -> Any:
         length = self._content_length()
         if self.headers.get("Transfer-Encoding", "").lower().strip() == "chunked":
-            # 不支持分块：静默当空 body 会让调用方以为请求体被接收了
+            # 不支持分块：静默当空 body 会让调用方以为请求体被接收了。
+            # 先读干净再回 411（与 413 同理，不排空就是 RST）。
+            self._drain_chunked()
             raise ApiError(411, "length_required", "不支持 Transfer-Encoding: chunked，请带 Content-Length")
         if length <= 0:
             return {}

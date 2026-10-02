@@ -185,6 +185,33 @@ def event_from_review(*, fp: str, is_attack: bool, reviewer: str = "",
     )
 
 
+#: 出站处置：`decision` 说的是**这个请求怎么处理的**，
+#: `outbound` 说的是**响应出去时发生了什么**。两个维度正交，混在一个字段里
+#: 就出现过三个语义重叠的名字（leak / secret_leak / redact_secrets），
+#: 而且为了记录出站结论要发**第二条**事件 ⇒ `by_decision` 把一次请求数成两次。
+#:
+#: - `none`     ：出站没有命中
+#: - `redacted` ：非流式，命中片段已就地脱敏
+#: - `replaced` ：整个响应被替换成告警（Canary 泄漏 + redact_leak）
+#: - `warned`   ：流式，内容已发出，只能末尾补告警
+#: - `rejected` ：上游响应形态无法保证检测（如 gzip），整条拒收
+OUTBOUND_NONE = "none"
+OUTBOUND_REDACTED = "redacted"
+OUTBOUND_REPLACED = "replaced"
+OUTBOUND_WARNED = "warned"
+OUTBOUND_REJECTED = "rejected"
+OUTBOUND_DISPOSITIONS = frozenset({
+    OUTBOUND_NONE, OUTBOUND_REDACTED, OUTBOUND_REPLACED, OUTBOUND_WARNED, OUTBOUND_REJECTED,
+})
+#: 历史值：旧日志里的 leak / secret_leak / redact_secrets 仍要能聚合，
+#: 但不再产生（新的单一事件把它们折成 outbound）。
+LEGACY_OUTBOUND_DECISIONS = {
+    "leak": OUTBOUND_REPLACED,
+    "redact_secrets": OUTBOUND_REDACTED,
+    "secret_leak": OUTBOUND_WARNED,
+}
+
+
 def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                      client: str = "", stream: bool = False,
                      upstream_ms: float = 0.0, detect_ms: float = 0.0,
@@ -193,7 +220,9 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                      truncated: int = 0, dropped: int = 0,
                      scanned_chars: int = 0, secret_kinds: dict | None = None,
                      secret_sampled: bool = False, secret_scanned_chars: int = 0,
-                     secret_capped: bool = False) -> AuditEvent:
+                     secret_capped: bool = False,
+                     outbound: str = OUTBOUND_NONE,
+                     outbound_detail: str = "") -> AuditEvent:
     """代理转发事件 -> 统一 AuditEvent。
 
     代理侧历史上另有一套 AuditRecord。现在统一到同一个事件模型：
@@ -250,5 +279,12 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
             "secret_scanned_chars": int(secret_scanned_chars),
             # capped=True：累积缓冲撞到上限，尾部**没有**被扫过
             "secret_capped": bool(secret_capped),
+            # 出站处置（与 decision 正交，见 OUTBOUND_* 常量）。
+            # 一次请求只落**一条**事件，出站结论记在这里 —— 此前为记录出站结论
+            # 额外发第二条事件，by_decision 因此把一次请求数成两次。
+            "outbound": outbound,
+            # 人读的说明（哪种凭据、哪种形态），例如
+            # "canary:exact（响应已替换）" / "aws_access_key×1（已脱敏）"
+            "outbound_detail": outbound_detail[:200],
         },
     )

@@ -243,6 +243,16 @@ class Pipeline:
         policy, fell_back = self.policies.resolve(policy_name or self.config.policy)
 
         result = ScanResult()
+        # 限流（默认关闭：GuardConfig.rate_limit=0）。开着时按 user 分桶，
+        # 超限**不阻断**而是转人工 —— 限流的语义是「别让一个人吃掉全部算力」，
+        # 不是「判定为攻击」，所以动作是 review + 说明里写明原因。
+        if not self.guard.check_rate(user):
+            result.level = Level.MEDIUM
+            result.action = Action.REVIEW
+            result.explained = (f"超过限流（{self.guard.config.rate_limit} 次/"
+                                f"{self.guard.config.rate_window_s:.0f}s），本条未做检测")
+            result.latency_ms["guard"] = (time.perf_counter() - started) * 1000.0
+            return result
         oversized_note = ""
         try:
             self.guard.check_length(text)

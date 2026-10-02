@@ -212,6 +212,21 @@ python -m prompt_ids.proxy --port 8787 --block-sandbox     # sandbox 等级也�
 支持特性：非流式与 SSE 流式透传、`/v1/models` 等旁路路径直通、`/healthz` 健康检查、
 多模态 content 提取、线程安全审计日志、**响应侧出站密钥扫描（默认开）**。
 
+**哪些路径会被检测**（明确列举，不是「不在列表里就透传」）：
+
+| 路径 | 处理 |
+|---|---|
+| `/v1/chat/completions` `/v1/completions` `/v1/messages` | 完整检测（含 L3 与分段） |
+| `/v1/models` `/v1/embeddings` `/v1/audio/*` `/v1/images/*` `/v1/moderations` | 直通，不过检测 |
+| `/v1/responses` `/v1/complete` | **501**，载荷结构尚未接入分段提取（明确报，不静默放行） |
+| 其他 | **404** + 列出上面两组路径 |
+
+`/v1/messages`（Anthropic 原生）此前落在「其余路径」里被静默透传，等于 Anthropic
+客户端完全不过检测；现在它走检测，因为 body 里同样是 `messages`。
+
+按来源 IP 的限流：`--rate-limit N` 或 `PROMPT_IDS_PROXY_RATE_LIMIT`（**默认 0 = 关闭**）。
+限流**不是攻击判定**：它转人工复核而非阻断，且被限流的请求同样落审计（429 有留痕）。
+
 **凭据与日志**：上游地址与 Key 全部走环境变量
 （`PROMPT_IDS_UPSTREAM` / `PROMPT_IDS_UPSTREAM_KEY`，兼容 `OPENAI_BASE_URL` / `OPENAI_API_KEY`），
 不硬编码。审计日志**只写指纹不写原文**（`test_audit_written_without_raw_text` 有断言守护），
@@ -613,7 +628,7 @@ python -m prompt_ids.api --api-key <key> --rate-limit 60  # 开鉴权与限流
 | `/v1/providers` | GET | 当前生效的语义后端 + 21 家提供商可用性清单 |
 | `/v1/review` | POST | 提交人工复核结论（`is_attack`），写入审计并喂回记忆层 |
 | `/v1/review/queue` | GET | 待复核队列（等级 ≥ medium 且无人工结论）+ 复核统计 + 规则台账，只含指纹 |
-| `/v1/review/patterns` | GET | 规则级复核台账与误报嫌疑榜（反哺规则的读数端，只给建议） |
+| `/v1/review/patterns` | GET | 规则级复核台账与误报嫌疑榜（反哺规则的读数端，只给建议）；`?limit=` 默认 1000、上限 20000 |
 | `/v1/metrics` | GET | 运行指标：扫描量、等级分布、检测器、语义层状态、复核计数 |
 | `/healthz` | GET | 健康检查 |
 | `/v1/openapi.json` | GET | 接口自描述 |
@@ -1253,7 +1268,7 @@ python scripts/eval_german.py --exclude PV-C015,PV-C019,PV-H025            # 消
 ### 其他基线
 
 ```bash
-pytest tests -q            # 579 项单测全绿
+pytest tests -q            # 600 项单测全绿
 python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检出 10/10 误报 0/6
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
@@ -1263,9 +1278,9 @@ python scripts/eval_semantic.py --dataset data/my.jsonl   # 换自己的数据�
 
 单测分布（`pytest --collect-only`）：providers 86 · core_units 41 · proxy 42 ·
 output_secrets 41 · semantic 35 · regressions 35 · audit 31 · review 32 ·
-canary 24 · api 29 · memory 27 · web 23 · pipeline 23 · network_robustness 15 ·
-verdict 19 · playground 18 · threshold_sweep 9 · concurrency 4 · rules_redos 9 ·
-agent_bench 10 · preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
+network_robustness 33 · api 29 · canary 24 · canary_cost 7 · memory 27 · web 23 ·
+pipeline 23 · verdict 19 · playground 18 · threshold_sweep 9 · concurrency 4 ·
+rules_redos 9 · agent_bench 10 · preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
 
 评测报告落在 `reports/ablation.json`，可直接画图。
 `reports/ablation_public.json` 是同一套配置只在公开集上的独立复跑，用于交叉验证

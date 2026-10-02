@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.audit.query import decision_of, load  # noqa: E402
+from prompt_ids.audit.query import decision_of, load, outbound_of  # noqa: E402
 from prompt_ids.canary.tokens import CanaryRegistry, issue  # noqa: E402
 from prompt_ids.eval.metrics import markdown_table  # noqa: E402
 from prompt_ids.proxy.server import ProxyConfig, create_server  # noqa: E402
@@ -150,13 +150,14 @@ def demo_proxy() -> None:
     # 统一审计模型之后，统计读的是事件文件而不是 logger 上的方法
     # （`AuditLogger.summary()` 在审计层统一到 AuditEvent 时就没了）。
     events = load(audit_path)
-    leaks = [e for e in events if e.kind == "leak" or decision_of(e) == "leak"]
-    print(f"审计落盘：{audit_path}（{len(events)} 条事件，其中泄漏 {len(leaks)} 条）")
+    leaks = [e for e in events if e.kind == "leak" or outbound_of(e) != "none"]
+    print(f"审计落盘：{audit_path}（{len(events)} 条事件，其中出站命中 {len(leaks)} 条）")
     for event in leaks:
         # 代理侧只记「怎么泄的」（exact/normalized/...），不记令牌本身；
         # /v1/canary/check 走 log_leak 才会带上脱敏令牌。
         print(f"  kind={event.kind} source={event.source} decision={decision_of(event)} "
-              f"note={event.note} token={(event.extra or {}).get('token', '（未落盘）')}")
+              f"outbound={outbound_of(event)} detail={event.extra.get('outbound_detail', '')} "
+              f"token={(event.extra or {}).get('token', '（未落盘）')}")
     server.shutdown()
     upstream.shutdown()
 

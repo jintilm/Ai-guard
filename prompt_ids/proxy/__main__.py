@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-redact", action="store_true", help="检出 Canary 泄漏时只记录不替换响应")
     parser.add_argument("--no-scan-secrets", action="store_true",
                         help="关掉出站密钥扫描（默认开：输出里出现第三方凭据会抹成 [REDACTED:*]）")
+    parser.add_argument("--rate-limit", type=int, default=0,
+                        help="每来源 IP 的请求上限，0 = 关闭（默认）。生产建议显式设置")
     args = parser.parse_args(argv)
 
     pipeline = create_pipeline(
@@ -61,12 +63,14 @@ def main(argv: list[str] | None = None) -> int:
         canary=canary,
         redact_leak=not args.no_redact,
         scan_secrets=not args.no_scan_secrets,
+        rate_limit=args.rate_limit,
     )
     print(f"上游: {config.upstream}")
     print(f"凭据: {'已配置' if config.api_key else '未配置（上游若为公开网关可忽略）'}")
     print(f"审计: {config.audit.path or '关闭'}")
     print(f"语义层: {'启用 ' + args.semantic_mode if args.semantic else '关闭'}")
     print(f"出站密钥扫描: {'开启' if config.scan_secrets else '关闭'}")
+    print(f"限流: {config.rate_limit + '/IP/' + str(int(config.rate_window_s)) + 's' if config.limiter else '关闭'}")
     if canary:
         print(f"Canary: {canary.current.value}  "
               f"将其埋入 system prompt 后，一旦出现在模型输出即判定提示已泄露")

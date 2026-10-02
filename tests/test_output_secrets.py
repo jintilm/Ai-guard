@@ -234,9 +234,11 @@ def test_secret_in_output_is_redacted_before_it_reaches_the_client(leaky_upstrea
         # 响应其余部分必须保持原样，不能因为替换把 JSON 弄坏
         assert json.loads(text)["choices"][0]["message"]["content"].startswith("根据文档")
         events = _events(audit_path)
-        secret_events = [e for e in events if e["extra"].get("decision") == "redact_secrets"]
+        secret_events = [e for e in events if e["extra"].get("outbound") == "redacted"]
         assert secret_events, "脱敏了却没落审计"
         assert secret_events[-1]["extra"]["secret_kinds"] == {"aws_access_key": 1}
+        # 一次请求只落一条事件（出站结论记在同一条的 extra.outbound 上）
+        assert len(events) == 1, f"一次请求落了 {len(events)} 条事件：{events}"
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -263,7 +265,7 @@ def test_secret_in_tool_call_arguments_is_also_redacted(leaky_upstream, tmp_path
         assert "[REDACTED:aws_access_key]" in arguments
         assert "config.py" in arguments
         events = _events(audit_path)
-        assert [e for e in events if e["extra"].get("decision") == "redact_secrets"]
+        assert [e for e in events if e["extra"].get("outbound") == "redacted"]
     finally:
         httpd.shutdown()
         httpd.server_close()
@@ -437,9 +439,10 @@ def test_stream_can_only_be_warned_after_the_fact(leaky_upstream, tmp_path_facto
         assert "AKIAIOSF" in text and "ODNN7EXAMPLE" in text
         assert "secret_scan" in text, "内容已发出去了，至少要补一条告警帧"
         events = _events(audit_path)
-        warned = [e for e in events if e["extra"].get("decision") == "secret_leak"]
+        warned = [e for e in events if e["extra"].get("outbound") == "warned"]
         assert warned and warned[-1]["extra"]["secret_kinds"] == {"aws_access_key": 1}
         assert "撤" in warned[-1]["note"], "审计要写明这一类无法撤回，否则会被误读成已拦住"
+        assert len(events) == 1, f"一次请求落了 {len(events)} 条事件：{events}"
     finally:
         httpd.shutdown()
         httpd.server_close()

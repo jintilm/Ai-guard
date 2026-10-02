@@ -23,18 +23,48 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from prompt_ids.audit import AuditLogger, event_from_proxy
+from prompt_ids.audit.events import (
+    OUTBOUND_NONE,
+    OUTBOUND_REDACTED,
+    OUTBOUND_REJECTED,
+    OUTBOUND_REPLACED,
+    OUTBOUND_WARNED,
+)
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
+from prompt_ids.preprocess.guard import RateLimiter
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
-from prompt_ids.core.types import Action, level_rank
+from prompt_ids.core.types import Action, ScanResult, level_rank
 from prompt_ids.proxy.forward import UpstreamError, forward_headers, post_json, post_stream
 
 DEFAULT_PORT = 8787
 # 请求体上限。不设的话攻击者可以用超大 Content-Length 吃满内存与 CPU：
 # 规则层耗时随长度线性增长（72KB 约 135ms），超大 body 足以拖垮代理
 MAX_BODY_BYTES = 2 * 1024 * 1024
-# 需要检测的路径；其余路径（如 /v1/models）直接透传
-SCANNED_PATHS = ("/v1/chat/completions", "/v1/completions", "/chat/completions", "/completions")
+#: 需要**检测**的路径。`/v1/messages` 是 Anthropic 原生形态，body 里同样有
+#: `messages`，现成的分段提取直接可用 —— 之前它落在「其余路径」里被静默透传，
+#: 等于 Anthropic 客户端**完全不过检测**，而这件事没有任何日志或提示。
+SCANNED_PATHS = (
+    "/v1/chat/completions", "/v1/completions",
+    "/chat/completions", "/completions",
+    "/v1/messages",
+)
+#: 明确**不检测**、直接透传的路径。逐个列出来，而不是「不在扫描列表里就透传」——
+#: 后者的含义是「将来新增的生成端点会自动被跳过检测」，而这正是静默漏检的来源。
+PASSTHROUGH_PATHS = (
+    "/v1/models", "/v1/embeddings",
+    "/v1/audio/speech", "/v1/audio/transcriptions", "/v1/audio/translations",
+    "/v1/images/generations", "/v1/images/edits", "/v1/moderations",
+)
+#: 已知但**尚未支持检测**的生成端点。明确报 501 而不是透传：
+#: 调用方能立刻知道「这里没有防护」，而不是以为检测过了。
+UNSUPPORTED_SCAN_PATHS = {
+    "/v1/responses": "OpenAI Responses API 的载荷结构（input / instructions）尚未接入分段提取",
+    "/v1/complete": "legacy completions 需要 prompt 而非 messages，尚未接入",
+}
+#: 代理支持的 HTTP 方法。其余返回 JSON 405，而不是 BaseHTTPRequestHandler 的 HTML 501
+#: （「所有响应都是 JSON」是本服务的对外约定，HTML 错误页会让 SDK 解析失败）。
+SUPPORTED_METHODS = ("GET", "POST", "OPTIONS")
 
 
 def _first_env(*names: str, default: str = "") -> str:
@@ -75,6 +105,11 @@ class ProxyConfig:
         max_response_mb: int = 32,
         # 直接给字节数的版本（测试与小内存部署用；给了就以它为准）
         max_response_bytes: int = 0,
+        # 每来源 IP 的请求上限（**默认 0 = 关闭**）。此前代理**完全没有**限流，
+        # 而 Guard 里的 rate_limit 是死配置（check_rate 全仓库无调用点）。
+        # 生产建议显式打开：默认关是为了不改变既有行为。
+        rate_limit: int = 0,
+        rate_window_s: float = 60.0,
         # 是否扫描 tool / function 角色的内容（间接注入面，默认开）。
         # 关掉它只为取证用：留一个能跑 A/B 的开关，才能说清「扫工具返回内容」本身
         # 带来多少检出、带来多少过防御。
@@ -121,6 +156,15 @@ class ProxyConfig:
             else max(1, int(_first_env("PROMPT_IDS_PROXY_MAX_RESPONSE_MB",
                                        default=str(max_response_mb)) or max_response_mb))
             * 1024 * 1024)
+        self.rate_limit = int(_first_env("PROMPT_IDS_PROXY_RATE_LIMIT",
+                                         default=str(rate_limit)) or rate_limit)
+        self.rate_window_s = float(_first_env("PROMPT_IDS_PROXY_RATE_WINDOW_S",
+                                              default=str(rate_window_s)) or rate_window_s)
+        self.limiter = (
+            RateLimiter(self.rate_limit, self.rate_window_s)
+            if self.rate_limit and self.rate_limit > 0
+            else None
+        )
         env_scan = _first_env("PROMPT_IDS_PROXY_SCAN_TOOL")
         if env_scan:
             # 显式开关优先于构造参数：代理是长驻进程，运维改环境变量比改代码现实
@@ -463,11 +507,58 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     # ---------- 路由 ----------
+    def _rate_limited(self) -> bool:
+        """按来源 IP 限流（默认关闭，`rate_limit=0`）。
+
+        为什么按 IP：代理把客户端的 Authorization 头透传给上游，自己没有可验证的
+        调用方身份 —— 拿请求头当分桶键等于「换个 key 换桶」，限流形同虚设。
+        """
+        limiter = self.config.limiter
+        if limiter is None:
+            return False
+        return not limiter.try_acquire(str(self.client_address[0]))
+
+    def _too_many_requests(self, path: str = "", result=None) -> None:
+        """回 429，并**落一条审计**。
+
+        限流发生在读 body 与检测之前，所以这条事件没有指纹、也没有判定 ——
+        但必须留痕：否则「限流把请求挡了」在日志里完全看不见，
+        而运维看到的是「请求数变少了」，猜不出原因。
+        """
+        retry = max(1, int(self.config.rate_window_s))
+        note = f"超过限流（{self.config.rate_limit} 次/{retry}s），未做检测"
+        self.config.audit.log(
+            event_from_proxy(result or ScanResult(), path=path or self._upstream_path(),
+                             client=self.client_address[0], stream=False, detect_ms=0.0,
+                             status=429, decision="rate_limited", note=note))
+        body = json.dumps({"error": {
+            "message": f"超过限流（{self.config.rate_limit} 次/{retry}s），请稍后再试",
+            "type": "rate_limited", "code": "rate_limited"}}, ensure_ascii=False).encode()
+        self.send_response(429)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Retry-After", str(retry))
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _method_not_allowed(self) -> None:
+        """未实现的方法返回 JSON 405。
+
+        BaseHTTPRequestHandler 的默认实现回的是 **HTML** 501 错误页 ——
+        与「所有响应都是 JSON」的对外约定冲突，SDK 侧会在解析错误体时再炸一次。
+        """
+        self._send_json(405, {"error": {
+            "message": f"不支持的方法 {self.command}；支持 {'/'.join(SUPPORTED_METHODS)}",
+            "type": "method_not_allowed", "code": "method_not_allowed"}})
+
     def do_GET(self) -> None:
         if self.path.rstrip("/") in ("/healthz", "/health"):
             self._send_json(200, {"status": "ok", "upstream": self.config.upstream})
             return
         self._passthrough("GET", b"")
+
+    # 其余方法统一走 JSON 405，而不是 BaseHTTPRequestHandler 的 HTML 501
+    do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = _method_not_allowed
 
     def _content_length(self) -> int:
         raw = (self.headers.get("Content-Length") or "").strip()
@@ -491,7 +582,47 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 break
             remaining -= len(chunk)
 
+    def _drain_chunked(self, *, max_bytes: int = MAX_BODY_BYTES) -> tuple[bool, int]:
+        """丢弃一个 chunked 请求体，返回 (是否读完, 读了多少字节)。
+
+        必须真的读掉再回 411：与 413 同理，客户端还在发 body 时服务端写错误并
+        关连接 ⇒ RST，调用方看到的是 ConnectionAbortedError 而不是 411。
+        超过 `max_bytes` 就放弃读完（那是超大 body，本就该被拒），此时靠
+        `Connection: close` 收尾。
+        """
+        total = 0
+        while True:
+            line = self.rfile.readline(1024)
+            if not line:
+                return False, total
+            try:
+                size = int(line.split(b";", 1)[0].strip() or b"0", 16)
+            except ValueError:
+                return False, total
+            if size == 0:
+                # 读掉 trailer 直到空行
+                while True:
+                    trailer = self.rfile.readline(1024)
+                    if not trailer or trailer in (b"\r\n", b"\n"):
+                        break
+                return True, total
+            remaining = size
+            total += size
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 65536))
+                if not chunk:
+                    return False, total
+                remaining -= len(chunk)
+            self.rfile.read(2)          # CRLF
+            if total > max_bytes:
+                return False, total
+
     def do_POST(self) -> None:
+        # 限流在**读 body 之前**判：否则被限流的请求仍然能把 2MB body 灌进代理
+        if self._rate_limited():
+            self._drain(len(self.headers.get("Content-Length") or 0) or 0)
+            self._too_many_requests()
+            return
         try:
             length = self._content_length()
         except ValueError:
@@ -511,14 +642,32 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if self.headers.get("Transfer-Encoding", "").lower().strip() == "chunked":
             # 不支持分块：静默当空 body 会让扫描路径报 400、而**非**扫描路径
             # （如 /v1/embeddings）把空 body 转发给上游，调用方的数据无声消失。
+            # 先把 chunked body 读干净再回 411，否则又是 RST（同一个坑的另一种形态）。
+            drained, total = self._drain_chunked()
+            self.close_connection = True
             self._send_json(411, {"error": {
                 "message": "不支持 Transfer-Encoding: chunked，请带 Content-Length",
                 "code": "length_required"}})
             return
         path = self._upstream_path()
 
+        if path in UNSUPPORTED_SCAN_PATHS:
+            # 响亮失败：明确知道「这里没有防护」，好过静默透传让人以为检测过了
+            self._send_json(501, {"error": {
+                "message": f"{path} 尚未接入检测：{UNSUPPORTED_SCAN_PATHS[path]}。"
+                           f"请改用 {'/'.join(SCANNED_PATHS[:2])}，或让应用直接指向上游。",
+                "type": "scan_unsupported", "code": "scan_unsupported"}})
+            return
         if path not in SCANNED_PATHS:
-            self._passthrough("POST", body)
+            if path in PASSTHROUGH_PATHS:
+                self._passthrough("POST", body)
+                return
+            # 未知路径：不转发。一个没被列进来的新端点如果被自动透传，
+            # 等于「新增生成端点 = 自动失去检测」，而没人会看到这件事发生。
+            self._send_json(404, {"error": {
+                "message": f"未识别的路径 {path}。检测路径：{'/'.join(SCANNED_PATHS)}；"
+                           f"直通路径：{'/'.join(PASSTHROUGH_PATHS)}",
+                "type": "unknown_path", "code": "unknown_path"}})
             return
 
         try:
@@ -588,8 +737,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _stream_body(self, chunks, path: str, result, status: int, detect_ms: float,
                      text: str, segments: int, trigger: str, truncated: int,
-                     dropped: int, scanned_chars: int, started: float) -> None:
-        """转发 SSE 流并做**出站**检测（Canary + 密钥）。
+                     dropped: int, scanned_chars: int, started: float):
+        """转发 SSE 流并做**出站**检测，返回 (出站处置, 说明, 类别计数, 是否取样, 扫描字符数)。
+
+        这里**不落审计**：出站结论由 `_forward` 统一写成一条事件（一次请求一条），
+        此前流式路径自己发两条事件（leak / secret_leak），
+        与非流式路径的重复计数是同一个毛病。
+
+        转发 SSE 流并做**出站**检测（Canary + 密钥）。
 
         三个坑在这里处理：
         1) **按完整帧转发，且最后一帧要扣住**。告警帧必须排在 `data: [DONE]` **之前**：
@@ -657,35 +812,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self.wfile.write(notices)
             self.wfile.flush()
         flush_held()
-        upstream_ms = (time.perf_counter() - started) * 1000
 
-        # 流式 Canary 泄漏此前**完全不落审计** —— 而流式正是提示提取最可能
-        # 被诱导使用的模式，「唯一的铁证」不能只存在于告警帧里。
+        # 出站处置：流式一律是「已发出、无法撤回」⇒ warned。
+        # 「无法撤回」这句话也进审计 note —— 别把它读成已拦住。
         if leak is not None:
-            self.config.audit.log(
-                event_from_proxy(result, path=path, client=self.client_address[0],
-                                 stream=True, upstream_ms=upstream_ms, detect_ms=detect_ms,
-                                 status=status, decision="leak",
-                                 note=f"Canary 泄漏({leak.how})（流式，内容已发出，无法撤回）",
-                                 text=text, segments=segments, trigger=trigger,
-                                 truncated=truncated, dropped=dropped,
-                                 scanned_chars=scanned_chars)
-            )
-        if secrets_found:
-            self.config.audit.log(
-                event_from_proxy(result, path=path, client=self.client_address[0],
-                                 stream=True, upstream_ms=upstream_ms, detect_ms=detect_ms,
-                                 status=status, decision="secret_leak",
-                                 note=f"出站密钥 {len(secrets_found)} 处（流式，内容已发出，"
-                                      "无法撤回，只能事后告警）",
-                                 text=text, segments=segments, trigger=trigger,
-                                 truncated=truncated, dropped=dropped,
-                                 scanned_chars=scanned_chars,
-                                 secret_kinds=summary(secrets_found),
-                                 secret_sampled=secret_sampled,
-                                 secret_scanned_chars=secret_chars,
-                                 secret_capped=capped)
-            )
+            detail = f"Canary 泄漏({leak.how})（流式，内容已发出，无法撤回，只能事后告警）"
+        elif secrets_found:
+            detail = (f"出站密钥 {len(secrets_found)} 处"
+                      "（流式，内容已发出，无法撤回，只能事后告警）")
+        else:
+            detail = ""
+        out = OUTBOUND_WARNED if (leak is not None or secrets_found) else OUTBOUND_NONE
+        return out, detail, summary(secrets_found), secret_sampled or capped, secret_chars
 
     def _forward(
         self,
@@ -702,19 +840,49 @@ class ProxyHandler(BaseHTTPRequestHandler):
         dropped: int = 0,
         scanned_chars: int = 0,
     ) -> None:
-        url = f"{self.config.upstream}{path}"
+        url = self._upstream_url(path)
         headers = self._build_headers()
         stream = bool(payload.get("stream"))
         started = time.perf_counter()
+        # 出站结论先攒着，**最后只落一条事件**。此前为记录出站结论会额外发一条
+        # `redact_secrets`/`leak`/`secret_leak` 事件 ⇒ by_decision 把一次请求数成两次，
+        # 而且三个名字语义重叠（都是「响应里有凭据」）。
+        outbound = OUTBOUND_NONE
+        outbound_detail = ""
+        secret_kinds: dict[str, int] = {}
+        secret_sampled = False
+        secret_chars = 0
+
+        def audit_one(status_code: int, note: str, *, upstream_ms: float,
+                      out: str | None = None, detail: str | None = None) -> None:
+            """一次请求一条事件。`out` 是出站处置，与 decision 正交。
+
+            ⚠ 默认值必须用 None 再回退到闭包变量：写成 `out: str = outbound`
+            会在**定义时**求值，把出站结论永远冻在 `none`（踩过：脱敏生效了、
+            审计里 outbound 却是 none）。
+            """
+            self.config.audit.log(
+                event_from_proxy(result, path=path, client=self.client_address[0], stream=stream,
+                                 upstream_ms=upstream_ms, detect_ms=detect_ms, status=status_code,
+                                 decision=decision, note=note, text=text, segments=segments,
+                                 trigger=trigger, truncated=truncated, dropped=dropped,
+                                 scanned_chars=scanned_chars, secret_kinds=secret_kinds,
+                                 secret_sampled=secret_sampled,
+                                 secret_scanned_chars=secret_chars,
+                                 outbound=outbound if out is None else out,
+                                 outbound_detail=outbound_detail if detail is None else detail)
+            )
+
         try:
             if stream:
                 status, resp_headers, chunks, _, close_upstream = post_stream(
                     url, body, headers, self.config.timeout_s)
                 self._relay_response(status, resp_headers)
                 try:
-                    self._stream_body(chunks, path, result, status, detect_ms, text,
-                                      segments, trigger, truncated, dropped, scanned_chars,
-                                      started)
+                    outbound, outbound_detail, secret_kinds, secret_sampled, secret_chars = \
+                        self._stream_body(chunks, path, result, status, detect_ms, text,
+                                          segments, trigger, truncated, dropped,
+                                          scanned_chars, started)
                 finally:
                     # 任何退出路径都关上游连接（生成器未被启动时它的 finally 不会跑）
                     close_upstream()
@@ -728,15 +896,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 encoding = {k.lower(): v for k, v in (resp_headers or {}).items()}.get(
                     "content-encoding", "identity")
                 if encoding not in ("", "identity"):
-                    self.config.audit.log(
-                        event_from_proxy(result, path=path, client=self.client_address[0],
-                                         stream=False, detect_ms=detect_ms, status=502,
-                                         decision="reject_encoding",
-                                         note=f"上游回了 {encoding} 响应，出站扫描无法保证，"
-                                              "已拒收", text=text, segments=segments,
-                                         trigger=trigger, truncated=truncated, dropped=dropped,
-                                         scanned_chars=scanned_chars)
-                    )
+                    audit_one(502, f"上游回了 {encoding} 响应，出站扫描无法保证，已拒收",
+                              upstream_ms=(time.perf_counter() - started) * 1000,
+                              out=OUTBOUND_REJECTED, detail=f"content-encoding:{encoding}")
                     self._send_json(502, {"error": {
                         "message": f"上游返回 {encoding} 编码的响应，出站检测无法保证，已拒收",
                         "code": "unsupported_content_encoding"}})
@@ -754,68 +916,39 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     # 非流式可以真正拦住：把命中片段就地抹成 [REDACTED:<kind>]，
                     # 审计只记类别与计数，不记原文（密钥进了审计文件就是新的泄露面）。
                     payload_bytes = redact_bytes(payload_bytes, secrets_found)
-                    self.config.audit.log(
-                        event_from_proxy(result, path=path, client=self.client_address[0],
-                                         stream=False, upstream_ms=(time.perf_counter() - started) * 1000,
-                                         detect_ms=detect_ms, status=status,
-                                         decision="redact_secrets",
-                                         note=f"出站密钥 {len(secrets_found)} 处已脱敏",
-                                         text=text, segments=segments, trigger=trigger,
-                                         truncated=truncated, dropped=dropped,
-                                         scanned_chars=scanned_chars,
-                                         secret_kinds=summary(secrets_found),
-                                         secret_sampled=secret_sampled,
-                                         secret_scanned_chars=secret_chars)
-                    )
+                    secret_kinds = summary(secrets_found)
+                    outbound = OUTBOUND_REDACTED
+                    outbound_detail = f"出站密钥 {len(secrets_found)} 处已脱敏"
+                if leak is not None:
+                    outbound = OUTBOUND_REPLACED
+                    outbound_detail = f"Canary 泄漏({leak.how})，响应已替换"
                 if leak is not None and self.config.redact_leak:
                     # 令牌已经出现在输出里，原文不能再往前传，换成告警。
                     # 状态码沿用上游的：post_json 对 4xx/5xx 不抛异常，硬写 200 会让
                     # SDK 把「上游鉴权失败」读成「请求成功了」。
-                    self.config.audit.log(
-                        event_from_proxy(result, path=path, client=self.client_address[0],
-                                         stream=False, upstream_ms=(time.perf_counter() - started) * 1000,
-                                         detect_ms=detect_ms, status=status, decision="leak",
-                                         note=f"Canary 泄漏({leak.how})，响应已替换", text=text,
-                                         segments=segments, trigger=trigger, truncated=truncated,
-                                         dropped=dropped, scanned_chars=scanned_chars)
-                    )
+                    audit_one(status, outbound_detail,
+                              upstream_ms=(time.perf_counter() - started) * 1000)
                     self._send_json(status, _leak_warning(leak))
                     return
-                if leak is not None:
-                    # 不重新 json.loads 再序列化：payload_bytes 已经在手上了，
-                    # 而且上游可能根本不是 JSON（`stream:false` 被忽略时回 SSE）。
-                    self._relay_response(status, resp_headers, body_modified=bool(secrets_found))
-                    self.wfile.write(payload_bytes)
-                    return
+                # 不重新 json.loads 再序列化：payload_bytes 已经在手上了，
+                # 而且上游可能根本不是 JSON（`stream:false` 被忽略时回 SSE）。
                 self._relay_response(status, resp_headers, body_modified=bool(secrets_found))
                 self.wfile.write(payload_bytes)
         except UpstreamError as exc:
             status = exc.status
+            audit_one(status, f"上游错误 {exc.status}",
+                      upstream_ms=(time.perf_counter() - started) * 1000)
             self._send_json(status, json.loads(exc.body.decode("utf-8", "replace")))
+            return
         except OSError:
             # 客户端提前断开。**照样要落审计** —— 用户中断生成恰恰是最需要留证的场景，
             # 而这里以前直接 return，整条请求（含判定与出站结论）从日志里消失。
-            status = 499
-            self.config.audit.log(
-                event_from_proxy(result, path=path, client=self.client_address[0], stream=stream,
-                                 upstream_ms=(time.perf_counter() - started) * 1000,
-                                 detect_ms=detect_ms, status=499, decision=decision,
-                                 note="客户端提前断开，响应未发完", text=text, segments=segments,
-                                 trigger=trigger, truncated=truncated, dropped=dropped,
-                                 scanned_chars=scanned_chars)
-            )
+            audit_one(499, "客户端提前断开，响应未发完",
+                      upstream_ms=(time.perf_counter() - started) * 1000)
             return
         upstream_ms = (time.perf_counter() - started) * 1000
 
-        self.config.audit.log(
-            event_from_proxy(
-                result, path=path, client=self.client_address[0], stream=stream,
-                upstream_ms=upstream_ms, detect_ms=detect_ms, status=status,
-                decision=decision, text=text,
-                segments=segments, trigger=trigger, truncated=truncated,
-                dropped=dropped, scanned_chars=scanned_chars,
-            )
-        )
+        audit_one(status, outbound_detail, upstream_ms=upstream_ms)
 
     def _upstream_path(self) -> str:
         """把请求路径规范化后再拼到上游。
@@ -830,9 +963,30 @@ class ProxyHandler(BaseHTTPRequestHandler):
             normalized = "/" + normalized
         return normalized.rstrip("/") or "/"
 
+    def _upstream_url(self, path: str) -> str:
+        """拼上游地址，折叠重复的 `/v1`。
+
+        上游地址常以 `/v1` 结尾（OpenAI 兼容网关都是），而客户端请求路径通常
+        也带 `/v1` —— 原样拼接会得到 `/v1/v1/chat/completions`。
+        这个重复前缀此前只影响**透传**路径（扫描路径写死用相对路径掩盖了它），
+        直到新增 `/v1/messages` 扫描才暴露出来。
+
+        注意与 `_upstream_path()` 分开：路由判定要用**客户端看到的路径**
+        （否则 `/v1/messages` 会被折叠成 `/messages` 而匹配不上扫描列表），
+        只有拼 URL 时才折叠。
+        """
+        base = self.config.upstream.rstrip("/")
+        if base.endswith("/v1"):
+            # 只削**路径**里的前缀，base 的 /v1 保留：
+            # 两边同时削会让 /v1 整个消失（上游收到 `/embeddings`），
+            # 两边都不削则得到 `/v1/v1/embeddings`。两者都实测过。
+            while path.startswith("/v1/"):
+                path = path[3:]
+        return base + path
+
     def _passthrough(self, method: str, body: bytes) -> None:
         """非检测路径（如 /v1/models）原样转发。路径先规范化。"""
-        url = f"{self.config.upstream}{self._upstream_path()}"
+        url = self._upstream_url(self._upstream_path())
         headers = self._build_headers()
         request = urllib.request.Request(url, data=body or None, headers=headers, method=method)
         try:

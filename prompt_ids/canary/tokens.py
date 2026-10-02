@@ -72,6 +72,32 @@ class CanaryMatch:
 
 
 @dataclass(frozen=True, slots=True)
+class _SearchContext:
+    """一次 `check()` 的搜索视图：归一化与解码展开**只做一遍**。
+
+    为什么要有它：`_match_one()` 是**按令牌**调用的，而归一化
+    （`_normalize(text)`）和 `self.expander.expand(text)` 都是 O(len(text)) 的。
+    放在 `_match_one()` 里就等于「令牌数 × 全文长度」—— 实测 400 个令牌时
+    每次 check 要 184ms，而这两个操作与令牌数无关。
+    """
+
+    text: str
+    haystack: str
+    decoded: tuple[tuple[str, str], ...] = ()
+
+    @classmethod
+    def build(cls, text: str, normalizer: Normalizer, expander: DecodeExpander) -> "_SearchContext":
+        decoded = tuple(
+            (variant.kind, _normalize(variant.text, normalizer))
+            for variant in expander.expand(text)
+        )
+        # 展开结果与 haystack 完全一致时不必留（重复匹配没有意义）
+        haystack = _normalize(text, normalizer)
+        unique = tuple((kind, norm) for kind, norm in decoded if norm and norm != haystack)
+        return cls(text=text, haystack=haystack, decoded=unique)
+
+
+@dataclass(frozen=True, slots=True)
 class CanaryToken:
     value: str
     issued_at: float = field(default_factory=time.time)
@@ -145,8 +171,17 @@ class CanaryRegistry:
         normalizer: Normalizer | None = None,
         max_decode_hops: int = 2,
         max_leak_history: int = 500,
+        max_tokens: int = 128,
+        max_retired: int = 512,
     ):
         self._tokens: dict[str, CanaryToken] = {}
+        #: 退役令牌（超出 `max_tokens` 的旧令牌）。它们**仍会被检出**，
+        #: 但只走便宜的路径（原文/归一化子串），不走解码展开。
+        #: 「轮换后旧令牌继续生效」这条承诺因此有一个明确边界：
+        #: 最近 `max_tokens` 个全量匹配，再往前 `max_retired` 个只做子串匹配。
+        self._retired: dict[str, CanaryToken] = {}
+        #: 令牌自身变体的归一化结果，注册时算一次（否则每次 check 都重算 8 个变体）
+        self._norm_cache: dict[str, tuple[tuple[str, str], ...]] = {}
         #: 签发顺序（单调递增）。**不能**只靠 issued_at 排序来定「最新」：
         #: time.time() 在 Windows 上被粗化到 15.6ms（GetSystemTimeAsFileTime），
         #: 同一 tick 内连发 issue()+rotate() 会拿到相同时间戳，此时 max() 会按字典顺序
@@ -156,6 +191,8 @@ class CanaryRegistry:
             self.register(token)
         self.normalizer = normalizer or Normalizer()
         self.expander = DecodeExpander(max_hops=max_decode_hops, max_variants=12)
+        self.max_tokens = max(1, int(max_tokens))
+        self.max_retired = max(0, int(max_retired))
         # `leaks` 是定长队列：原来是无界 list，只 append 不裁剪，
         # 而 `stats()` 每次 /v1/metrics 都要全量遍历它。
         self.leaks: deque[CanaryMatch] = deque(maxlen=max_leak_history)
@@ -171,12 +208,20 @@ class CanaryRegistry:
         with self._lock:
             self._tokens[token.value] = token
             self._order.setdefault(token.value, len(self._order))
-        return token
-
-    # ---------- 管理 ----------
-    def register(self, token: CanaryToken) -> CanaryToken:
-        self._tokens[token.value] = token
-        self._order.setdefault(token.value, len(self._order))
+            # 退役窗口：超出 max_tokens 的旧令牌移入 `_retired`，只做便宜的匹配。
+            # 不设窗口的话，`check()` 的成本随签发次数线性增长，而
+            # POST /v1/canary/issue 默认无鉴权无配额 ⇒ 每签发 400 个，
+            # 每个响应就要多付 184ms（实测，改成「上下文只建一次」后是 36ms，
+            # 而这 36ms 仍然全花在逐个令牌匹配上）。
+            while len(self._tokens) > self.max_tokens:
+                oldest = min(self._tokens.values(), key=self._freshness)
+                self._tokens.pop(oldest.value, None)
+                self._retired[oldest.value] = oldest
+                self._norm_cache.pop(oldest.value, None)
+            while len(self._retired) > self.max_retired:
+                key = min(self._retired.values(), key=self._freshness).value
+                self._retired.pop(key, None)
+                self._norm_cache.pop(key, None)
         return token
 
     def _freshness(self, token: CanaryToken) -> tuple[float, int]:
@@ -196,69 +241,127 @@ class CanaryRegistry:
         return self.issue(label=label or "rotated", **kwargs)
 
     def values(self) -> list[str]:
-        return [t.value for t in self._tokens.values()]
+        return [t.value for t in self._tokens.values()] + \
+            [t.value for t in self._retired.values()]
 
     def __len__(self) -> int:
-        return len(self._tokens)
+        return len(self._tokens) + len(self._retired)
 
     # ---------- 检测 ----------
     def check(self, text: str) -> CanaryMatch | None:
-        """在文本中查找任一已知令牌。返回首个命中，未命中返回 None。"""
+        """在文本中查找任一已知令牌。返回首个命中，未命中返回 None。
+
+        **归一化与解码展开每次调用只做一遍**。原来它们在 `_match_one()` 里，
+        而 `_match_one()` 是**每个令牌**调一次 —— N 个令牌就是 N 遍
+        O(len(text)) 的归一化加一遍解码展开。实测 400 个令牌时每次 check 要
+        184ms，而这段开销与令牌数无关却按令牌数重复付。
+        """
         if not text:
             return None
         # 先在锁内取快照再遍历：否则与并发 register() 相撞会抛
         # `RuntimeError: dictionary changed size during iteration`
         with self._lock:
             tokens = sorted(self._tokens.values(), key=self._freshness, reverse=True)
+        context = _SearchContext.build(text, self.normalizer, self.expander)
         for token in tokens:
-            match = self._match_one(token, text)
+            match = self._match_one(token, context)
+            if match:
+                self.leaks.append(match)
+                return match
+        # 退役令牌：只查原文与归一化子串（便宜），跳过解码展开
+        with self._lock:
+            retired = list(self._retired.values())
+        for token in retired:
+            match = self._match_cheap(token, context)
             if match:
                 self.leaks.append(match)
                 return match
         return None
 
     def check_all(self, text: str) -> list[CanaryMatch]:
+        context = _SearchContext.build(text, self.normalizer, self.expander)
+        with self._lock:
+            tokens = list(self._tokens.values()) + list(self._retired.values())
         matches = []
-        for token in self._tokens.values():
-            match = self._match_one(token, text)
+        for token in tokens:
+            match = self._match_cheap(token, context) if token.value in self._retired \
+                else self._match_one(token, context)
             if match:
                 matches.append(match)
         self.leaks.extend(matches)
         return matches
 
-    def _match_one(self, token: CanaryToken, text: str) -> CanaryMatch | None:
+    def _match_cheap(self, token: CanaryToken, context: "_SearchContext") -> CanaryMatch | None:
+        """退役令牌的匹配路径：原文 + 归一化 + 自身变体，**不做文本解码展开**。
+
+        解码展开是匹配里最贵的一步，而它针对的是「percent / unicode 转义」这类
+        形态 —— 一个已经轮换掉的令牌以这种形态泄漏，概率远低于刚签发的那批。
+        代价必须写清楚：退役令牌的 `decoded:*` 命中会被漏掉。
+        """
+        if token.value in context.text:
+            return CanaryMatch(token.value, token.label, "exact",
+                               _snippet(context.text, token.value), token.issued_at)
+        needle = self._normalized_variants(token)
+        haystack = context.haystack
+        for how, vnorm in needle:
+            if vnorm and vnorm in haystack:
+                return CanaryMatch(token.value, token.label, f"variant:{how}",
+                                   _snippet(context.text, ""), token.issued_at)
+        return None
+
+    def _normalized_variants(self, token: CanaryToken) -> tuple[tuple[str, str], ...]:
+        cached = self._norm_cache.get(token.value)
+        if cached is None:
+            cached = tuple(
+                (how, _normalize(variant, self.normalizer))
+                for how, variant in token.variants()
+            )
+            self._norm_cache[token.value] = cached
+        return cached
+
+    def _match_one(self, token: CanaryToken, context: "_SearchContext") -> CanaryMatch | None:
+        """在**已构建好的**搜索上下文里匹配一个令牌。
+
+        顺序即成本（从便宜到贵）：原文子串 → 归一化子串 → 令牌自身的编码变体 →
+        文本解码展开。前三步每个令牌都做（都很便宜：needle 只有几十字符，
+        haystack 已由 context 归一化一次）；第四步最贵，**只对 context.decoded
+    非空的令牌做**（正常文本通常展开不出东西）。
+    """
+        text = context.text
         # 1) 原文直接命中
         if token.value in text:
             return CanaryMatch(token.value, token.label, "exact",
                                _snippet(text, token.value), token.issued_at)
 
-        haystack = _normalize(text, self.normalizer)
-        needle = _normalize(token.value, self.normalizer)
-
         # 2) 归一化后命中：覆盖插空格、插标点、大小写、零宽字符、同形字
-        if needle and needle in haystack:
+        needle = _normalize(token.value, self.normalizer)
+        if needle and needle in context.haystack:
             return CanaryMatch(token.value, token.label, "normalized",
                                _snippet(text, ""), token.issued_at)
 
         # 3) 按令牌自身的编码/反转形态比对 —— 比"解码任意文本"更精准，不会误报
         #    （解码器刻意不匹配裸 hex 串，因为正常文本里太多）
-        for how, variant in token.variants():
-            vnorm = _normalize(variant, self.normalizer)
-            if vnorm and vnorm in haystack:
+        for how, vnorm in self._normalized_variants(token):
+            if vnorm and vnorm in context.haystack:
                 return CanaryMatch(token.value, token.label, f"variant:{how}",
                                    _snippet(text, ""), token.issued_at)
 
         # 4) 兜底：把文本解码展开后再匹配，覆盖 percent、unicode 转义等形态
-        for variant in self.expander.expand(text):
-            decoded_norm = _normalize(variant.text, self.normalizer)
-            if needle and needle in decoded_norm:
-                return CanaryMatch(token.value, token.label, f"decoded:{variant.kind}",
-                                   _snippet(variant.text, ""), token.issued_at)
+        if needle and context.decoded:
+            for kind, decoded_norm in context.decoded:
+                if needle in decoded_norm:
+                    return CanaryMatch(token.value, token.label, f"decoded:{kind}",
+                                       _snippet(text, ""), token.issued_at)
         return None
 
     def stats(self) -> dict:
         return {
             "tokens": len(self._tokens),
+            # 退役窗口要单独报：`tokens=128` 单独看会让人以为「只剩 128 个令牌」，
+            # 而实际上还有 512 个退役令牌仍在被检出。
+            "retired": len(self._retired),
+            "max_tokens": self.max_tokens,
+            "max_retired": self.max_retired,
             "current": self.current.value,
             "leaks": len(self.leaks),
             "by_how": _count_by(self.leaks, lambda m: m.how),

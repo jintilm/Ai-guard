@@ -18,7 +18,11 @@ class GuardConfig:
     max_variants_fanout: int = 5_000  # 归一化后文本长度的安全上限倍数
     cache_size: int = 1_000
     cache_ttl_s: float = 300.0
-    rate_limit: int = 30
+    #: 每窗口每租户的请求上限。**0 = 关闭**。
+    #: 此前默认 30 且 `check_rate()` 全仓库无调用点 —— 也就是说这个「保护」
+    #: 一次都没生效过，而配置看起来像是生效的。现在它真的接在 `Pipeline.scan`
+    #: 上，所以默认值必须改成 0：否则离线评测（900+ 样本）与本地使用会被自己限流。
+    rate_limit: int = 0
     rate_window_s: float = 60.0
     max_tracked_users: int = 10_000
 
@@ -35,37 +39,50 @@ class LengthRejected(Exception):
 
 
 class LRUCache:
-    """带 TTL 的 LRU。键为规范化文本的指纹，值为可序列化的扫描结果。"""
+    """带 TTL 的 LRU。键为规范化文本的指纹，值为可序列化的扫描结果。
+
+    **加锁**：代理/REST 是每请求一线程，共享同一个 Pipeline（因而共享同一个
+    cache）。原来无锁时 `put` 里的 `while len > size: popitem` 不是原子序列 ——
+    超额淘汰，而 `hits`/`misses` 计数漂移 ⇒ `/v1/metrics` 的 `cache_hits` 不可信。
+    """
 
     def __init__(self, size: int = 1_000, ttl_s: float = 300.0):
         self.size = size
         self.ttl_s = ttl_s
         self._store: OrderedDict[str, tuple[float, Any]] = OrderedDict()
+        self._lock = threading.Lock()
         self.hits = 0
         self.misses = 0
 
     def get(self, key: str) -> Any | None:
-        item = self._store.get(key)
-        if item is None:
-            self.misses += 1
-            return None
-        ts, value = item
-        if self.ttl_s > 0 and (time.monotonic() - ts) > self.ttl_s:
-            self._store.pop(key, None)
-            self.misses += 1
-            return None
-        self._store.move_to_end(key)
-        self.hits += 1
-        return value
+        with self._lock:
+            item = self._store.get(key)
+            if item is None:
+                self.misses += 1
+                return None
+            ts, value = item
+            if self.ttl_s > 0 and (time.monotonic() - ts) > self.ttl_s:
+                self._store.pop(key, None)
+                self.misses += 1
+                return None
+            self._store.move_to_end(key)
+            self.hits += 1
+            return value
 
     def put(self, key: str, value: Any) -> None:
-        self._store[key] = (time.monotonic(), value)
-        self._store.move_to_end(key)
-        while len(self._store) > self.size:
-            self._store.popitem(last=False)
+        with self._lock:
+            self._store[key] = (time.monotonic(), value)
+            self._store.move_to_end(key)
+            while len(self._store) > self.size:
+                self._store.popitem(last=False)
+
+    def stats(self) -> dict[str, int]:
+        with self._lock:
+            return {"size": len(self._store), "hits": self.hits, "misses": self.misses}
 
     def clear(self) -> None:
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
 
 
 @dataclass(slots=True)
@@ -130,9 +147,15 @@ class Guard:
     def __init__(self, config: GuardConfig | None = None):
         self.config = config or GuardConfig()
         self.cache = LRUCache(self.config.cache_size, self.config.cache_ttl_s)
-        self.limiter = RateLimiter(
-            self.config.rate_limit, self.config.rate_window_s, self.config.max_tracked_users
+        # rate_limit=0 表示关闭：默认建一个 capacity=0 的桶会让每次请求都被拒，
+        # 那等于把「默认关闭」变成「默认全拒」。
+        self.limiter = (
+            RateLimiter(self.config.rate_limit, self.config.rate_window_s,
+                        self.config.max_tracked_users)
+            if self.config.rate_limit and self.config.rate_limit > 0
+            else None
         )
+        self.rate_limited = 0
 
     def check_length(self, text: str) -> None:
         if len(text) > self.config.max_chars:
@@ -147,4 +170,18 @@ class Guard:
         return text[: self.config.max_chars], True
 
     def check_rate(self, user: str = "default") -> bool:
-        return self.limiter.try_acquire(user)
+        """限流。未配置（rate_limit=0）时永远放行。"""
+        if self.limiter is None:
+            return True
+        allowed = self.limiter.try_acquire(user)
+        if not allowed:
+            self.rate_limited += 1
+        return allowed
+
+    def stats(self) -> dict[str, Any]:
+        return {
+            "cache": self.cache.stats(),
+            "rate_limit": self.config.rate_limit,
+            "rate_window_s": self.config.rate_window_s,
+            "rate_limited": self.rate_limited,
+        }

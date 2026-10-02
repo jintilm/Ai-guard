@@ -152,6 +152,9 @@ def collect(ablation_path: Path, audit_path: Path | None) -> dict:
         data["proxy"] = {
             "total": len(rows),
             "by_decision": _tally(rows, "decision"),
+            # 出站处置是独立维度：请求的处置 vs 响应出去时发生了什么。
+            # 旧日志没有这个字段，按 legacy 值兜底映射（见 query.outbound_of）。
+            "by_outbound": _tally(rows, "outbound", extra_key="decision"),
             "by_level": _tally(rows, "level"),
             "avg_detect_ms": round(sum(r.get("detect_ms", 0) for r in rows) / max(len(rows), 1), 2),
             "recent": rows[-8:],
@@ -168,10 +171,17 @@ def _count_sources(ds: Dataset) -> dict[str, int]:
     return acc
 
 
-def _tally(rows: list[dict], key: str) -> dict[str, int]:
+def _tally(rows: list[dict], key: str, extra_key: str = "") -> dict[str, int]:
     acc: dict[str, int] = {}
     for row in rows:
-        acc[str(row.get(key, "-"))] = acc.get(str(row.get(key, "-")), 0) + 1
+        if key in ("outbound",) and not row.get(key) and row.get(extra_key):
+            # 旧日志没有 outbound 字段，出站结论塞在 decision 里
+            from prompt_ids.audit.events import LEGACY_OUTBOUND_DECISIONS
+
+            value = LEGACY_OUTBOUND_DECISIONS.get(str(row.get(extra_key)), "none")
+        else:
+            value = str(row.get(key, "-"))
+        acc[value] = acc.get(value, 0) + 1
     return acc
 
 
@@ -567,10 +577,16 @@ function render(){
   }
 
   if(d.proxy){
-    document.getElementById('proxy-card').style.display='';    document.getElementById('proxy-list').innerHTML =
+    document.getElementById('proxy-card').style.display='';
+    var OB = {none:'未命中', redacted:'已脱敏', replaced:'响应被替换',
+              warned:'已发出仅告警', rejected:'已拒收'};
+    document.getElementById('proxy-list').innerHTML =
       '<li><span>请求总数</span><span>'+d.proxy.total+'</span></li>' +
       Object.keys(d.proxy.by_decision).map(function(k){
-        return '<li><span>'+k+'</span><span>'+d.proxy.by_decision[k]+'</span></li>';
+        return '<li><span>请求 '+k+'</span><span>'+d.proxy.by_decision[k]+'</span></li>';
+      }).join('') +
+      Object.keys(d.proxy.by_outbound || {}).map(function(k){
+        return '<li><span>出站 '+(OB[k]||k)+'</span><span>'+d.proxy.by_outbound[k]+'</span></li>';
       }).join('') +
       '<li><span>平均检测耗时</span><span>'+d.proxy.avg_detect_ms+' ms</span></li>';
   }

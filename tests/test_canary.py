@@ -207,12 +207,18 @@ def test_proxy_redacts_leaked_response(leaky_proxy):
     assert payload["error"]["code"] == "system_prompt_leaked"
     assert token.value not in json.dumps(payload, ensure_ascii=False), "响应里仍然包含完整令牌"
 
-    from prompt_ids.audit.query import decision_of, load
+    from prompt_ids.audit.query import decision_of, load, outbound_of
 
     events = load(config.audit.path)
-    leak_events = [e for e in events if decision_of(e) == "leak"]
+    # 出站结论记在同一条事件的 extra["outbound"] 上（一次请求一条事件）。
+    # 此前为记录泄漏另发一条 decision="leak" 事件，by_decision 因此把
+    # 一次请求数成两次。
+    leak_events = [e for e in events if outbound_of(e) == "replaced"]
     assert len(leak_events) == 1, [e.to_dict() for e in events]
     assert leak_events[0].kind == "proxy"
+    assert decision_of(leak_events[0]) == "allow", \
+        "请求本身没被拦，decision 应是 allow；响应被替换由 outbound 表达"
+    assert len(events) == 1, f"一次请求落了 {len(events)} 条事件"
 
 
 def test_proxy_passes_clean_response(leaky_proxy):
