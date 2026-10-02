@@ -1,0 +1,34 @@
+{
+  "generated_by": "scripts/build_redteam.py",
+  "samples": 961,
+  "labels": {
+    "1（攻击）": 961,
+    "0（良性）": 0
+  },
+  "removed_dupes": 200,
+  "seed": 20261002,
+  "by_source": {
+    "redteam:agentic": 21,
+    "redteam:completion_bait": 11,
+    "redteam:delimiter": 46,
+    "redteam:indirect_tool": 30,
+    "redteam:multilingual": 25,
+    "redteam:obfuscation": 19,
+    "redteam:roleplay": 51,
+    "redteam:task_reframe": 56,
+    "redteam:variant_of_miss": 702
+  },
+  "by_split": {
+    "test": 799,
+    "train": 162
+  },
+  "method": {
+    "generator": "确定性模板 + 种子（零 LLM 调用、零成本、逐字可重放）",
+    "why_not_llm": "LLM 生成要 Key、≈10s/条且不可复现；而缺口是**特定的几种形态**，显式模板枚举更可控。LLM 改写留作第二层（generator 标 llm:<model>:<seed>）。",
+    "split": "**按 template_id 哈希切分**（70/30）。同一模板的所有样本必须同侧 —— 按行切会泄漏（PINT 基准踩过：lang_i % 10 < 7 把全部良性塞进 train）。",
+    "from_misses": "用 miss_analysis 的漏检做种子时，**一律进 test** —— 种子本身已参与过评测，进 train 等于用测试集调参。",
+    "cannot": "**给不了系统能力的绝对值。** 生成器只能产出「我们想得到的形态」，在它上面测出的召回既不是上界也不是下界，只能当**形态覆盖探针**，必须与公开集并列报、不许单独引用。",
+    "needs_human_label": "**可用率需要人工标注。** 生成 N 条不代表 N 条都是真攻击；check 脚本在无标注时必须写「可用率未标注」，不许拿模型自己的判定冒充人工标注。",
+    "pair_with": "与 data/overrefusal.jsonl（纯良性、只测 FP）互补，两者互不污染。"
+  }
+}

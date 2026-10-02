@@ -264,6 +264,8 @@ python -m prompt_ids.proxy --port 8787 --block-sandbox     # sandbox 等级也�
 ```bash
 python scripts/build_overrefusal.py   # 需联网：OR-Bench hard-1k(1319) + XSTest safe(214)
 python scripts/overrefusal_check.py   # → reports/overrefusal.json（约 5 分钟）
+python scripts/build_redteam.py       # 生成红队语料（8 个形态族，纯攻击集）
+python scripts/redteam_check.py --configs all   # → reports/redteam.json（约 2 分钟）
 ```
 
 实测（n=1533，policy=default，本地 DeBERTa，语义层弃权 0%）：
@@ -751,9 +753,32 @@ python -m prompt_ids.web --audit logs/proxy.jsonl   # 带上代理审计概览
 - 视觉遵循 Bento 不对称布局：中性底 + 单一强调色（teal），等宽数字，
   避免常见的 AI 模板感（紫蓝渐变、三等宽卡片、居中大字标题）
 
-⚠ 说清楚范围：**零外部依赖指的是看板与检测台的运行时**。项目本体有一个硬依赖
-`PyYAML`（要解析 `rules/*.yaml`），语义层/记忆库/加速引擎都在可选 extra 里。
-「装完 PyYAML 就能跑规则层，1.4ms/条、零配置」—— 这是上手路径，不是营销话术。
+⚠ 说清楚范围：**零外部依赖指的是看板与检测台的运行时**。项目本体只有两个硬依赖
+`PyYAML`（解析 `rules/*.yaml`）与 `numpy`（向量检索）；语义层/记忆库/加速引擎都在
+可选 extra 里。**装完这两个就能跑规则层**（1.4ms/条、零配置）——
+这条承诺现在有 `tests/test_minimal_install.py` 守着：它在子进程里屏蔽全部可选依赖，
+断言 import、规则层攻击判定、REST 绑定都成立。
+
+> ⚠ **曾经这句话是假的**：`numpy` 原本只声明在 `[memory]` extra，而
+> `memory/*.py` 在模块级 import 它 ⇒ 只装 PyYAML 时 `import prompt_ids` 直接
+> ImportError，连纯规则层都起不来，而报错只说缺 numpy，看不出跟规则层有关。
+> 静态检查抓不到这类故障（开发机把可选依赖全装齐了），只能靠**真的按最小依赖跑一遍**。
+
+## 容器与 CI
+
+```bash
+docker build -t prompt-ids .                        # 默认 = full（含语义层）
+docker build --target slim -t prompt-ids:slim .     # 只装规则层，镜像小得多
+docker compose up                                    # proxy(8787) + api(8790)
+```
+
+- **slim 镜像 = 纯规则层**（无 torch），full 才带 L3 语义层。两者都非 root、
+  只 `pip install`、**零 apt-get**，`HEALTHCHECK` 用标准库打 `/healthz`（不装 curl）
+- compose 把端口**只发布到宿主回环**（`127.0.0.1:8787:8787`）—— 因为代理与检测台
+  **没有客户端鉴权**（见已知限制），对外暴露必须自己前置反向代理
+- CI：windows + ubuntu 双平台矩阵。⚠ **Linux 腿尚未实跑过**
+- `ruff check` 暂为 `continue-on-error`：基线有 85 条历史告警（全是 F401/E741 之类），
+  当天设成闸门会让 CI 从第一天起就红，而噪声会训练人忽略红灯
 
 验证渲染内容（不是只看文件生成成功）：
 
@@ -990,7 +1015,7 @@ python scripts/eval_pint_shape.py                              # -> reports/pint
 ## 验证
 
 ```bash
-pytest tests -q                      # 503 项单测
+pytest tests -q                      # 728 项单测
 python scripts/smoke.py              # 端到端：10 条攻击 + 6 条正常语料
 python scripts/bench.py              # P50/P95 延迟与缓存命中率
 python scripts/eval_semantic.py      # 三层消融，报告落 reports/ablation.json
@@ -1353,7 +1378,7 @@ python scripts/eval_german.py --exclude PV-C015,PV-C019,PV-H025            # 消
 ### 其他基线
 
 ```bash
-pytest tests -q            # 647 项单测全绿
+pytest tests -q            # 728 项单测全绿
 python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检出 10/10 误报 0/6
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
@@ -1408,18 +1433,31 @@ agent_bench 10 · rules_redos 9 · preprocess 8 · engine 7 · decoder 6 · pint
   按 IP 限流与 canary 签发配额**都不是鉴权**。要对外暴露必须自己前置反向代理
 - 单进程单实例设计：`/v1/metrics` 里的 `cache.scope == "process"`，
   多副本部署时那个命中率**不可跨实例比较**
-- 本仓库**没有 Dockerfile / compose / CI**，测试只在本机跑；
-  容器化部署必须 `--host 0.0.0.0`，请务必配反向代理（见上文「Web 看板与在线检测台」）
+- 容器化部署必须 `--host 0.0.0.0`（Pod 内 `127.0.0.1` 别的容器摸不到），
+  请务必前置反向代理做 TLS/鉴权 —— compose 只把端口发布到宿主回环，不替你做鉴权
 
-### 下一阶段路线图（2026-10 定）
+### 路线图与现状（2026-10）
 
-1. **攻击生成与红队闭环** —— 当前最大缺口。全部评测语料都是公开静态集，
-   而约 70% 的 deepset「攻击」是角色扮演/任务改写型（对短语匹配召回 ≈ 0），
-   这类形态只能靠主动生成补。约束：按模板/种子切分、记 `generator`+`seed`、
-   生成集上的召回**不能当绝对值**（必须同时报人工抽检可用率）。
-2. **OTel / Langfuse 观测接入** —— 只输出 OTLP 结构化日志（不引 SDK，保住零依赖）。
-   硬约束：trace 属性里**不能放原文**，审计层只落指纹这条不变。
-3. **流式与 agent 轨迹可视化** —— 流式面板 + 工具调用序列。
-   ⚠ 轨迹必然含原文，属「第二个数据面」，要显式配置才落盘并进 `.gitignore`
-   （参照 `review_corpus.jsonl` 的处理）。
-4. **容器化与 CI** —— 上面三项的共同前置。
+**攻击生成与红队闭环** ✅ `scripts/build_redteam.py` + `scripts/redteam_check.py`。
+8 个形态族 66 个模板，纯攻击集。规则层的形态差异第一次被量化：
+`task_reframe` 0.0357 / `roleplay` **0.0196**（≥high）vs `delimiter` 0.7391。
+⚠ 这不是系统能力的量度（生成器只能产出「我们想得到的形态」），
+**可用率还需要人工标注**（无标注时报告显式写「未标注」）。
+
+**OTel / Langfuse 观测接入** ✅ `prompt_ids/observability.py`。
+手写 OTLP/JSON，**零 SDK 零依赖**（Langfuse 的摄取端点本身就是 OTLP 兼容的）。
+⚠ 属性走**白名单**而不是黑名单 —— 只有 `ALLOWED_ATTRIBUTES` 里的键能出网，
+超长值直接丢而不是截断。原文绝不出网。
+
+**agent 轨迹** ✅ `prompt_ids/proxy/trajectory.py`。
+看板实时面板显示 `↳ tool#2`（注入从哪一条进来）。**纯索引、不含原文** ——
+一条消息由 `(role, index)` 唯一定位，所以不需要「第二个数据面」那套落盘开关。
+
+**流式 SSE 推送面板** ❌ 未做。代理侧的流式出站结论（告警帧排在 `[DONE]` 之前、
+脱敏、「无法撤回」）已全部落审计，看板 4s 轮询能看到。
+
+**容器化与 CI** ✅ Dockerfile（三阶段，含纯规则层的 slim 镜像）/ compose /
+Makefile / GitHub Actions 双平台。⚠ Linux 腿未实跑。
+
+**仍未做**：多用户 RBAC / 团队共享 · 生产部署的安全姿势文档（容器形态下
+「绑 0.0.0.0 + 前置网关做 TLS/鉴权」目前只有声明没有示例配置）。

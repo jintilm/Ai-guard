@@ -251,7 +251,8 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                      secret_sampled: bool = False, secret_scanned_chars: int = 0,
                      secret_capped: bool = False,
                      outbound: str = OUTBOUND_NONE,
-                     outbound_detail: str = "") -> AuditEvent:
+                     outbound_detail: str = "",
+                     trajectory: dict | None = None) -> AuditEvent:
     """代理转发事件 -> 统一 AuditEvent。
 
     代理侧历史上另有一套 AuditRecord。现在统一到同一个事件模型：
@@ -298,6 +299,13 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
             "truncated": int(truncated),
             "dropped": int(dropped),
             "scanned_chars": int(scanned_chars),
+            # **纯索引轨迹**：逐段判定（role#index / level / score / pattern_id），
+            # 回答「注入从哪一条进来的」。**不含原文** —— 一条消息由
+            # (role, index) 就能定位，应用方看得到自己发出去的请求。
+            # 所以它可以直接进审计文件，不需要第二个数据面、不需要额外配置，
+            # 也不会把「要不要落盘」变成一个必须记得开的开关。
+            # 由 `proxy.trajectory` 构造；`None` 表示这条路径没有分段信息。
+            "trajectory": dict(trajectory) if trajectory else None,
             # 出站密钥扫描命中的类别与计数：**只落类别，不落原文**。
             # 密钥的脱敏形态（首尾几个字符）只出现在给客户端的告警体里，不进审计文件。
             "secret_kinds": dict(secret_kinds or {}),

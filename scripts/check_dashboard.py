@@ -119,22 +119,94 @@ def main() -> int:
     payload = json.loads(line[len("__RESULT__"):])
     store, display = payload["store"], payload["display"]
 
+    # ⚠ **数字必须从报告现算，不能硬编码。**
+    # 踩过：`indirect-body` 断言 `"0.2583" in v`（120 样本的旧读数），后来把
+    # 报告换成 n=250 的 0.1960 时忘了改这条断言 ⇒ 看板检查**一直是红的**，
+    # 而失败信息长得像「这张卡片没渲染出来」，很容易被当成渲染问题放过去。
+    # 硬编码测量值的检查有一个共同毛病：每次重跑报告都可能变红，而红的原因
+    # 与「卡片没画出来」完全不同。现算之后它守的不变式才是真正值得守的那个：
+    # **看板显示的数字 == 报告里的数字**。
+    def from_report(relative: str, *path: str, fmt: str = "{:.4f}") -> str | None:
+        target = ROOT / "reports" / relative
+        if not target.exists():
+            return None
+        node = json.loads(target.read_text(encoding="utf-8"))
+        for key in path:
+            if not isinstance(node, dict) or key not in node:
+                return None
+            node = node[key]
+        return fmt.format(node) if isinstance(node, (int, float)) else None
+
+    # 卡片显示名（原 checks 的第一个元素，保持控制台输出不变）
+    CARD_NAMES = {
+        "indirect-body": "间接注入面", "agent-body": "agent 面",
+        "policy-body": "分角色策略", "output-body": "出站检测",
+        "sweep-body": "策略影响", "knee-body": "阈值取舍",
+    }
+
+    # (报告, 取值路径, 格式) -> 期望出现在渲染结果里的字符串
+    expected = {
+        "indirect-body": from_report("indirect.json", "shapes", "tool_only",
+                                     "scan_tool", "block_recall"),
+        "agent-body": from_report("agent_check.json", "runs", "rules_tool",
+                                  "attack_block_recall"),
+        "policy-body": from_report("agent_check.json", "rag_traffic",
+                                   "system_rules_only", "block_rate"),
+        "output-body": from_report("output_scan.json", "synthetic", "caught",
+                                   fmt="{:.0f}"),
+        "output-corpus": from_report("output_scan.json", "benign", "groups",
+                                     "corpus", "flagged", fmt="{:.0f}"),
+        "output-corpus-n": from_report("output_scan.json", "benign", "groups",
+                                       "corpus", "n", fmt="{:.0f}"),
+        "sweep-body": from_report("threshold_sweep.json", "policies", "default",
+                                  "block_recall"),
+        "knee-body": from_report("threshold_sweep.json", "knee",
+                                 "fpr_at_budget_0_01", "threshold", fmt="{:.2f}"),
+    }
+
+    def rows_at_least(key: str, rows: int) -> tuple[str, tuple[str, object]]:
+        """行数下限 + 「报告里现算的数字」都要满足；报告缺失时只查行数。"""
+        want = expected.get(key)
+        label = CARD_NAMES[key]
+
+        def test(value: str) -> bool:
+            if value.count("<tr") < rows:
+                return False
+            return want is None or want in value
+
+        return (key, (label, test))
+
+    def rows_exactly(key: str, rows: int) -> tuple[str, tuple[str, object]]:
+        want = expected.get(key)
+        label = CARD_NAMES[key]
+
+        def test(value: str) -> bool:
+            if value.count("<tr") != rows:
+                return False
+            return want is None or want in value
+
+        return (key, (label, test))
+
     checks = {
         "ablation-body": ("消融表格", lambda v: v.count("<tr") >= 3),
         "best-note": ("核心结论", lambda v: "F1" in v),
         "source-list": ("分数据源对比", lambda v: v.count("<li") >= 3),
         "rule-chips": ("规则库构成", lambda v: "chip" in v),
         "dataset-list": ("数据集构成", lambda v: v.count("<li") >= 2),
-        # 间接注入面卡片：数字必须真的渲染出来，而且不能是空的占位
-        "indirect-body": ("间接注入面", lambda v: v.count("<tr") >= 3 and "0.2583" in v),
         "sampling-body": ("取样覆盖", lambda v: v.count("<tr") >= 3 and "%" in v),
-        "agent-body": ("agent 面", lambda v: v.count("<tr") >= 2 and "0.0000" in v),
-        "policy-body": ("分角色策略", lambda v: v.count("<tr") == 2 and "0.0833" in v),
-        "output-body": ("出站检测", lambda v: v.count("<tr") == 4 and "16/16" in v
-                      and "0 / 5449" in v),
-        "sweep-body": ("策略影响", lambda v: v.count("<tr") == 4 and "0.1694" in v),
-        "knee-body": ("阈值取舍", lambda v: v.count("<tr") == 3 and "43.02" in v),
+        **dict([
+            rows_at_least("indirect-body", 3),
+            rows_at_least("agent-body", 2),
+            rows_exactly("policy-body", 2),
+            rows_exactly("output-body", 4),
+            rows_exactly("sweep-body", 4),
+            rows_exactly("knee-body", 3),
+        ]),
     }
+    missing = sorted(key for key, value in expected.items() if value is None)
+    if missing:
+        print(f"[提示] 这些报告缺失，对应卡片只查结构不查数字：{missing}")
+
     ok = 0
     for key, (name, test) in checks.items():
         value = store.get(key, "")

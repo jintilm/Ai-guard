@@ -1,0 +1,165 @@
+# ============================================================================
+# prompt-ids 本地/单机编排
+#
+#   docker compose build          # 构建两个 target
+#   docker compose up -d          # 起 proxy(8787) + api(8790)
+#   docker compose ps             # 看健康状态
+#   docker compose down -v        # 停掉并清掉审计卷
+#
+# 两个 service 故意用**不同的 build target**，因为它们回答的是两个不同问题：
+#
+#   proxy  target=full   代理在**请求热路径**上，必须够快够准。
+#                      本地 DeBERTa ≈219ms/条，且不产生任何外部调用与费用；
+#                      实测 agent 面攻击召回 0.0000 → 0.4469 靠的就是这层，
+#                      所以这里不用 slim。
+#   api    target=slim   REST 服务通常给内部系统/看板调用，吞吐优先于延迟，
+#                      而检测内容与 proxy 同源（同一套规则 + 同一套指纹口径）。
+#                      slim 省掉的 ~2GB 是 torch 权重；注意它**仍然能开 L3**
+#                      （走 LLM 裁判，只需一个 Key），只是不能跑本地模型。
+#
+# ⚠ 两个 service 都不设 depends_on：proxy 转发到的是**外部 LLM 上游**，
+#   不是我们的 api。硬凑一个依赖只会让「api 挂了 ⇒ proxy 也别起」这种
+#   错误的因果关系写进编排文件。
+#
+# ⚠ 端口一律发布到**宿主回环**（127.0.0.1:xxxx），不是 0.0.0.0。
+#   这是容器内 `--host 0.0.0.0` 的必要配套（net.py 会在 stderr 打出暴露面告警：
+#   proxy 与 web **没有客户端鉴权机制**，Authorization 头是透传给上游的）。
+#   告警不是要你去容器里改回 127.0.0.1（那样别的容器就访问不到了），
+#   而是要你在宿主机/网关这一层把访问面收窄。要对外服务就自己加一层
+#   做 TLS + 鉴权的反向代理。
+# ============================================================================
+
+x-common-env: &common-env
+  # ⚠ 这两个变量**各自只对其中一个 service 有意义**，放在共享块里是为了少写一遍。
+  #   引用它们时要记得是哪一个，别把「proxy 的上游」当成「api 的上游」——
+  #   api 根本不转发请求，它只做检测，语义层用的是 21 家提供商那套变量
+  #   （DEEPSEEK_API_KEY / OPENAI_API_KEY …，见 .env.example）。
+  #
+  # PROMPT_IDS_UPSTREAM：**只对 proxy 有意义**。代理转发的目标是它；
+  #   api 读了也不会用。留空则按 OPENAI_BASE_URL → 厂商约定名 → 默认值 逐级回退。
+  #   占位值指向宿主上的网关 —— Docker Desktop 上 host.docker.internal 原生可用，
+  #   **Linux 上必须靠下面的 extra_hosts: host-gateway 才解析得到**。
+  PROMPT_IDS_UPSTREAM: ${PROMPT_IDS_UPSTREAM:-http://host.docker.internal:8000/v1}
+  # OPENAI_API_KEY：proxy 侧是「转发到上游用的 Key」（留空则沿用客户端的
+  #   Authorization 头）；api 侧是「LLM 裁判后端的 Key」。两处同名不同义，
+  #   但都是「上游凭据」，所以共用一个变量没问题。
+  #   走宿主机环境变量注入，别把真 Key 写进这个文件。
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  #
+  # ⚠ 刻意**不**在这里设 PROMPT_IDS_LLM_PROVIDER / HF_ENDPOINT / HF_HUB_* 之类：
+  #   slim 镜像里没有 transformers/torch，设了本地模型相关的变量只会误导。
+  #   其余全部走各服务的默认值。
+
+services:
+  proxy:
+    build:
+      context: .
+      target: full          # 最后一个 stage，也是 docker build 不带 --target 时的默认
+    image: prompt-ids:full
+    command:
+      - prompt-ids-proxy
+      - --host
+      - 0.0.0.0              # 容器内必须；见文件头的告警说明
+      - --port
+      - "8787"
+      - --audit
+      - /var/log/prompt-ids/proxy.jsonl
+      # 按来源 IP 限流。默认 0=关闭，生产建议显式打开。
+      # ⚠ 它的语义是**转人工复核（review）不是 block**，且被限流的请求仍落审计。
+      - --rate-limit
+      - "120"
+      # 注意：这里**不开** --semantic。想开 L3 请加 --semantic
+      # （后端由 auto 选：配了 Key 走 LLM 裁判，否则走本地 DeBERTa）。
+      # 之所以默认不开：语义层把每条请求的延迟抬到百毫秒~十秒量级，
+      # 是否值得取决于你的流量与对 agent 面召回的要求（见 README 的 agent 面一节）。
+    environment:
+      <<: *common-env
+      # 探 proxy 自己（它的 /healthz 不需要鉴权），不是探 api。
+      PROMPT_IDS_HEALTHCHECK_URL: http://127.0.0.1:8787/healthz
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      # 用**命名卷**而不是 ./logs bind mount：命名卷会继承镜像里该目录的属主
+      # （Dockerfile 里已 chown 给 appuser），非 root 进程直接能写；
+      # bind mount 的目录属主是宿主 root，非 root 进程会 EACCES，
+      # 而审计写失败是**静默的**（只是审计文件不增长）。
+      - proxy-audit:/var/log/prompt-ids
+    extra_hosts:
+      # Linux 上 host.docker.internal 默认不解析。加 host-gateway 才等于宿主网关。
+      # Docker Desktop / Podman Desktop 上这行无害（已内置同名主机）。
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import json, os, urllib.request as u
+          req = u.Request(os.environ.get("PROMPT_IDS_HEALTHCHECK_URL", "http://127.0.0.1:8787/healthz"))
+          key = os.environ.get("PROMPT_IDS_API_KEY", "")
+          if key:
+              req.add_header("X-API-Key", key)
+          body = u.urlopen(req, timeout=4).read()
+          raise SystemExit(0 if json.loads(body).get("status") == "ok" else 1)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: slim          # 轻量镜像：不带 torch 权重
+    image: prompt-ids:slim
+    command:
+      - prompt-ids-api
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8790"
+      - --audit
+      - /var/log/prompt-ids/api.jsonl
+      # ⚠ 刻意**不**在这里写 --api-key，也刻意不给它一个占位默认值。
+      #   理由：给一个众所周知的默认值比「没有鉴权」更糟 ——
+      #   后者会让 prompt_ids/net.py 往 stderr 打暴露面告警（响亮失败），
+      #   前者看起来像配好了鉴权，实际谁都能猜到（静默降级）。
+      #   所以这里只透传环境变量：PROMPT_IDS_API_KEY 留空 = 不鉴权 + 有告警，
+      #   填上就自动生效（api/server.py 的 _first_env("PROMPT_IDS_API_KEY") 会读它）。
+      - --canary-issue-limit
+      - "30"
+    environment:
+      <<: *common-env
+      PROMPT_IDS_HEALTHCHECK_URL: http://127.0.0.1:8790/healthz
+      # ⚠ 这一项必须能被健康检查读到：api 对**所有**路由（含 /healthz）统一鉴权，
+      #   漏了它健康检查永远 401，而服务本身是好的。留空则不鉴权（见上）。
+      PROMPT_IDS_API_KEY: ${PROMPT_IDS_API_KEY:-}
+    ports:
+      - "127.0.0.1:8790:8790"
+    volumes:
+      - api-audit:/var/log/prompt-ids
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import json, os, urllib.request as u
+          req = u.Request(os.environ.get("PROMPT_IDS_HEALTHCHECK_URL", "http://127.0.0.1:8790/healthz"))
+          key = os.environ.get("PROMPT_IDS_API_KEY", "")
+          if key:
+              req.add_header("X-API-Key", key)
+          body = u.urlopen(req, timeout=4).read()
+          raise SystemExit(0 if json.loads(body).get("status") == "ok" else 1)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  # 审计日志（**只记指纹不记原文**）。named volume，不是 bind mount，见上方说明。
+  proxy-audit:
+  api-audit:

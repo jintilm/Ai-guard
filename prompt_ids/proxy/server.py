@@ -37,6 +37,7 @@ from prompt_ids.preprocess.guard import RateLimiter
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, ScanResult, level_rank
 from prompt_ids.net import warn_if_exposed
+from prompt_ids.proxy import trajectory
 from prompt_ids.proxy.forward import UpstreamError, forward_headers, post_json, post_stream
 
 DEFAULT_PORT = 8787
@@ -378,6 +379,10 @@ class SegmentScan:
     truncated: int = 0
     dropped: int = 0
     scanned_chars: int = 0
+    #: 逐段判定的**纯索引**轨迹（role#index / level / score / pattern_id，无原文）。
+    #: 以前这里只留最严重的那一段，于是「注入从哪一条进来的」在日志里查不到 ——
+    #: 而那恰恰是排查 agent 被注入时第一个要回答的问题。
+    steps: tuple = ()
 
 
 def _allocate(segments: list[Segment], budget: int) -> tuple[list[tuple[Segment, str, bool]], int]:
@@ -441,15 +446,20 @@ def scan_segments(pipeline: Pipeline, segments: list[Segment],
     worst = None
     worst_seg: Segment | None = None
     truncated = scanned = 0
+    results: list = []
     for seg, text, cut in plan:
         result = pipeline.scan(text, semantic=False if seg.rules_only else None)
+        results.append(result)
         scanned += len(text)
         truncated += int(seg.truncated or cut)
         if worst is None or (level_rank(result.level), result.score) > (
             level_rank(worst.level), worst.score
         ):
             worst, worst_seg = result, seg
-    return SegmentScan(worst, worst_seg, truncated, dropped, scanned)
+    # 逐段判定记成纯索引轨迹（不含原文）。构造放在最后：它会断言
+    # 「计划与结果一一对应」，数量对不上时要响亮失败而不是少记一步。
+    steps = trajectory.build_steps(plan, results)
+    return SegmentScan(worst, worst_seg, truncated, dropped, scanned, steps)
 
 
 def decide(result, config: ProxyConfig, trigger: Segment | None = None) -> tuple[str, int, str]:
@@ -698,12 +708,21 @@ class ProxyHandler(BaseHTTPRequestHandler):
         coverage = dict(segments=len(segments), trigger=trigger.tag if trigger else "",
                         truncated=scan.truncated, dropped=scan.dropped,
                         scanned_chars=scan.scanned_chars)
+        # 轨迹**单独传**，不混进 coverage：coverage 是 splat 进 event_from_proxy 的
+        # 关键字参数集合，而轨迹要先在 proxy 侧转成 dict（audit 层不能反向 import
+        # proxy —— proxy 已经依赖 audit 了）。
+        traj = trajectory.to_dict(
+            scan.steps,
+            coverage={"segments": len(segments), "budget_chars": self.config.max_total_scan_chars,
+                      "scanned_chars": scan.scanned_chars,
+                      "truncated": scan.truncated, "dropped": scan.dropped})
 
         if decision == "block":
             self.config.audit.log(
                 event_from_proxy(
                     result, path=path, client=self.client_address[0], stream=False,
                     detect_ms=detect_ms, status=status, decision=decision, note=note, text=text,
+                    trajectory=traj,
                     **coverage,
                 )
             )
@@ -722,12 +741,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
                         "findings": [f.pattern_id for f in result.findings][:10],
                         "explained": result.explained,
                         "trigger": trigger.tag if trigger else "",
+                        # 纯索引轨迹：告诉调用方「注入从哪一条进来」。
+                        # ⚠ 只给 role#index 与命中规则，**不回显内容** ——
+                        #   调用方看得到自己发的请求，能自己对回那一条。
+                        "trajectory": trajectory.to_dict(
+                            scan.steps,
+                            coverage={"segments": len(segments),
+                                      "truncated": scan.truncated,
+                                      "dropped": scan.dropped,
+                                      "scanned_chars": scan.scanned_chars}),
                     },
                 },
             )
             return
 
-        self._forward(path, body, payload, result, decision, detect_ms, text, **coverage)
+        self._forward(path, body, payload, result, decision, detect_ms, text,
+                        steps=scan.steps, **coverage)
 
     # ---------- 转发 ----------
     def _build_headers(self) -> dict[str, str]:
@@ -841,6 +870,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         truncated: int = 0,
         dropped: int = 0,
         scanned_chars: int = 0,
+        steps: tuple = (),
     ) -> None:
         url = self._upstream_url(path)
         headers = self._build_headers()
@@ -872,7 +902,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                                  secret_sampled=secret_sampled,
                                  secret_scanned_chars=secret_chars,
                                  outbound=outbound if out is None else out,
-                                 outbound_detail=outbound_detail if detail is None else detail)
+                                 outbound_detail=outbound_detail if detail is None else detail,
+                                 trajectory=trajectory.to_dict(steps, coverage={
+                                     "segments": len(steps),
+                                     "budget_chars": self.config.max_total_scan_chars,
+                                     "scanned_chars": scanned_chars,
+                                     "truncated": truncated,
+                                     "dropped": dropped,
+                                 }))
             )
 
         try:

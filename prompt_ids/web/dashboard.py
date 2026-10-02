@@ -18,6 +18,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # noqa: E402 - 只为静态检查解析 `_make_context` 的返回标注
+    from prompt_ids.api.app import ApiContext
+
 from prompt_ids.eval.datasets import Dataset  # noqa: E402
 from prompt_ids.rules.loader import RuleBook  # noqa: E402
 
@@ -1189,8 +1194,17 @@ PG_JS = """
       var evs = (e && e.events) ? e.events.slice().reverse() : [];
       var list = evs.map(function(x){
         var pat = (x.patterns && x.patterns.length) ? ' · ' + esc(x.patterns.join(', ')) : '';
+        // agent 轨迹：只显示「注入从哪一条进来」（role#index）与步数。
+        // ⚠ 轨迹本身是**纯索引**（不含原文），所以这里能直接显示 ——
+        //   要看内容得走复核语料，那才是显式配置才落盘的第二个数据面。
+        var tr = x.extra && x.extra.trajectory;
+        var traj = (tr && tr.entry)
+          ? ' · <b title="逐段判定（纯索引，不含原文)">↳ ' + esc(tr.entry) + '</b>'
+            + (tr.steps ? '（' + tr.steps.length + ' 段）' : '')
+            + (tr.coverage && tr.coverage.truncated ? ' · 已截断' : '')
+          : '';
         return '<li><span class="t">' + esc(fmtTime(x.ts)) + '</span>' + lvl(x.level) +
-          '<span class="src">' + esc(x.source || x.kind || '') + pat + '</span>' +
+          '<span class="src">' + esc(x.source || x.kind || '') + pat + traj + '</span>' +
           '<span class="ms">' + (typeof x.detect_ms === 'number' ? x.detect_ms.toFixed(1) + 'ms' : '') + '</span></li>';
       }).join('');
       var evBlock;
@@ -1204,7 +1218,7 @@ PG_JS = """
       body.innerHTML = kpis + '<div class="dist">' + segs + '</div>' +
         '<div class="dist-legend">' + legend + '</div>' +
         '<h2 style="margin-top:8px">最近事件</h2>' +
-        '<p class="hint">只含指纹与判定，不含原文</p>' + evBlock;
+        '<p class="hint">只含指纹与判定，不含原文。代理事件里的 <b>↳ tool#2</b> 是注入入口（纯索引轨迹）</p>' + evBlock;
     }
     async function tick(){
       try {

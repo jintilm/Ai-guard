@@ -100,6 +100,11 @@ class Pipeline:
         self._warm: set[str] = set()
         # 各层的一次性初始化耗时，仅用于观测，永远不占用请求预算
         self.cold_start_ms: dict[str, float] = {}
+        # 遥测开关在**构造期**读一次并缓存：scan 是热路径，不能每次查 env。
+        # 默认 off ⇒ 每次扫描的代价就是读一个 bool。
+        from prompt_ids.observability import exporter
+
+        self.telemetry_enabled = exporter().enabled()
 
     # ---------- 内建配件 ----------
     @property
@@ -300,6 +305,7 @@ class Pipeline:
 
         skipped: list[str] = []
         cold_notes: list[str] = []
+        cold_used_ms = 0.0
         detectors = [d for d in self.registry if d.enabled]
         for index, detector in enumerate(detectors):
             # 预筛门禁：L3 是否调用由前置层的初判分决定
@@ -338,6 +344,7 @@ class Pipeline:
                 )
                 if used >= COLD_START_REPORT_MS:
                     cold_notes.append(f"{detector.name} {used:.0f}ms")
+                cold_used_ms += used
             else:
                 elapsed_total += used
             if layer_findings:
@@ -406,6 +413,23 @@ class Pipeline:
 
         if self.config.enable_cache:
             self.guard.cache.put(cache_key, result)
+
+        # 遥测（默认 off，未启用时只是几次字典查表）。
+        # ⚠ 属性走白名单，**原文绝不出去** —— 与审计层「只落指纹」同一条边界，
+        # 但遥测会被送到第三方并长期留存，比审计层更敏感。见 prompt_ids/observability.py。
+        if self.telemetry_enabled:
+            from prompt_ids.observability import emit_scan
+
+            semantic_stats: dict = {}
+            detector_sem = self.semantic_detector
+            if detector_sem is not None and getattr(detector_sem, "enabled", False):
+                try:
+                    semantic_stats = detector_sem.stats()
+                except Exception:  # noqa: BLE001 - 统计读不出来不该让检测失败
+                    semantic_stats = {}
+            emit_scan(result=result, user=user, policy=policy.name,
+                      text_chars=len(text), cold_start_ms=cold_used_ms,
+                      semantic=semantic_stats or None)
         return result
 
     def scan_batch(self, texts: list[str], user: str = "default",

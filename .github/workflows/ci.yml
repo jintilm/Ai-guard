@@ -1,0 +1,147 @@
+# ============================================================================
+# prompt-ids CI
+#
+# ⚠⚠ 关于「两条腿都绿」这件事，先说清楚，别让这个文件制造错觉：
+#
+#   * windows-latest —— **验证过**。682 项单测在本机 Windows / Python 3.11 全绿。
+#   * ubuntu-latest  —— **未验证**。这条腿是新增的，本项目至今没在任何 Linux
+#     机器上跑过单测。首次跑通之前，请不要把它当成「跨平台已验证」的证据。
+#
+#   本 workflow 的作用是把「验证过」变成「每次提交自动验证」，
+#   而不是替一个未验证的平台背书。两个平台的差异（路径分隔符、代码页、
+#   文件锁、时序精度）恰恰是最容易出静默失效的地方 ——
+#   本仓库已经吃过一次亏：Windows 的 time.time() 只有 15.625ms 分辨率，
+#   令 canary 轮换在同一个 tick 内静默失效（见 AGENTS.md「测试」一节）。
+#
+# ⚠ 这里**不跑**任何需要 API Key 或联网下数据集的脚本。
+#   build_overrefusal.py / build_pint_shape.py / eval_semantic.py / agent_check.py
+#   等一律不进 CI：它们要么下几十 MB 外部语料，要么对 LLM 端点发几百次请求，
+#   既不可复现也不该在 PR 上花这个钱。CI 只跑**纯本地、确定性**的那部分。
+# ============================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# 最小权限：CI 只需要读代码。不给 contents: write。
+permissions:
+  contents: read
+
+# 同一个分支的新提交取消上一次还在跑的 CI，避免队列堆积。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # 两边都要看到结果：一边失败就取消另一边，会把「哪个平台坏了」这个
+    # 关键信息藏掉 —— 而跨平台差异正是这个 workflow 存在的理由。
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            note: "已验证：本机 Windows / Python 3.11 上 682 项单测全绿。"
+          - os: ubuntu-latest
+            note: "未验证：本项目至今未在任何 Linux 机器上跑过单测，首次跑通前不要引用为跨平台结论。"
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 装 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          # 只缓存 pip 下载，不缓存 site-packages —— 后者会把本机的
+          # torch/regex 装法带进 CI，环境就不确定了。
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 装依赖（dev + speed）
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev,speed]"
+        # ⚠ 刻意**不装** semantic / memory 两个 extra：
+        #   torch + transformers 约 2GB，装它会让每次 CI 多花几分钟且容易超时，
+        #   而单测里 L3 的行为由替身覆盖（见 tests/test_regressions.py）。
+        #   没装 transformers/torch 时 LocalModelBackend.is_available() 返回 False，
+        #   这正是测试要断言的那种「静默降级」路径，所以缺依赖反而测到了真东西。
+
+      - name: ruff 静态检查（暂不作为闸门）
+        run: python -m ruff check prompt_ids scripts tests --output-format=github
+        continue-on-error: true
+        # ⚠ 这一条**故意**是 continue-on-error，不是忘了配。
+        #   首次运行实测基线债务 85 条（42×F401 未用导入 · 18×E741 · 11×F841 ·
+        #   6×E702 · 5×F541 · 3×F811），绝大多数是历史遗留，与任何一次改动无关。
+        #   把它当闸门的话，CI 从第一天起就是红的 —— 那不是保护，是噪声，
+        #   而噪声会让人习惯性忽略红灯（比没有 CI 更糟）。
+        #   债务还清之后：删掉这一行 continue-on-error，并考虑 `--fix` 一次性收掉 50 条。
+        #   顺带：F821 报告的 prompt_ids/web/dashboard.py:1665 `ApiContext` 未定义
+        #   是**真问题**（不是风格），已在下面的 job summary 里单独点出来。
+        #
+        # 只查 prompt_ids scripts tests，不查 data/：data/raw/ 是下载来的第三方语料，
+        # 对它跑 lint 只会产出与本项目无关的噪声。
+
+      - name: packaging 自检（package-data 有没有真的装进去）
+        run: python -m prompt_ids.cli --rules-stats
+        # 这条是**闸门**而不是装饰：prompt_ids/rules/*.yaml 是 package-data，
+        # 一旦打包配置写错（比如漏了 package-data 或被 .dockerignore 排掉），
+        # 规则层会变成「一条规则都没有」，而服务照常起、照常返回 200 ——
+        # 静态检查发现不了这种故障，只有真跑一次规则加载能发现。
+
+      - name: 单测
+        run: python -m pytest
+        # ⚠ 绝不在这里叠 -q：pyproject 的 addopts 已经有 "-q"，叠了会变 -qq，
+        #   pytest 连 "N passed" 总结行一起吞掉，于是「全绿」和「一个都没跑」
+        #   在输出里长得一模一样。判全绿看退出码（Actions 本来就看退出码）。
+        #   数用例用 --collect-only -q。
+
+      - name: 端到端冒烟
+        run: python scripts/smoke.py
+        # 期望「检出 10/10，误报 0/6」。纯本地，不联网、不需要 Key。
+
+      - name: 看板自检（需要 node，允许失败）
+        run: python scripts/check_dashboard.py
+        continue-on-error: true
+        # 用真 JS 引擎跑一遍看板里的内联脚本。允许失败的两个原因：
+        #   1) 需要本机有 node（脚本内部按 shutil.which 找，找不到会优雅跳过，
+        #      但「跳过」与「通过」在 Actions 里同为绿色，这里不假装两者一样）；
+        #   2) 看板要读 reports/*.json，而 reports/ 不入库 ⇒ CI 上多数检查是 SKIP，
+        #      本地有报告时才会真跑。允许失败是为了不挡住真正该挡的东西。
+
+      - name: 规则层对抗输入耗时上界（允许失败）
+        run: python scripts/redos_check.py
+        continue-on-error: true
+        # 纯计时，阈值与机器性能强相关（共享 runner 上噪声很大）。
+        # 它防的是「远程可打 DoS」那一类回归，值得跑，但不该因为共享 runner
+        # 慢 20ms 就把整个 PR 判死。
+
+      - name: 记录验证状态（job summary）
+        env:
+          # 用 YAML 块标量传文本，避开 Windows(pwsh) 与 Linux(bash) 的引号差异。
+          SUMMARY: |
+            ### prompt-ids CI · ${{ matrix.os }}
+
+            ${{ matrix.note }}
+
+            - 单测：`python -m pytest`（pyproject 的 `addopts = "-q"` 已生效；
+              **不要**在命令行再叠 `-q`，会变 `-qq` 并吞掉 "N passed" 总结行）
+            - 装的是 `.[dev,speed]`，**不含** `semantic`/`memory`
+              （torch + transformers 约 2GB；且没装它们时 `LocalModelBackend.is_available()`
+              返回 False，正好让单测覆盖到「后端不可用 → 弃票」那条路径）
+            - 闸门：`pytest`、`scripts/smoke.py`、`--rules-stats`
+            - 非闸门：`ruff check`（基线债务 85 条，见 workflow 注释）、
+              `scripts/check_dashboard.py`（需 node 且依赖未入库的 `reports/*.json`）、
+              `scripts/redos_check.py`（计时，阈值与机器性能相关）
+            - 刻意不跑：任何需要 API Key 或联网下载数据集的脚本
+              （`build_overrefusal.py` / `build_pint_shape.py` / `eval_semantic.py` /
+              `agent_check.py` …）—— 不可复现，且不该在 PR 上花这个钱。
+
+            ⚠ 首次跑通前，本文件**不构成**「跨平台已验证」的结论。
+        run: >-
+          python -c "import os, pathlib;
+          pathlib.Path(os.environ['GITHUB_STEP_SUMMARY']).write_text(os.environ['SUMMARY'],
+          encoding='utf-8')"

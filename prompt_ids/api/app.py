@@ -602,6 +602,16 @@ def handle_review_queue(ctx: ApiContext, payload: Any, params: dict) -> tuple[in
     }
 
 
+def _observability_stats() -> dict:
+    """遥测出口的读数。独立 try —— 观测读不出来不该让 /v1/metrics 整个 500。"""
+    try:
+        from prompt_ids.observability import stats
+
+        return stats()
+    except Exception as exc:  # noqa: BLE001
+        return {"kind": "error", "enabled": False, "error": type(exc).__name__}
+
+
 def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     det = ctx.rule_detector
     book = det.rulebook if det and hasattr(det, "rulebook") else None
@@ -623,6 +633,10 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
             "info": ctx.pipeline.semantic_detector.stats() if ctx.pipeline.semantic_detector else {},
         },
         "canary": ctx.canary.stats() if ctx.canary else None,
+        # 遥测出口：kind=off 时也给，让用户知道「有这条路、现在没开」。
+        # failed/degraded 必须与任何遥测读数一起看 —— 否则「看不到 trace」
+        # 会被读成「没有攻击」，而真实原因可能是 collector 挂了。
+        "observability": _observability_stats(),
         # 签发配额状态：默认开着（30/分钟·每身份），未鉴权部署下这是唯一的护栏
         "canary_issue_limit": (
             {
