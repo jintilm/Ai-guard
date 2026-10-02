@@ -49,8 +49,10 @@ def build_argparser() -> argparse.ArgumentParser:
     sem = p.add_argument_group("语义层 L3")
     sem.add_argument("--semantic", action="store_true", help="启用语义层（自动挑可用后端）")
     sem.add_argument("--semantic-backend", default="auto",
-                     help="后端：auto/local/lightweight/null，或 21 家提供商之一"
-                          "（deepseek/openai/azure/qwen/zhipu/moonshot/siliconflow/volces/"
+                     help="后端：auto/local/lightweight/null，或 21 家提供商之一。"
+                          "auto = llm > local > lightweight（云端优先：配了 Key 就用 LLM 裁判，"
+                          "没配才回落本地模型；实测云端 ≈10s/条、本地 219ms）。提供商："
+                          "deepseek/openai/azure/qwen/zhipu/moonshot/siliconflow/volces/"
                           "qianfan/minimax/anthropic/groq/mistral/together/openrouter/xai/"
                           "perplexity/ollama/vllm/lmstudio/custom），"
                           "也接受 LiteLLM 风格一行写法 groq/llama-3.3-70b-versatile，"
@@ -175,6 +177,44 @@ def _make_pipeline(args: argparse.Namespace) -> Pipeline:
     )
 
 
+def _announce_semantic_backend(pipeline, *, machine_output: bool, quiet: bool = False) -> None:
+    """用 `--semantic` 时先说清**实际跑的是哪个后端**。
+
+    为什么必须说：`auto` 是云端优先（2026-10 改），配了 Key 就走 LLM 裁判
+    （实测 ≈10s/条），没配才回落本地 DeBERTa（219ms）。以前顺序相反，
+    于是「配了云端 key 却跑在本地模型上」这件事完全不可见 ——
+    用户看到 93ms 就以为云端没生效，或者反过来花 10s/条才知道走的是云端。
+
+    去哪写：人读输出走 stdout（**不能走 stderr** —— Windows PowerShell 会把
+    stderr 渲染成红色错误行，看着像崩了）；`--json`/`--jsonl` 这种机器输出
+    走 stderr，否则会污染 JSON 流。
+
+    ⚠ `--quiet` 抑制的是**信息**不是**警报**：后端那行不说，
+    但「语义层已降级」必须照说（走 stderr，免得混进 terse 的结果流里）。
+    """
+    det = pipeline.semantic_detector
+    if det is None or not getattr(det, "enabled", False):
+        return
+    backend = getattr(det, "backend", None)
+    if backend is None:
+        return
+    stream = sys.stderr if (machine_output or quiet) else sys.stdout
+    stats = det.stats()
+    if not quiet:
+        name = getattr(backend, "name", "?")
+        provider = getattr(backend, "provider", "") or ""
+        model = det.effective_model_name or ""
+        label = f"{name}/{provider}" if provider else name
+        print(f"语义层: 启用 {det.mode}  后端 {label}"
+              f"{('  模型 ' + model) if model else ''}"
+              f"{'  [不可用，本条将弃票]' if not stats.get('available') else ''}",
+              file=stream)
+    if stats.get("degraded"):
+        print(f"⚠ 语义层已降级：{stats['abstained']}/{stats['calls']} 次调用弃权"
+              f"（{stats['failed_share']:.0%} > 20%），L3 实际未生效。"
+              f"最近错误：{stats.get('last_error') or '（无）'}", file=stream)
+
+
 def _disp_width(text: str) -> int:
     """终端显示宽度：CJK 全角字符占 2 列。
 
@@ -261,7 +301,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.probe:
         from prompt_ids.detectors.semantic import probe
 
-        print(json.dumps(probe(), ensure_ascii=False, indent=2))
+        report = probe()
+        # 权威答案先打一行：JSON 里有 21 家提供商 + 5 个后端，
+        # 「到底跑哪个」要翻到最底下才看得到，而这恰恰是唯一会被误读的地方
+        # （历史上 provider 条目里的 chosen 与实际生效的后端不是一回事）。
+        eff = report.get("effective") or {}
+        model = eff.get("model") or ""
+        print(f"实际生效的后端（不加 --semantic-backend 时）：{eff.get('backend', '?')}"
+              f"{('/' + str(eff.get('provider'))) if eff.get('provider') else ''}"
+              f"{('  模型 ' + model) if model else ''}")
+        print(f"auto 候选顺序：{' > '.join(eff.get('preference') or [])}")
+        print(f"{eff.get('override_hint', '')}\n")
+        print(json.dumps(report, ensure_ascii=False, indent=2))
         return EXIT_PASS
 
     if args.list_providers:
@@ -275,6 +326,8 @@ def main(argv: list[str] | None = None) -> int:
 
     pipeline = _make_pipeline(args)
     if args.semantic:
+        _announce_semantic_backend(
+            pipeline, machine_output=bool(args.json or args.jsonl), quiet=bool(args.quiet))
         pipeline.warmup()
     texts = _split(_read_input(args), args.lines)
     results = pipeline.scan_batch(texts, user=args.user)

@@ -345,12 +345,68 @@ def test_env_example_documents_deepseek_key():
 
 # ---------------------------------------------------------------- CLI
 def _run_cli(*args: str) -> tuple[int, str, str]:
+    """跑 CLI 子进程并取回文本。
+
+    ⚠ **编码必须两端都钉死**：子进程显式 `PYTHONIOENCODING=utf-8`，
+    父进程显式 `encoding="utf-8"`。以前这里是 `text=True` 且不钉 encoding ——
+    解码走**本机代码页**（cp936），于是「子进程按 UTF-8 写出」时 GBK 解码失败，
+    `proc.stdout` 变 None，测试报的是 `TypeError: argument of type 'NoneType'
+    is not iterable`（或 `AttributeError: NoneType.splitlines`）——
+    **报错完全指不到真正的原因**，而触发条件只是环境里多了一个
+    `PYTHONIOENCODING=utf-8`（曾以约 1/25 全量跑的比例出现，长期查不出触发条件；
+    2026-10 定位）。现在测试与机器 locale 无关。
+    """
+    import os
+    import pathlib
+
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
     proc = subprocess.run(
         [PYTHON, "-m", "prompt_ids.cli", *args],
-        capture_output=True, text=True, timeout=120, cwd=str(
-            __import__("pathlib").Path(__file__).resolve().parent.parent),
+        capture_output=True, encoding="utf-8", errors="replace",
+        timeout=120, cwd=str(pathlib.Path(__file__).resolve().parent.parent), env=env,
     )
     return proc.returncode, proc.stdout, proc.stderr
+
+
+def test_cli_subprocess_decodes_as_utf8_on_any_locale():
+    """钉死「两端都钉 UTF-8」这件事，别把它改回 `text=True` + 跟随 locale。
+
+    这不是洁癖：以前解码走本机代码页（cp936），只要环境里出现
+    `PYTHONIOENCODING=utf-8`，子进程就按 UTF-8 写出、GBK 解码失败、
+    `proc.stdout` 变 None，报错是 `TypeError: argument of type 'NoneType'
+    is not iterable` —— 与真实原因毫无关系，长期查不出触发条件。
+    """
+    import ast
+    import inspect
+    import os
+    import subprocess
+    import textwrap
+
+    source = textwrap.dedent(inspect.getsource(_run_cli))
+    assert "encoding=\"utf-8\"" in source, "父进程必须显式钉解码"
+    assert 'env["PYTHONIOENCODING"] = "utf-8"' in source, "子进程必须显式钉编码"
+    # 只看代码不看 docstring —— 上面那段解释里就写着 `text=True` 这个词
+    tree = ast.parse(source)
+    body = tree.body[0].body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]                       # 去掉 docstring
+    code = ast.unparse(ast.Module(body=body, type_ignores=[]))
+    assert "text=True" not in code, "text=True 会让解码回落到本机代码页"
+
+    # 行为验证：环境里有 PYTHONIOENCODING 时也必须拿到文本而不是 None
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    proc = subprocess.run(
+        [PYTHON, "-m", "prompt_ids.cli", "--json", "帮我写快速排序"],
+        capture_output=True, encoding="utf-8", errors="replace", env=env, timeout=120,
+        cwd=str(__import__("pathlib").Path(__file__).resolve().parent.parent),
+    )
+    assert proc.stdout is not None and proc.stdout.strip(), \
+        "解码失败时 stdout 会是 None（这正是那条地雷的形态）"
+    import json
+
+    assert "level" in json.loads(proc.stdout)
 
 
 def test_cli_exit_code_zero_for_benign():

@@ -9,6 +9,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -319,9 +322,6 @@ def test_add_to_gitignore_only_adds_exact_path(tmp_path, monkeypatch):
 
 def test_mined_script_output_is_dataset_shaped(tmp_path):
     """`review_mined.jsonl` 必须能被现成脚本吃下：字段与 data/*.jsonl 一致。"""
-    import subprocess
-    import sys
-
     from prompt_ids.audit.review_corpus import ReviewCorpus
 
     corpus = ReviewCorpus(tmp_path / "corpus.jsonl")
@@ -329,10 +329,15 @@ def test_mined_script_output_is_dataset_shaped(tmp_path):
                patterns=("PV-C001",), top_pattern="PV-C001")
     corpus.add(text="攻击样本原文", is_attack=True, fp="f2", top_pattern="PV-C002")
     out = tmp_path / "review_mined.jsonl"
+    # 显式钉 UTF-8（子进程 env + 父进程解码）：`text=True` 不钉 encoding 会让解码
+    # 跟随本机代码页（cp936），脚本的中文输出直接抛 UnicodeDecodeError，
+    # 报错完全指不到真正的原因。tests/test_core_units.py 的 _run_cli 同款。
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [sys.executable, "scripts/review_mined.py", "--corpus",
          str(tmp_path / "corpus.jsonl"), "--out", str(out)],
-        capture_output=True, text=True, cwd=str(Path(__file__).resolve().parents[1]),
+        capture_output=True, encoding="utf-8", errors="replace",
+        cwd=str(Path(__file__).resolve().parents[1]), env=env,
     )
     assert proc.returncode == 0, proc.stderr
     rows = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines() if l.strip()]
@@ -386,10 +391,19 @@ def test_ablation_report_flags_unreliable_groups():
 
 
 def test_eval_script_marks_high_timeout_groups_as_unusable():
-    """阈值与措辞钉在脚本里：失败率过高时必须同时出现在 JSON、表格和告警里。"""
+    """阈值与措辞钉住：失败率过高时必须同时出现在 JSON、表格和告警里。
+
+    阈值住在**包里**（`detector.DEGRADED_CALL_FAIL_SHARE`），脚本 import 它 ——
+    之前脚本里写死一份 `0.20`、运行时压根没有 degraded 判断，于是
+    「离线把超时组标成不可用、线上却一切正常」这类不一致谁也发现不了。
+    """
     source = (Path(__file__).resolve().parents[1] / "scripts" / "eval_semantic.py") \
         .read_text(encoding="utf-8")
-    assert "DEGRADED_CALL_FAIL_SHARE = 0.20" in source
+    from prompt_ids.detectors.semantic.detector import DEGRADED_CALL_FAIL_SHARE
+
+    assert DEGRADED_CALL_FAIL_SHARE == 0.20, "阈值变了要同步改 AGENTS.md 里的实验口径"
+    assert "DEGRADED_CALL_FAIL_SHARE" in source
+    assert "= 0.20" not in source, "阈值必须是 import 进来的，不是脚本里又抄一份"
     assert '"reliability"' in source
     assert "不可用" in source, "降级组必须在输出里被标出来"
 

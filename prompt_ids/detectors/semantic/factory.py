@@ -29,12 +29,29 @@ from prompt_ids.detectors.semantic.providers import (
 #: 非 LLM 的本地后端关键字
 BUILTIN = ("local", "lightweight", "null")
 
+#: `auto` 的候选顺序。**云端优先**（2026-10 定）——
+#: 配了 Key 就用 LLM 裁判，否则回落到本地模型，再否则是轻量词袋。
+#:
+#: 为什么不是「本地优先」：本地 DeBERTa 在 agent 面这类目标导向注入上召回 0.4469
+#: 来自 L3 语义层，规则层单干是 0.0000 —— 用户既然配了 Key、要付这份钱，
+#: 就该默认拿到泛化更强的那一层，而不是被 219ms 的本地模型静默顶替。
+#: ⚠ 代价必须写清楚：LLM 裁判实测 **≈10s/条**（免费网关），本地是 219ms。
+#: 要回本地就显式 `--semantic-backend local`。
+#:
+#: ⚠ 顺序只影响「谁先被选中」，**不影响可用性判定**：
+#: `LLMBackend.is_available()` 看的是 Key 是否配了，**不是**网关是否通。
+#: 网关挂掉时 `auto` 照样选它，于是每次调用都失败并**按弃票处理**
+#: （`ok=False` ⇒ `contribution()` 返回 None）⇒ L3 静默失效。
+#: 这就是为什么 `probe()` 之外还要求用 `scripts/llm_check.py` 判「连通 ≠ 可用」。
+AUTO_PREFERENCE = ("llm", "local", "lightweight")
+
 
 def build_backend(spec: str | SemanticBackend | None = "auto", **kwargs) -> SemanticBackend:
     """构造语义后端。
 
     spec 取值：
-      auto              按依赖可用性自动挑选，全部不可用时返回 NullBackend
+      auto              按 `AUTO_PREFERENCE` 的顺序挑第一个可用的
+                        （云端优先：配了 Key 就用 LLM 裁判）
       local             transformers + torch 本地推理（DeBERTa）
       lightweight       sklearn TF-IDF + 逻辑回归（需先训练）
       null              显式关闭
@@ -54,7 +71,7 @@ def build_backend(spec: str | SemanticBackend | None = "auto", **kwargs) -> Sema
     key = (spec or "auto").strip()
 
     if key.lower() in ("auto", ""):
-        for candidate in ("local", "llm", "lightweight"):
+        for candidate in AUTO_PREFERENCE:
             backend = build_backend(candidate, **kwargs)
             if backend.is_available():
                 return backend
@@ -98,13 +115,25 @@ def _pick(data: dict[str, Any], *names: str) -> dict[str, Any]:
 def probe() -> dict[str, dict[str, Any]]:
     """列出所有后端的可用性与原因，便于排查环境问题。
 
-    键顺序即展示顺序：先是三个非 LLM 后端，再是全部 21 家提供商，最后 `selected`。
-    `chosen=True` 标出 `auto` 实际会选中哪一家 —— 排查「以为在用 A 其实在用 B」时最关键。
+    键顺序即展示顺序：先是三个非 LLM 后端，再是全部 21 家提供商，
+    最后 `selected` 与 `effective`。
+
+    ⚠ 只有一个键回答「不加 `--semantic-backend` 时实际跑哪个」：**`effective`**
+    （与 `selected` 同源，前者是给人读的摘要）。provider 条目里的
+    `llm_auto_pick` 回答的是另一个问题：「**如果**走 LLM 后端，会选哪家」——
+    两者在旧版本里都叫 chosen/selected，docstring 还把前者说成后者，
+    于是照着它排查会得出相反结论（实测：llm_judge 标 chosen，
+    而实际生效的是 local_model）。两个问题现在用两个不同的键名。
     """
     report: dict[str, dict[str, Any]] = {}
 
     report["local"] = LocalModelBackend().info()
     report["lightweight"] = LightweightBackend().info()
+    # `loaded` 在探针里的含义要写清楚：探针进程**不会加载模型**，
+    # 于是本地后端永远报 loaded=false —— 不解释就会被读成「模型不在」，
+    # 而实测它就在缓存里（always 模式 semantic=219ms）。
+    report["local"]["note"] = "loaded=false 只表示本探针进程未加载模型（探针不加载），不表示模型缺失"
+    report["lightweight"]["note"] = "loaded=false 同上：探针不加载，缺失时 available 会是 false"
     llm_auto = LLMBackend()
     report["llm"] = llm_auto.info()
     if not llm_auto.is_available():
@@ -117,11 +146,29 @@ def probe() -> dict[str, dict[str, Any]]:
     report.update(diagnose_llm())
 
     chosen = build_backend("auto")
+    provider = getattr(chosen, "provider", "")
     report["selected"] = {
         "backend": chosen.name,
-        "provider": getattr(chosen, "provider", ""),
+        "provider": provider,
         "info": chosen.info(),
         "reason": _explain(chosen.name, chosen),
+    }
+    # 单一权威答案。上面那些都是分项可用性，只有这一条回答
+    # 「不加 --semantic-backend 时到底跑哪个」—— 排查「以为在用 A 其实在用 B」
+    # 只看它。`llm_auto_pick`（provider 级）回答的是另一个问题：
+    # 「如果走 LLM，会选哪家」。
+    report["effective"] = {
+        "backend": chosen.name,
+        "provider": provider,
+        "model": chosen.info().get("model", ""),
+        "preference": list(AUTO_PREFERENCE),
+        "override_hint": (
+            "--semantic-backend local（回本地模型，默认关云端时更快也更省）/ "
+            "lightweight（词袋）/ null（关掉 L3）/ "
+            "custom、groq/llama-3.3-70b-versatile（指定提供商或提供商/模型）"
+        ),
+        "note": "这是不加 --semantic-backend 时的实际选择；各 provider 的 "
+                "llm_auto_pick 只表示「若走 LLM 会选哪家」。",
     }
     return report
 

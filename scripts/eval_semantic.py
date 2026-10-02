@@ -51,13 +51,20 @@ from prompt_ids.eval.datasets import BUILTIN, Dataset, source_label  # noqa: E40
 from prompt_ids.eval.metrics import BLOCK_LEVELS, Confusion, latency_stats, markdown_table  # noqa: E402
 from prompt_ids.preprocess.guard import Guard  # noqa: E402
 from prompt_ids.rules.loader import RuleBook  # noqa: E402
+from prompt_ids.detectors.semantic.detector import (  # noqa: E402
+    DEGRADED_CALL_FAIL_SHARE as _DEGRADED_CALL_FAIL_SHARE,
+)
 
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports"
 
 #: 一组里 LLM 调用失败（超时+错误）超过这个比例，就把该组标记为 degraded。
 #: 取 20%：低于它失败基本是零星；高于它，召回的差异更可能来自「谁先跑」
 #: 而不是配置本身 —— 跨组比较就不再有意义。详见 run_group 里的注释。
-DEGRADED_CALL_FAIL_SHARE = 0.20
+#:
+#: ⚠ 阈值本身住在包里（与运行时 `SemanticDetector.stats()["degraded"]` 共用）：
+#: 之前这里写死一份、运行时压根没有这个判断，于是「离线把超时组标成不可用、
+#: 线上却一切正常」这类不一致谁也发现不了。
+DEGRADED_CALL_FAIL_SHARE = _DEGRADED_CALL_FAIL_SHARE
 
 
 class CachedSemanticBackend(SemanticBackend):

@@ -23,6 +23,12 @@ MODES = ("fallback", "always", "hybrid", "confirm")
 
 _EVIDENCE_LEN = 120
 
+#: 调用失败（弃权）占比超过它就算「降级」。**唯一事实来源**：
+#: 运行时 `stats()["degraded"]` 与离线 `scripts/eval_semantic.py` 的
+#: reliability 账用的是同一个阈值 —— 之前脚本里写死 0.20、运行时压根没有这个判断，
+#: 于是「离线会把超时组标成不可用、线上却一切正常」这类不一致无从发现。
+DEGRADED_CALL_FAIL_SHARE = 0.20
+
 
 def _coerce(raw: Any, backend_name: str) -> Prediction:
     """兼容 Predicton 对象与 (prob, rationale) 元组两种返回。"""
@@ -60,6 +66,7 @@ class SemanticDetector(Detector):
         self.calls = 0
         self.timeouts = 0
         self.errors = 0
+        self.abstained = 0
         self.total_latency_ms = 0.0
         self.last_error: str | None = None
         # `last_prediction` 是**线程局部**的：它承担的是「本次扫描的判决要递给
@@ -142,6 +149,10 @@ class SemanticDetector(Detector):
                 prediction.ok,
             )
         self.calls += 1
+        # 弃权计数：ok=False 意味着这一层从融合里退出（不贡献分数），
+        # 连续大量弃权 = L3 实际上没在工作，必须能被 metrics 看见。
+        if not prediction.ok:
+            self.abstained += 1
         self.total_latency_ms += prediction.latency_ms
         self.last_prediction = prediction
         return prediction
@@ -234,6 +245,18 @@ class SemanticDetector(Detector):
             "calls": self.calls,
             "timeouts": self.timeouts,
             "errors": self.errors,
+            # 弃权计数。**后端自己返回 ok=False 时 timeouts/errors 都是 0** ——
+            # 而「网关 401/503」「推理模型 content 为空」这些恰恰走这条路。
+            # 缺了它，一次死网关就是 L3 彻底静默失效：每次调用都弃票，
+            # 分数回到只有规则层，看板上一切正常（`ablation.json` 那次
+            # 87.2% 超时把召回压到 0.33 的教训，同一个坑在运行时也会踩）。
+            "abstained": self.abstained,
+            "failed_share": (
+                round(self.abstained / self.calls, 4) if self.calls else 0.0
+            ),
+            "degraded": (
+                self.calls > 0 and self.abstained / self.calls > DEGRADED_CALL_FAIL_SHARE
+            ),
             "avg_latency_ms": round(self.total_latency_ms / self.calls, 2) if self.calls else 0.0,
             "last_error": self.last_error,
         }

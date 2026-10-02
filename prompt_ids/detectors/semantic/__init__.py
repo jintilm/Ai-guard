@@ -16,8 +16,13 @@ from prompt_ids.detectors.semantic.base import (
     Prediction,
     SemanticBackend,
 )
-from prompt_ids.detectors.semantic.detector import MODES, SemanticDetector
+from prompt_ids.detectors.semantic.detector import (
+    DEGRADED_CALL_FAIL_SHARE,
+    MODES,
+    SemanticDetector,
+)
 from prompt_ids.detectors.semantic.factory import (
+    AUTO_PREFERENCE,
     build_backend,
     probe,
     provider_table,
@@ -34,6 +39,8 @@ from prompt_ids.detectors.semantic.providers import (
 )
 
 __all__ = [
+    "AUTO_PREFERENCE",
+    "DEGRADED_CALL_FAIL_SHARE",
     "DEFAULT_MODEL",
     "MODES",
     "PROVIDERS",

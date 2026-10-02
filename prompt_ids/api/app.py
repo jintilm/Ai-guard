@@ -590,6 +590,7 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
         "rules": book.stats() if book else {},
         "stats": stats,
         "detectors": ctx.pipeline.registry.names(),
+        "guard": ctx.pipeline.guard.stats(),
         "semantic": {
             "enabled": bool(ctx.pipeline.semantic_detector and ctx.pipeline.semantic_detector.enabled),
             "info": ctx.pipeline.semantic_detector.stats() if ctx.pipeline.semantic_detector else {},

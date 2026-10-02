@@ -473,13 +473,21 @@ LLMJudgeBackend = LLMBackend
 
 
 def diagnose_llm() -> dict[str, dict[str, Any]]:
-    """逐家诊断 —— 给 `--probe` 与 CLI 用，口径与后端完全一致。"""
+    """逐家诊断 —— 给 `--probe` 与 CLI 用，口径与后端完全一致。
+
+    ⚠ 这里标的是 **`llm_auto_pick`：如果最终选的是 LLM 后端，它会选哪家**。
+    它**不是**「实际生效的后端」—— 那个答案在 `factory.probe()["selected"]`。
+    这两个「auto」含义不同，历史上把前者叫 `chosen`、docstring 又说它标的是
+    `auto` 实际会选的那家，于是排查「以为在用 A 其实在用 B」时照着它看
+    会得出**相反**结论（实测：probe 里 `llm_judge.chosen=true`，
+    而 `selected.backend=local_model`）。所以改名并把两个答案分开。
+    """
     report: dict[str, dict[str, Any]] = {}
     for name in provider_names():
         info = diagnose(name)
-        info["chosen"] = False
+        info["llm_auto_pick"] = False
         report[name] = info
     chosen = resolve_provider("auto")
     if chosen:
-        report[chosen]["chosen"] = True
+        report[chosen]["llm_auto_pick"] = True
     return report

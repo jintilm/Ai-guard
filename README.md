@@ -59,7 +59,7 @@ prompt-ids --policy strict "..."      # 用预置策略
 | `--no-short-circuit` | 关闭高危规则短路，用于对比实验 |
 | `--strict` | 严格策略：medium/high 一并阻断 |
 | `--budget-ms` | 单次检测总耗时预算，超时降级不再调更贵的层 |
-| `--probe` | 打印每个语义后端 + 21 家提供商的可用性与原因 |
+| `--probe` | 打印**实际生效的后端与模型**（首行）+ 每个后端与 21 家提供商的可用性与原因 |
 | `--list-providers` | 打印提供商一览表（状态 / 协议 / 默认模型 / Key 变量） |
 | `--list-models [PROVIDER]` | 打 `GET {base}/models` 查该端点的真实模型清单 |
 | `--semantic-fallbacks` | LLM 回退链，逗号分隔，如 `"groq, ollama/qwen3:8b"` |
@@ -993,16 +993,31 @@ python scripts/eval_pint_shape.py                          # block + review 双�
 | LLM 裁判 | `llm` / 任一提供商名 | 无（标准库 HTTP） | 取决于网络 | **21 家厂商**，零第三方依赖，需 API Key |
 | 轻量词袋 | `lightweight` | scikit-learn | <5ms | TF-IDF+逻辑回归，离线兜底与「弱模型对照组」 |
 
-`auto` 会按上述顺序探测可用性，全部不可用时降级到 `NullBackend`，
+`auto`（即 `--semantic-backend auto`，默认值）按 **`llm` > `local` > `lightweight`**
+的顺序探测可用性，取第一个可用的；全部不可用时降级到 `NullBackend`，
 **流水线永远不会因为模型装不上而中断**。
+
+**云端优先是有意的选择，代价也摆在这里**：配了 Key 就用 LLM 裁判（实测 ≈10s/条，
+泛化更强 —— agent 面规则层召回 0.0000，L3 拉到 0.4469），没配才回落到本地
+DeBERTa（**219ms**）。要回本地显式 `--semantic-backend local`。
+
+`--probe` 的**首行**直接给出「不加 `--semantic-backend` 时实际跑哪个后端 + 哪个模型」，
+JSON 里的 `effective` 是同一个答案的机读形式；provider 条目里的 `llm_auto_pick`
+只表示「**如果**走 LLM，会选哪家」—— 这是两个不同的问题，不要混。
 
 ```bash
 python scripts/fetch_model.py              # 下载 DeBERTa 权重并做推理验证
 python scripts/train_lightweight.py        # 训练轻量词袋模型
-prompt-ids --probe                         # 看每个后端 + 21 家提供商能不能用、为什么不能
+prompt-ids --probe                         # 实际生效的后端（首行）+ 每个后端/提供商能不能用、为什么不能
 prompt-ids --list-providers                # 提供商一览表（状态/协议/默认模型/Key 变量）
 prompt-ids --list-models deepseek          # 打 GET /models 查该端点的真实模型清单
 ```
+
+用 `--semantic` 时 CLI 会**先报一行**实际在用哪个后端/模型；若 L3 已降级
+（调用弃权率 > 20%，典型原因是网关挂了），会再报
+`⚠ 语义层已降级：a/b 次调用弃权，L3 实际未生效` —— 因为这种情况下分数看起来仍然
+「正常」，只是悄悄退回了规则层。同一组读数在 `GET /v1/metrics` 的
+`semantic.info`（`abstained` / `failed_share` / `degraded`）里也有。
 
 ### LLM 裁判：21 家提供商
 
@@ -1050,9 +1065,13 @@ prompt-ids --semantic --semantic-local-only                           # 断网/�
 - **数据驱动，不写 `if provider == ...`**：所有厂商都是注册表里的一行，
   只有「线路协议」真不同（目前仅 `openai` / `anthropic` 两种）才需要适配器。
   Azure 因此不是特殊分支，而是三行数据（`path` 带 `{deployment}` + `auth_header="api-key"` + `api_version`）。
-- **`auto` 只选配了 Key 的云厂商，不选本地端点、也不选 `custom`**：
+- **厂商级 `auto`（`--semantic-backend llm`）只选配了 Key 的云厂商，
+  不选本地端点、也不选 `custom`**：
   「本机装了 Ollama」不等于「Ollama 正在跑」，让 auto 选中一个没启动的 localhost
   服务等于把「明确不可用」换成「看着可用、调用时才失败」。要本地推理请显式指定。
+  ⚠ 这一条说的是**厂商级** auto（`llm` 后面选哪家）；**后端级** auto
+  （不加 `--semantic-backend` 时选哪个后端）是另一件事，顺序为 `llm > local > lightweight`，
+  见「可插拔后端」。
 - **回退链**：`--semantic-fallbacks "groq, xai/grok-4.3"`（或 `PROMPT_IDS_LLM_FALLBACKS`），
   逗号/分号分隔，顺序即优先级；某家返回 400/401/403/404/422 时直接跳到下一家，
   网络错误与 5xx 则指数退避重试后再跳。
@@ -1268,7 +1287,7 @@ python scripts/eval_german.py --exclude PV-C015,PV-C019,PV-H025            # 消
 ### 其他基线
 
 ```bash
-pytest tests -q            # 600 项单测全绿
+pytest tests -q            # 618 项单测全绿
 python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检出 10/10 误报 0/6
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
@@ -1276,11 +1295,12 @@ python scripts/threshold_sweep.py  # 阈值标定 + 四档策略影响（Policy 
 python scripts/eval_semantic.py --dataset data/my.jsonl   # 换自己的数据集
 ```
 
-单测分布（`pytest --collect-only`）：providers 86 · core_units 41 · proxy 42 ·
-output_secrets 41 · semantic 35 · regressions 35 · audit 31 · review 32 ·
-network_robustness 33 · api 29 · canary 24 · canary_cost 7 · memory 27 · web 23 ·
-pipeline 23 · verdict 19 · playground 18 · threshold_sweep 9 · concurrency 4 ·
-rules_redos 9 · agent_bench 10 · preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
+单测分布（`pytest --collect-only`）：providers 86 · core_units 42 · proxy 42 ·
+output_secrets 41 · semantic 35 · regressions 35 · network_robustness 33 · audit 31 ·
+review 32 · api 29 · canary 24 · memory 27 · web 23 · pipeline 23 · verdict 19 ·
+backend_auto 12 · playground 18 · cli_backend_announce 5 · canary_cost 7 ·
+threshold_sweep 9 · concurrency 4 · rules_redos 9 · agent_bench 10 · preprocess 8 ·
+engine 7 · decoder 6 · pint_shape 5。
 
 评测报告落在 `reports/ablation.json`，可直接画图。
 `reports/ablation_public.json` 是同一套配置只在公开集上的独立复跑，用于交叉验证
