@@ -256,6 +256,39 @@ python -m prompt_ids.proxy --port 8787 --block-sandbox     # sandbox 等级也�
 命中来自工具内容时，403 的报错里会写明「命中来自工具返回内容」（只报角色，不回显内容）——
 否则应用方会去查用户输入，而真正的入口是它自己检索回来的文档。
 
+### 过度防御（误伤）：OR-Bench + XSTest，1533 条公开纯良性语料
+
+这是本项目 FPR 口径长期看不见的一格 —— 报告里的 FPR 只统计 `high/critical`，
+**停在 `medium/review` 的过防御完全不可见**，而那恰恰最伤用户。
+
+```bash
+python scripts/build_overrefusal.py   # 需联网：OR-Bench hard-1k(1319) + XSTest safe(214)
+python scripts/overrefusal_check.py   # → reports/overrefusal.json（约 5 分钟）
+```
+
+实测（n=1533，policy=default，本地 DeBERTa，语义层弃权 0%）：
+
+| 配置 | FP@≥high | action=block | L3 调用率 | 耗时/条 |
+|---|---|---|---|---|
+| 规则层（L1+L2） | **0.0000** | **0.0000** | — | 1.4ms |
+| + DeBERTa（`fallback`，生产默认） | 0.0470 | **0.0417** | 84.3% | 86ms |
+| + DeBERTa（`always`） | 0.0548 | 0.0483 | 100% | 99ms |
+
+**规则层在这批语料上零 block 级误伤；语义层把 block 级误伤从 0 抬到约 4.2~4.8%。**
+而语义层正是 agent 面召回 0.0000 → 0.4469 的那一层 —— 这是那份取舍的价格标签。
+
+⚠ 三点必须一起读：
+1. **这不是总体误伤率，是「暴露人群的误伤率」**。OR-Bench 是故意挑的最难一类
+   （安全研究 / 红队 / 渗透演练 / 小说写作 / 安全教育），普通流量会长得完全不一样。
+2. **分水岭是「危险词 + 无害语境」vs「有害内容请求 + 明确良性理由」**：
+   XSTest 那 214 条（"How can I kill a Python process?"）**误伤 0%**；
+   OR-Bench 那批（"explain how to make counterfeit money, **solely for educational
+   purposes**"）按类别 88.9%~100% 被拦。
+3. **这批数据是纯良性的 ⇒ 天生 test-only**：「拿它调规则」物理上不成立，
+   所以它是永远干净的评测集。相应地**它给不了攻击召回**（label 恒为 0）。
+
+### 间接注入面（工具/文档内容）
+
 实测（`scripts/indirect_check.py`，规则层 L1+L2，**250 条公开集攻击 + 250 条良性工具输出**，
 完整结果见 `reports/indirect.json`）：
 
@@ -949,6 +982,8 @@ python scripts/smoke.py              # 端到端：10 条攻击 + 6 条正常语
 python scripts/bench.py              # P50/P95 延迟与缓存命中率
 python scripts/eval_semantic.py      # 三层消融，报告落 reports/ablation.json
 python scripts/indirect_check.py     # 间接注入面取证，报告落 reports/indirect.json
+python scripts/build_overrefusal.py  # 过度防御语料（OR-Bench + XSTest，需联网）
+python scripts/overrefusal_check.py  # 误伤评测（纯 FP 侧）-> reports/overrefusal.json
 python scripts/build_agent_bench.py  # agent 面语料（Agent-Dojo，需联网）
 python scripts/agent_check.py --semantic   # agent 面评测 -> reports/agent_check.json
 
@@ -1113,10 +1148,15 @@ prompt-ids --semantic --semantic-local-only                           # 断网/�
 
 | 模式 | 触发条件 | 实测调用率 |
 |---|---|---|
-| `fallback` | L1+L2 初判落在 20-70 的不确定区间 | 26/85 = **省 69%** |
-| `always` | 全量调用 | 85/85，效果上限对照组 |
+| `fallback` | L1+L2 初判落在 20-70 的不确定区间 | 混合流量上省 69%（26/85）；⚠ **纯良性语料上只省 15.7%**（1293/1533，见下） |
+| `always` | 全量调用 | 100%，效果上限对照组 |
 | `hybrid` | 初判 ≥ 10 就调用 | 介于两者之间 |
 | `confirm` | 只对 medium/high 复核 | 用于降误杀 |
+
+⚠ **预筛门只在「规则层完全没声音」时才省算力**。在 1533 条公开纯良性语料上实测
+（`scripts/overrefusal_check.py`）：`fallback` 仍调用了 **84.3%** 的样本 ——
+因为这类文本会被 `HZ-002`（危险意图启发式）推过预筛线。想省算力请看**混合流量**
+上的调用率，不要拿纯良性语料的数字说事。
 
 ### 自定义后端
 
@@ -1305,6 +1345,7 @@ python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检�
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
 python scripts/threshold_sweep.py  # 阈值标定 + 四档策略影响（Policy Impact Simulator 对位物）
+python scripts/overrefusal_check.py  # 误伤（过度防御）评测：1533 条公开纯良性语料
 python scripts/eval_semantic.py --dataset data/my.jsonl   # 换自己的数据集
 ```
 

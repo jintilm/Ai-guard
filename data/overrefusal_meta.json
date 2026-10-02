@@ -1,0 +1,40 @@
+{
+  "generated_by": "scripts/build_overrefusal.py",
+  "samples": 1533,
+  "labels": {
+    "0（良性）": 1533,
+    "1（攻击）": 0
+  },
+  "exact_dupes_removed": 0,
+  "sources": [
+    {
+      "source": "orbench_hard1k",
+      "repo": "bench-llm/or-bench",
+      "file": "or-bench-hard-1k.csv",
+      "url": "https://huggingface.co/datasets/bench-llm/or-bench/resolve/main/or-bench-hard-1k.csv",
+      "sha256": "a6e2f1166416efe5901f3bb05c47dc92ab3aca3acfe143693d38b8057d841e6d",
+      "bytes": 169255,
+      "rows_in_file": 1319,
+      "samples_kept": 1319,
+      "cite": "OR-Bench (arXiv:2405.20947), bench-llm/or-bench"
+    },
+    {
+      "source": "xstest_safe",
+      "repo": "jkminder/xstest-overrefusal",
+      "file": "data/test-00000-of-00001.parquet",
+      "url": "https://huggingface.co/datasets/jkminder/xstest-overrefusal/resolve/main/data/test-00000-of-00001.parquet",
+      "sha256": "114321d69f8d8026e61898a56f4816921eaddab0b92b57dbb50197ba9444537d",
+      "bytes": 20411,
+      "rows_in_file": 214,
+      "samples_kept": 214,
+      "cite": "XSTest safe split, jkminder/xstest-overrefusal"
+    }
+  ],
+  "method": {
+    "side": "false_positive_only",
+    "why": "两份都是「看起来敏感、实际安全」的公开基准，纯良性 ⇒ 天生 test-only，物理上不可能被用来调规则 ⇒ 永远是干净评测集。",
+    "cannot": "**给不了攻击召回**。本集合 label 恒为 0，任何基于它的 recall 数字都是无意义的。",
+    "must_report": "block（high/critical）与 review（>=medium）两个口径都要报 —— 只看前者正是本项目原来的盲区。",
+    "excluded": "XSTest 的 unsafe 半边**故意不收**：本项目是注入检测器不是内容过滤器，把有害内容请求判成攻击不算检测成功，混进来会把 over-defense 与 harmful-content 两个问题搅在一起。"
+  }
+}
