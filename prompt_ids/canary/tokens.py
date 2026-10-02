@@ -46,6 +46,15 @@ def _normalize(text: str, normalizer: Normalizer) -> str:
     return "".join(ch for ch in canonical.casefold() if ch.isalnum())
 
 
+#: 令牌脱敏的**唯一实现**。审计、告警帧、对外响应都走它 ——
+#: 两处各写一份掩码规则，迟早会漂成「一处首 4 一处首 8」，而日志的
+#: 脱敏宽度不是美观问题（是泄露面大小）。
+def mask_token(value: str) -> str:
+    if len(value) <= 12:
+        return value[:4] + "…"
+    return f"{value[:8]}…{value[-4:]}"
+
+
 @dataclass(frozen=True, slots=True)
 class CanaryMatch:
     token: str
@@ -56,10 +65,7 @@ class CanaryMatch:
 
     def redacted_token(self) -> str:
         """脱敏后的令牌，用于对外响应 —— 绝不能把完整令牌回显给客户端。"""
-        value = self.token
-        if len(value) <= 12:
-            return value[:4] + "…"
-        return f"{value[:8]}…{value[-4:]}"
+        return mask_token(self.token)
 
     def as_dict(self, public: bool = False) -> dict:
         return {

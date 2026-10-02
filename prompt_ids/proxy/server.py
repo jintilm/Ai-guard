@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from prompt_ids.audit import AuditLogger, event_from_proxy
+from prompt_ids.audit.events import KIND_PROXY, AuditEvent
 from prompt_ids.audit.events import (
     OUTBOUND_NONE,
     OUTBOUND_REDACTED,
@@ -660,7 +661,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
         if path not in SCANNED_PATHS:
             if path in PASSTHROUGH_PATHS:
-                self._passthrough("POST", body)
+                self._passthrough_post(path, body)
                 return
             # 未知路径：不转发。一个没被列进来的新端点如果被自动透传，
             # 等于「新增生成端点 = 自动失去检测」，而没人会看到这件事发生。
@@ -985,7 +986,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
         return base + path
 
     def _passthrough(self, method: str, body: bytes) -> None:
-        """非检测路径（如 /v1/models）原样转发。路径先规范化。"""
+        """非检测路径（如 /v1/models 的 GET）原样转发。路径先规范化。"""
+        self._relay_passthrough(method, body)
+
+    def _relay_passthrough(self, method: str, body: bytes) -> tuple[int, bytes]:
+        """转发并返回 (状态码, 响应体)，供调用方决定要不要落审计。"""
         url = self._upstream_url(self._upstream_path())
         headers = self._build_headers()
         request = urllib.request.Request(url, data=body or None, headers=headers, method=method)
@@ -994,15 +999,121 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 data = response.read(self.config.max_response_bytes + 1)
                 if len(data) > self.config.max_response_bytes:
                     self._send_json(502, {"error": "上游响应体过大，已拒收"})
-                    return
+                    return 502, b""
                 self._relay_response(response.status, dict(response.headers))
                 self.wfile.write(data)
+                return response.status, data
         except urllib.error.HTTPError as exc:
             self._send_json(exc.code, {"error": f"上游返回 {exc.code}"})
+            return exc.code, b""
         except (urllib.error.URLError, TimeoutError):
             self._send_json(502, {"error": "上游不可达"})
+            return 502, b""
         except http.client.HTTPException as exc:
             self._send_json(502, {"error": f"上游响应不完整：{type(exc).__name__}"})
+            return 502, b""
+
+    # ---------- 直通路径的输入侧扫描 ----------
+    def _passthrough_post(self, path: str, body: bytes) -> None:
+        """直通路径的 POST：**先扫文本再转发**，并落审计。
+
+        为什么这些端点也要扫（`proxy/passthrough.py` 的 docstring 写了完整
+        威胁模型）：`/v1/embeddings` 的输入文本几乎一定会被某次检索捞出来、
+        拼进**另一个** prompt —— 那是 RAG 间接注入链的**入口**。只在
+        `/v1/chat/completions` 上检测等于在链条开头就放行。
+
+        ⚠ 与聊天路径的差别：这里**没有 role 语义**（没有 system/user 之分），
+        所以每段都是普通 author 段（走完整流水线）。
+        """
+        from prompt_ids.proxy.passthrough import (
+            PASSTHROUGH_NO_TEXT,
+            extract_passthrough_segments,
+        )
+
+        payload: dict[str, Any] = {}
+        if body:
+            try:
+                parsed = json.loads(body.decode("utf-8", "replace"))
+                payload = parsed if isinstance(parsed, dict) else {}
+            except (ValueError, TypeError):
+                payload = {}
+        if not payload:
+            # 不是 JSON 对象（如 multipart 音频）：没有可扫的文本，直通并留痕。
+            # ⚠ 说明要取**该路径专属**的那条（音频转写写明「输入是音频字节」），
+            # 而不是笼统的「非 JSON 请求体」—— 后者读起来像是代理坏了。
+            note = PASSTHROUGH_NO_TEXT.get(path) or "非 JSON 请求体，无文本可扫"
+            self._audit_passthrough(path, None, note, status=0, scanned=False)
+            self._passthrough("POST", body)
+            return
+
+        segments, _fields, note = extract_passthrough_segments(path, payload)
+        if not segments:
+            self._audit_passthrough(path, None, note or "无文本可扫", status=0, scanned=False)
+            self._passthrough("POST", body)
+            return
+
+        pipeline = self.config.pipeline_instance
+        started = time.perf_counter()
+        scan = scan_segments(pipeline, segments,
+                             budget_chars=self.config.max_total_scan_chars)
+        detect_ms = (time.perf_counter() - started) * 1000
+        decision, status, why = decide(scan.result, self.config, scan.trigger)
+        text = "\n".join(seg.text for seg in segments)
+
+        if decision == "block":
+            self._audit_passthrough(
+                path, scan, note, status=status, scanned=True, detect_ms=detect_ms,
+                decision=decision, reason=why, segments=len(segments))
+            self._send_json(403, {
+                "error": {
+                    "message": f"{why}（{note}）",
+                    "type": "prompt_injection_blocked",
+                    "code": "injection_detected",
+                },
+                "prompt_ids": {
+                    "score": scan.result.score,
+                    "level": scan.result.level.value,
+                    "action": scan.result.action.value,
+                    "findings": [f.pattern_id for f in scan.result.findings][:10],
+                    "explained": scan.result.explained,
+                    "scanned_path": path,
+                },
+            })
+            return
+
+        status_code, _data = self._relay_passthrough("POST", body)
+        self._audit_passthrough(
+            path, scan, note, status=status_code or status, scanned=True,
+            detect_ms=detect_ms, decision=decision, reason=why, segments=len(segments))
+
+    def _audit_passthrough(self, path: str, scan, note: str, *, status: int,
+                           scanned: bool, detect_ms: float = 0.0,
+                           decision: str = "allow", reason: str = "",
+                           segments: int = 0) -> None:
+        """直通路径也落审计。
+
+        此前直通请求**一条事件都不写** —— 于是「请求总数」只统计被检测的调用，
+        而 `/v1/embeddings` 里流过多少文本在日志里完全不存在。写一条
+        `passthrough` 事件（`scanned=false` 时 note 说清为什么没扫）之后，
+        「没扫」与「扫了没命中」才分得开。
+        """
+        extra = {"scanned": bool(scanned), "passthrough": True}
+        if scan is not None:
+            extra.update({
+                "segments": segments,
+                "trigger": scan.trigger.tag if scan.trigger else "",
+                "truncated": scan.truncated,
+                "dropped": scan.dropped,
+                "scanned_chars": scan.scanned_chars,
+            })
+        self.config.audit.log(AuditEvent(
+            ts=time.time(), kind=KIND_PROXY, source="proxy",
+            level=(scan.result.level.value if scan is not None else "info"),
+            action=(scan.result.action.value if scan is not None else "pass"),
+            detect_ms=round(detect_ms, 2), note=(reason or note)[:200],
+            extra={"decision": decision, "path": path, "status": status,
+                   "client": self.client_address[0], **extra},
+        ))
 
 
 def _collect_output(obj: Any, parts: list[tuple[str, str]]) -> None:

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from prompt_ids.audit.events import (
+    KIND_CANARY,
     KIND_CUSTOM,
     KIND_LEAK,
     KIND_MEMORY,
@@ -77,6 +78,22 @@ class AuditLogger:
             ts=time.time(), kind=KIND_LEAK, source=source,
             note=f"Canary 泄漏({match.how})", extra={
                 "token": match.redacted_token(), "label": match.label, **extra},
+        ))
+
+    def log_canary_issue(self, token, *, source: str = "api", **extra) -> None:
+        """Canary 令牌**签发**留痕。
+
+        为什么签发也要落审计：这个端点**明文返回完整令牌**，而此前它不留任何记录
+        —— 于是「谁签了多少、什么时候签的」在日志里完全不存在，出了泄漏只能靠
+        猜。⚠ 只落**脱敏**令牌（首 4 尾 2），绝不落完整值：审计文件本身
+        不能成为第二个泄露源（与 `log_leak` 同一纪律）。
+        """
+        from prompt_ids.canary.tokens import mask_token
+
+        self.log(AuditEvent(
+            ts=time.time(), kind=KIND_CANARY, source=source,
+            note=f"Canary 签发({token.label or '未命名'})",
+            extra={"token": mask_token(token.value), "label": token.label, **extra},
         ))
 
     def log_review(self, *, fp: str, is_attack: bool, **kwargs) -> None:

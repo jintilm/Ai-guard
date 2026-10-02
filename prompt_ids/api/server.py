@@ -43,6 +43,8 @@ class ApiServerConfig:
         rate_limit: int = 0,
         rate_window_s: float = 60.0,
         cors: bool = True,
+        canary_issue_limit: int = 30,
+        canary_issue_window_s: float = 60.0,
     ):
         self.port = port
         self.host = host
@@ -52,6 +54,30 @@ class ApiServerConfig:
         self.limiter = (
             RateLimiter(capacity=rate_limit, refill_s=rate_window_s)
             if rate_limit and rate_limit > 0
+            else None
+        )
+        #: `POST /v1/canary/issue` 的**独立**配额。
+        #:
+        #: 为什么不用上面的通用限流：签发是特权操作（它明文返回完整令牌），
+        #: 额度必须比「跑一次检测」紧得多；而共用一个桶的话，一次 issue 就要
+        #: 占掉一次普通请求的额度，或者反过来把 issue 的额度放到几百 ——
+        #: 两个都不是我们想要的语义。
+        #:
+        #: 默认**开着**（30/分钟·每身份），而不是像 `rate_limit` 那样默认关：
+        #: 这个端点未鉴权部署时谁都能签走一个令牌，关掉配额等于没有防护。
+        #: 确实需要高频轮换（自动化测试每次签一批）就显式调大或设 0 关闭。
+        self.canary_issue_limit = int(
+            _first_env("PROMPT_IDS_CANARY_ISSUE_LIMIT", default=str(canary_issue_limit))
+            or canary_issue_limit
+        )
+        self.canary_issue_window_s = float(
+            _first_env("PROMPT_IDS_CANARY_ISSUE_WINDOW_S",
+                       default=str(canary_issue_window_s)) or canary_issue_window_s
+        )
+        self.canary_issue_limiter = (
+            RateLimiter(capacity=self.canary_issue_limit,
+                        refill_s=self.canary_issue_window_s)
+            if self.canary_issue_limit and self.canary_issue_limit > 0
             else None
         )
 
@@ -113,6 +139,19 @@ class ApiHandler(BaseHTTPRequestHandler):
         if self.config.limiter and not self.config.limiter.try_acquire(self._client_id()):
             self._drain_body()
             self._error(429, "rate_limited", "请求过于频繁，请稍后再试")
+            return
+
+        # 签发令牌是特权操作，**单独**一个桶（默认 30/分钟·每身份，默认开着）。
+        # 不共用上面的通用限流：共用的话 issue 要么占掉一次普通请求额度、
+        # 要么就得把整体额度放到几百，两者都不是这个端点该有的语义。
+        if (self.path.split("?")[0] == "/v1/canary/issue"
+                and self.config.canary_issue_limiter is not None
+                and not self.config.canary_issue_limiter.try_acquire(self._client_id())):
+            self._drain_body()
+            retry = max(1, int(self.config.canary_issue_window_s))
+            self._error(429, "canary_issue_rate_limited",
+                        f"签发过于频繁（{self.config.canary_issue_limit} 次/{retry}s），"
+                        f"请稍后再试；令牌轮换不需要这么频繁")
             return
 
         payload: Any = {}

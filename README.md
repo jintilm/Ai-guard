@@ -217,12 +217,21 @@ python -m prompt_ids.proxy --port 8787 --block-sandbox     # sandbox 等级也�
 | 路径 | 处理 |
 |---|---|
 | `/v1/chat/completions` `/v1/completions` `/v1/messages` | 完整检测（含 L3 与分段） |
-| `/v1/models` `/v1/embeddings` `/v1/audio/*` `/v1/images/*` `/v1/moderations` | 直通，不过检测 |
+| `/v1/embeddings` `/v1/moderations` `/v1/images/*` `/v1/audio/speech` | **扫文本字段**（`input` / `prompt`）后再转发 |
+| `/v1/audio/transcriptions` `/v1/audio/translations` | 直通（输入是**音频字节**，无文本可扫；审计 note 写明） |
+| `/v1/models` | 直通（GET，无请求体） |
 | `/v1/responses` `/v1/complete` | **501**，载荷结构尚未接入分段提取（明确报，不静默放行） |
 | 其他 | **404** + 列出上面两组路径 |
 
 `/v1/messages`（Anthropic 原生）此前落在「其余路径」里被静默透传，等于 Anthropic
 客户端完全不过检测；现在它走检测，因为 body 里同样是 `messages`。
+
+**为什么 `/v1/embeddings` 这种没有 system prompt 的端点也要扫**：威胁模型不同。
+「注入进这一次调用」对它没有意义，有意义的是**写进去的文本日后会被检索捞出来、
+拼进另一个 prompt** —— 那正是 RAG 间接注入链的**入口**。只在
+`/v1/chat/completions` 上检测，等于在链条开头就放行。批量提交同样受共享预算约束，
+不能靠塞大量无关文本稀释（守护 `test_padding_cannot_dilute_a_batch_of_embeddings`）。
+**覆盖不到的**：token id 形态的 `input`、以及转写/翻译结果（在**响应**侧，未覆盖）。
 
 按来源 IP 的限流：`--rate-limit N` 或 `PROMPT_IDS_PROXY_RATE_LIMIT`（**默认 0 = 关闭**）。
 限流**不是攻击判定**：它转人工复核而非阻断，且被限流的请求同样落审计（429 有留痕）。
@@ -247,15 +256,19 @@ python -m prompt_ids.proxy --port 8787 --block-sandbox     # sandbox 等级也�
 命中来自工具内容时，403 的报错里会写明「命中来自工具返回内容」（只报角色，不回显内容）——
 否则应用方会去查用户输入，而真正的入口是它自己检索回来的文档。
 
-实测（`scripts/indirect_check.py`，规则层 L1+L2，120 条公开集攻击 + 120 条良性工具输出，
+实测（`scripts/indirect_check.py`，规则层 L1+L2，**250 条公开集攻击 + 250 条良性工具输出**，
 完整结果见 `reports/indirect.json`）：
 
 | 投递方式 | 只看用户输入 | 扫工具内容 |
 |---|---|---|
-| 载荷只在工具返回里 | block 0.0000 | **0.2583** |
-| 载荷在长文档末尾 | 0.0000 | **0.2500** |
-| 载荷在长文档中段 | 0.0000 | 0.0583（见下方取样说明） |
-| 载荷拆到两条工具消息 | 0.0000 | **0.2250** |
+| 载荷只在工具返回里 | block 0.0000 | **0.1960** |
+| 载荷在长文档末尾 | 0.0000 | **0.1920** |
+| 载荷在长文档中段 | 0.0000 | 0.0560（见下方取样说明） |
+| 载荷拆到两条工具消息 | 0.0000 | **0.1560** |
+
+⚠ 早前版本这张表用的是 **120 条**样本，对应数字是 0.2583 / 0.2500 / 0.0583 / 0.2250。
+样本加大后各项都下降（0.2583 → 0.1960）—— 说明旧读数偏乐观，**引用请用上面这组**，
+并带样本量：小样本下的分母 120 恰好排掉了更难的那批，差 0.06 不是噪声。
 | 良性工具输出误报 | 0.0000 | **0.0250**（review 口径 0.0583） |
 
 那 0.0250 的误报**全部来自「文档里引用了攻击样例」**：本仓库自己的 README、AGENTS.md、
@@ -1287,7 +1300,7 @@ python scripts/eval_german.py --exclude PV-C015,PV-C019,PV-H025            # 消
 ### 其他基线
 
 ```bash
-pytest tests -q            # 618 项单测全绿
+pytest tests -q            # 647 项单测全绿
 python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检出 10/10 误报 0/6
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
@@ -1296,11 +1309,11 @@ python scripts/eval_semantic.py --dataset data/my.jsonl   # 换自己的数据�
 ```
 
 单测分布（`pytest --collect-only`）：providers 86 · core_units 42 · proxy 42 ·
-output_secrets 41 · semantic 35 · regressions 35 · network_robustness 33 · audit 31 ·
+output_secrets 41 · semantic 35 · regressions 35 · network_robustness 33 · audit 35 ·
 review 32 · api 29 · canary 24 · memory 27 · web 23 · pipeline 23 · verdict 19 ·
-backend_auto 12 · playground 18 · cli_backend_announce 5 · canary_cost 7 ·
-threshold_sweep 9 · concurrency 4 · rules_redos 9 · agent_bench 10 · preprocess 8 ·
-engine 7 · decoder 6 · pint_shape 5。
+passthrough_scan 16 · backend_auto 12 · playground 18 · canary_issue_quota 9 ·
+threshold_sweep 9 · concurrency 4 · canary_cost 7 · cli_backend_announce 5 ·
+agent_bench 10 · rules_redos 9 · preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
 
 评测报告落在 `reports/ablation.json`，可直接画图。
 `reports/ablation_public.json` 是同一套配置只在公开集上的独立复跑，用于交叉验证

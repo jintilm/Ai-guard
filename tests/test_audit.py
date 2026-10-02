@@ -15,6 +15,7 @@ import pytest
 from prompt_ids.audit.events import (
     KIND_LEAK,
     KIND_MEMORY,
+    KIND_PROXY,
     KIND_SCAN,
     AuditEvent,
     event_from_scan,
@@ -59,9 +60,16 @@ def test_event_from_scan_does_not_carry_text():
 
 
 def test_event_is_blocking():
+    """`is_blocking` 只回答「请求被拦了吗」。
+
+    此前 `leak` 事件也算 blocking —— 那是响应侧的事，混进来之后
+    报表上的「拦截数」既不是拦截数也不是处置数。
+    """
     blocked = AuditEvent(ts=0, kind=KIND_SCAN, action="block")
     leaked = AuditEvent(ts=0, kind=KIND_LEAK)
-    assert blocked.is_blocking and leaked.is_blocking
+    assert blocked.is_blocking
+    assert not leaked.is_blocking, "令牌泄漏不是请求被拦"
+    assert leaked.leaked, "但它确实是泄漏"
     assert not AuditEvent(ts=0, kind=KIND_SCAN, action="pass").is_blocking
 
 
@@ -180,8 +188,114 @@ def test_summarize_groups(logfile):
     summary = summarize(load(logfile))
     assert summary.total == 3
     assert summary.by_level["critical"] == 1
-    assert summary.blocked == 2  # block + leak
+    # 三个口径正交：leak 事件是「令牌露了」，**不是**「请求被拦」
+    assert summary.blocked == 1, "泄漏事件被算成拦截了"
+    assert summary.leaked == 1
+    assert summary.outbound_acted == 0, "leak 事件没做任何处置，别算成已处置"
     assert summary.avg_detect_ms == pytest.approx(11.67, abs=0.1)
+
+
+def _proxy_event(decision: str, outbound: str = "", **extra) -> AuditEvent:
+    """构造一条**形态与真实代理事件一致**的记录。
+
+    `action` 要跟 `decision` 对齐（真实事件由 `event_from_proxy` 从
+    ScanResult 填），否则就是在拿一个现实中不存在的样本测口径。
+    """
+    payload = {"decision": decision, "outbound": outbound}
+    payload.update(extra)
+    action = "block" if decision == "block" else "pass"
+    return AuditEvent(ts=1.0, kind=KIND_PROXY, level="low", action=action, extra=payload)
+
+
+def test_real_proxy_event_agrees_between_the_two_readings():
+    """`is_blocking`（读 action）与聚合口径（读 extra.decision）必须在真实数据上一致。
+
+    两处实现分家是很隐蔽的坑：事件级判定说「拦了」、报表说「没拦」，
+    而两边都绿。守护钉在 `event_from_proxy` + 真实 `ScanResult` 上。
+    """
+    from prompt_ids.audit.events import event_from_proxy
+    from prompt_ids.audit.query import decision_of, summarize
+    from prompt_ids.core.pipeline import create_pipeline
+
+    pipeline = create_pipeline()
+    try:
+        blocked = event_from_proxy(pipeline.scan(ATTACK), decision="block",
+                                   path="/v1/chat/completions", text=ATTACK)
+        assert blocked.is_blocking, "真实被拦事件必须 is_blocking"
+        assert decision_of(blocked) == "block"
+        assert summarize([blocked]).blocked == 1
+
+        # 放行 + 响应被脱敏：请求没被拦，但响应侧动了手
+        redacted = event_from_proxy(pipeline.scan(BENIGN), decision="allow",
+                                    path="/v1/chat/completions", text=BENIGN,
+                                    outbound="redacted")
+        assert not redacted.is_blocking
+        assert redacted.outbound_acted
+        s = summarize([redacted])
+        assert (s.blocked, s.outbound_acted) == (0, 1), s.as_dict()
+    finally:
+        pipeline.close()
+
+
+def test_blocked_and_outbound_acted_are_orthogonal_counters():
+    """「请求被拦」与「响应侧已处置」必须能分开数。
+
+    此前 `blocked = decision in BLOCK_ACTIONS or kind == "leak"`，
+    而报告行自称「阻断/泄漏」—— 读的人无法知道差值是「放行了」
+    还是「已处置但没拦」。这是本项要修的东西。
+    """
+    events = [
+        _proxy_event("block"),                       # 真的被拒
+        _proxy_event("allow", "redacted"),           # 放行但脱敏了
+        _proxy_event("allow", "replaced"),           # 放行但响应被替换（canary 泄漏）
+        _proxy_event("allow", "warned"),             # 流式：已发出，只能告警
+        _proxy_event("allow"),                       # 纯放行
+    ]
+    summary = summarize(events)
+    assert summary.blocked == 1, summary.as_dict()
+    assert summary.outbound_acted == 2, "redacted + replaced 算处置；warned 不算"
+    assert summary.leaked == 2, "replaced + warned 都是令牌确实露了"
+    assert summary.total == 5
+    # 报告行必须把三个数分开写，不能再合成一个「阻断/泄漏」
+    from prompt_ids.audit.query import render_report
+
+    report = render_report(events)
+    assert "阻断/泄漏" not in report, "报告还在用合并口径"
+    for label in ("请求被拦", "响应侧已处置", "令牌泄漏"):
+        assert label in report, f"报告没写 {label}"
+
+
+def test_legacy_outbound_decisions_are_not_counted_as_blocked():
+    """老日志把出站结论塞在 decision 里（leak/redact_secrets/secret_leak）。
+
+    那三个值在 `by_decision` 里仍会出现（保留原始信息），但**绝不能**
+    计入「请求被拦」—— 它们是响应侧发生的事。
+    """
+    events = [
+        _proxy_event("leak"),                  # legacy：响应被替换
+        _proxy_event("redact_secrets"),        # legacy：已脱敏
+        _proxy_event("secret_leak"),           # legacy：流式已发出
+        _proxy_event("block"),
+    ]
+    summary = summarize(events)
+    assert summary.blocked == 1, summary.as_dict()
+    assert summary.outbound_acted == 2, "legacy 的 leak + redact_secrets 都算已处置"
+    assert summary.leaked == 2, "legacy 的 leak + secret_leak 都是令牌露了"
+    assert summary.by_outbound["redacted"] == 1
+    assert summary.by_outbound["replaced"] == 1
+    assert summary.by_outbound["warned"] == 1
+
+
+def test_audit_event_flags_match_the_counters():
+    """事件级判定与聚合计数必须一致（两处实现容易漂）。"""
+    blocked = _proxy_event("block")
+    redacted = _proxy_event("allow", "redacted")
+    warned = _proxy_event("allow", "warned")
+    assert blocked.is_blocking and not blocked.outbound_acted
+    assert not redacted.is_blocking and redacted.outbound_acted
+    assert warned.leaked and not warned.outbound_acted, \
+        "流式已发出就撤回不了，不能算成「处置了」"
+    assert summarize([blocked, redacted, warned]).as_dict()["outbound_acted"] == 1
 
 
 def test_last_hours_filters():

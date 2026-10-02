@@ -14,7 +14,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from prompt_ids.audit.events import AuditEvent
+from prompt_ids.audit.events import LEGACY_OUTBOUND_DECISIONS, AuditEvent
 from prompt_ids.audit.logger import disk_usage, file_size
 from prompt_ids.audit.query import (
     last_hours,
@@ -53,18 +53,28 @@ def cmd_summary(args: argparse.Namespace) -> int:
         return 1
     print(f"文件: {args.path}  ({file_size(args.path) / 1024:.1f} KB，"
           f"含轮转 {disk_usage(args.path) / 1024:.1f} KB)")
-    print(f"事件: {summary.total}  阻断/泄漏: {summary.blocked}")
+    print(f"事件: {summary.total}  请求被拦: {summary.blocked}"
+          f"  放行但标记: {summary.noticed}"
+          f"  响应侧已处置: {summary.outbound_acted}"
+          f"  令牌泄漏: {summary.leaked}")
     print(f"耗时: 平均 {summary.avg_detect_ms:.2f} ms  P95 {summary.p95_detect_ms:.2f} ms")
     if summary.span_s > 0:
         print(f"跨度: {summary.span_s / 3600:.1f} 小时")
     for name, mapping in (
         ("类型", summary.by_kind), ("等级", summary.by_level),
         ("动作", summary.by_action), ("决策", summary.by_decision),
-        ("来源", summary.by_source),
+        ("出站", summary.by_outbound), ("来源", summary.by_source),
     ):
         if mapping:
             detail = "  ".join(f"{k}={v}" for k, v in mapping.items())
             print(f"{name}: {detail}")
+    # 老日志里出站结论塞在 decision 里（leak/redact_secrets/secret_leak），
+    # 单看「决策」那一行会以为那是三种请求处置。明确提示它们的正确去处。
+    legacy = {k: v for k, v in (summary.by_decision or {}).items()
+              if k in LEGACY_OUTBOUND_DECISIONS}
+    if legacy:
+        print(f"⚠ 「决策」里的 {sorted(legacy)} 是**旧日志**把出站结论写在 decision 里，"
+              f"不是请求处置；它们已计入上面的「出站」与「响应侧已处置」。")
     return 0
 
 

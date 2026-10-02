@@ -200,6 +200,9 @@ def test_metrics_expose_the_effective_backend_and_guard_state():
         _status, body = handle_metrics(ctx, None, {})
         assert "guard" in body, "限流/缓存状态没有出口"
         assert "cache" in body["guard"] and "rate_limited" in body["guard"]
+        # 缓存是进程内的：读数必须带 scope，否则多实例部署时那个命中率
+        # 会被当成全局指标（当前部署是单实例，按「适用」处理而非修）
+        assert body["guard"]["cache"]["scope"] == "process"
         assert "semantic" in body and "info" in body["semantic"]
         assert "backend" in body["semantic"]["info"], "看不出实际用的哪个后端"
     finally:

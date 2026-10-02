@@ -44,6 +44,11 @@ class LRUCache:
     **加锁**：代理/REST 是每请求一线程，共享同一个 Pipeline（因而共享同一个
     cache）。原来无锁时 `put` 里的 `while len > size: popitem` 不是原子序列 ——
     超额淘汰，而 `hits`/`misses` 计数漂移 ⇒ `/v1/metrics` 的 `cache_hits` 不可信。
+
+    ⚠ **缓存是进程内的**（`stats()["scope"] == "process"`）：多实例部署时每个
+    实例各有一份，命中率**不可横向比较**，也没有跨实例失效。当前部署形态是
+    单实例（127.0.0.1 绑定的 api/proxy/web），所以按「适用」处理而不是修 ——
+    但读数里必须带 `scope`，否则多实例时那个命中率会被当成全局指标。
     """
 
     def __init__(self, size: int = 1_000, ttl_s: float = 300.0):
@@ -180,7 +185,7 @@ class Guard:
 
     def stats(self) -> dict[str, Any]:
         return {
-            "cache": self.cache.stats(),
+            "cache": {**self.cache.stats(), "scope": "process"},
             "rate_limit": self.config.rate_limit,
             "rate_window_s": self.config.rate_window_s,
             "rate_limited": self.rate_limited,

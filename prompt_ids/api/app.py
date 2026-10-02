@@ -46,6 +46,8 @@ class ApiContext:
         audit_path: str = "",
         review_corpus: Any | None = None,
         review_corpus_path: str = "",
+        canary_issue_limit: int = 0,
+        canary_issue_window_s: float = 60.0,
     ):
         self.pipeline = pipeline or create_pipeline(
             config=PipelineConfig(
@@ -68,6 +70,10 @@ class ApiContext:
         else:
             self.review_corpus = None
         self.started_at = time.time()
+        # 签发配额放在 ctx 上（而不是只留在 config 里）：`/v1/metrics` 只拿到
+        # ctx，而「配额是多少」正是运维要看的那个数。
+        self.canary_issue_limit = canary_issue_limit
+        self.canary_issue_window_s = canary_issue_window_s
         self._lock = threading.Lock()
         self.stats: dict[str, Any] = {
             "scans": 0,
@@ -76,6 +82,7 @@ class ApiContext:
             "blocked": 0,
             "canary_checks": 0,
             "canary_leaks": 0,
+            "canary_issues": 0,
             "output_checks": 0,
             "output_secret_hits": 0,
         }
@@ -95,6 +102,12 @@ class ApiContext:
             self.stats["canary_checks"] += 1
             if leaked:
                 self.stats["canary_leaks"] += 1
+
+    def record_canary_issue(self, label: str) -> None:
+        with self._lock:
+            self.stats["canary_issues"] = self.stats.get("canary_issues", 0) + 1
+            key = f"canary_issue:{label}"
+            self.stats[key] = self.stats.get(key, 0) + 1
 
     def record_output_scan(self, hits: int) -> None:
         with self._lock:
@@ -288,11 +301,25 @@ def handle_canary_issue(ctx: ApiContext, payload: Any, params: dict) -> tuple[in
         raise ApiError(404, "not_enabled", "Canary 未启用，启动时加 --canary")
     label = str(_optional_key(payload, "label", "api") or "api")
     token = ctx.canary.issue(label)
-    return 200, {
+    ctx.record_canary_issue(label)
+    # 签发必须留痕：这个端点明文返回完整令牌，此前它不留任何记录，
+    # 于是「谁签了多少」在日志里根本不存在。审计只落**脱敏**令牌。
+    if ctx.audit is not None:
+        ctx.audit.log_canary_issue(token, source="api")
+    body = {
         "token": token.value,          # 服务端签发，需要把完整值交回调用方
         "label": token.label,
         "guard_instruction": token.guard_instruction(),
     }
+    # 回显当前保留窗口：签发出去的历史令牌仍会被检出，但退役窗口之外的不再匹配。
+    # 不回显的话调用方只会以为「签了就有用」，而实际窗口是有限的。
+    stats = ctx.canary.stats()
+    body["retention"] = {
+        "max_tokens": stats.get("max_tokens", 0),
+        "max_retired": stats.get("max_retired", 0),
+        "tokens_known": len(ctx.canary),
+    }
+    return 200, body
 
 
 def handle_canary_check(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
@@ -596,6 +623,14 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
             "info": ctx.pipeline.semantic_detector.stats() if ctx.pipeline.semantic_detector else {},
         },
         "canary": ctx.canary.stats() if ctx.canary else None,
+        # 签发配额状态：默认开着（30/分钟·每身份），未鉴权部署下这是唯一的护栏
+        "canary_issue_limit": (
+            {
+                "limit": getattr(ctx, "canary_issue_limit", None),
+                "window_s": getattr(ctx, "canary_issue_window_s", None),
+            }
+            if ctx.canary is not None else None
+        ),
         "reviews": ctx.review_stats(),
     }
 

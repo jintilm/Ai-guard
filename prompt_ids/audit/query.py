@@ -18,10 +18,13 @@ from typing import Any, Iterable, Sequence
 
 from prompt_ids.eval.metrics import markdown_table
 from prompt_ids.audit.events import (
+    KIND_LEAK,
     LEGACY_OUTBOUND_DECISIONS,
     OUTBOUND_NONE,
     OUTBOUND_REDACTED,
+    OUTBOUND_REJECTED,
     OUTBOUND_REPLACED,
+    OUTBOUND_WARNED,
     REVIEW_LEVELS,
     AuditEvent,
 )
@@ -155,6 +158,21 @@ def pending_reviews(events: Sequence[AuditEvent], limit: int = 20) -> list[Audit
     return out
 
 
+#: 响应侧「真的做了处置」的取值。`warned` 不在其中：内容已经发出去了。
+_ACTED_OUTBOUND = frozenset({OUTBOUND_REDACTED, OUTBOUND_REPLACED, OUTBOUND_REJECTED})
+#: 「令牌确实露了」的取值（含只能事后告警的流式）。
+_LEAKED_OUTBOUND = frozenset({OUTBOUND_REPLACED, OUTBOUND_WARNED})
+
+
+def _acted(event: AuditEvent) -> bool:
+    """读历史事件时也要走 outbound_of()（那里才有 legacy 值映射）。"""
+    return outbound_of(event) in _ACTED_OUTBOUND
+
+
+def _leaked(event: AuditEvent) -> bool:
+    return event.kind == KIND_LEAK or outbound_of(event) in _LEAKED_OUTBOUND
+
+
 def decision_of(event: AuditEvent) -> str:
     """统一读取「放行 / 拦截」语义。
 
@@ -231,6 +249,11 @@ class AuditSummary:
     by_source: dict[str, int] = None  # type: ignore[assignment]
     blocked: int = 0
     noticed: int = 0
+    #: 响应侧**真的做了处置**（脱敏 / 替换 / 拒收）。与 `blocked` 正交：
+    #: 一个请求可以被放行、而它的响应被脱敏；也可以被拦下、而响应压根没发生。
+    outbound_acted: int = 0
+    #: Canary 令牌确实出现在输出里（含「只能事后告警」的流式）。
+    leaked: int = 0
     avg_detect_ms: float = 0.0
     p95_detect_ms: float = 0.0
     span_s: float = 0.0
@@ -244,9 +267,17 @@ class AuditSummary:
             "by_decision": dict(self.by_decision or {}),
             "by_outbound": dict(self.by_outbound or {}),
             "by_source": dict(self.by_source or {}),
+            # 三个正交的口径，别再混成一个「阻断/泄漏」：
+            #   blocked        请求被拒
+            #   outbound_acted 响应侧做了处置（脱敏/替换/拒收）
+            #   leaked         令牌确实露了
+            # 历史日志里出站结论塞在 decision 里（leak/redact_secrets/secret_leak），
+            # 那三个值在 by_decision 里仍会出现，但它们的处置在 by_outbound。
             "blocked": self.blocked,
             # 放行但被标记（sandbox / review）：不算拦截，但要看得到
             "noticed": self.noticed,
+            "outbound_acted": self.outbound_acted,
+            "leaked": self.leaked,
             "avg_detect_ms": round(self.avg_detect_ms, 2),
             "p95_detect_ms": round(self.p95_detect_ms, 2),
             "span_s": round(self.span_s, 1),
@@ -277,10 +308,15 @@ def summarize(events: Sequence[AuditEvent]) -> AuditSummary:
         by_decision=_tally(events, decision_of),
         by_outbound=_tally(events, outbound_of),
         by_source=_tally(events, lambda e: e.source),
-        blocked=sum(
-            1 for e in events if decision_of(e) in BLOCK_ACTIONS or e.kind == "leak"
-        ),
+        # `blocked` 只认**请求处置**。此前 `or e.kind == "leak"` 把「输出里
+        # 出现了 Canary 令牌」也算成拦截 —— 那是响应侧的事。混在一起的直接后果：
+        # 报表写「阻断/泄漏 N」，而代理日志里真正被拒的只有其中一部分，
+        # 读的人无法知道差值是「放行了」还是「已处置但没拦」。
+        blocked=sum(1 for e in events if decision_of(e) in BLOCK_ACTIONS),
         noticed=sum(1 for e in events if decision_of(e) in NOTICE_ACTIONS),
+        # 用 outbound_of() 而不是直接读 extra：历史日志的出站结论在 decision 里
+        outbound_acted=sum(1 for e in events if _acted(e)),
+        leaked=sum(1 for e in events if _leaked(e)),
         avg_detect_ms=sum(durations) / len(durations) if durations else 0.0,
         p95_detect_ms=percentile(durations, 0.95) if durations else 0.0,
         span_s=(max(timestamps) - min(timestamps)) if len(timestamps) > 1 else 0.0,
@@ -305,8 +341,16 @@ def render_report(events: Sequence[AuditEvent], title: str = "审计摘要") -> 
         return f"## {title}\n\n（无记录）"
 
     lines = [f"## {title}", ""]
-    lines.append(f"- 事件总数：**{summary.total}**，其中阻断/泄漏 **{summary.blocked}**"
-                 f"（放行但被标记 sandbox/review **{summary.noticed}**，不计入阻断）")
+    # 三个口径分开写：混成「阻断/泄漏 N」时，读的人无法知道差值是
+    # 「放行了」还是「已处置但没拦」—— 这正是本项要修的东西。
+    lines.append(
+        f"- 事件总数 **{summary.total}** ｜ 请求被拦 **{summary.blocked}**"
+        f" ｜ 放行但标记（sandbox/review）**{summary.noticed}**"
+        f" ｜ 响应侧已处置 **{summary.outbound_acted}**"
+        f" ｜ 令牌泄漏 **{summary.leaked}**"
+    )
+    lines.append("  （三者正交：响应被脱敏/替换的请求**不在**「请求被拦」里；"
+                 "流式只能事后告警的泄漏**不在**「响应侧已处置」里。）")
     lines.append(f"- 平均检测耗时 {summary.avg_detect_ms:.2f} ms，P95 {summary.p95_detect_ms:.2f} ms")
     if summary.span_s > 0:
         lines.append(f"- 时间跨度 {summary.span_s / 3600:.1f} 小时")

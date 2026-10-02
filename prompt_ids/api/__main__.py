@@ -24,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rate-window", type=float, default=60.0)
     parser.add_argument("--no-cors", action="store_true")
     parser.add_argument("--canary", action="store_true", help="启用 Canary 端点")
+    parser.add_argument("--canary-issue-limit", type=int, default=30,
+                        help="POST /v1/canary/issue 每身份的窗口内签发上限，"
+                             "0 = 关闭（默认 30；该端点明文返回完整令牌，默认开着）")
+    parser.add_argument("--canary-issue-window", type=float, default=60.0)
     parser.add_argument("--semantic", action="store_true", help="启用 L3 语义层")
     parser.add_argument("--semantic-mode", default="fallback")
     parser.add_argument("--memory", action="store_true", help="启用 L4 向量记忆库（自进化）")
@@ -64,7 +68,16 @@ def main(argv: list[str] | None = None) -> int:
         rate_limit=args.rate_limit,
         rate_window_s=args.rate_window,
         cors=not args.no_cors,
+        canary_issue_limit=args.canary_issue_limit,
+        canary_issue_window_s=args.canary_issue_window,
     )
+    # 配额透进 ctx：`/v1/metrics` 只拿到 ctx，而「配额是多少」正是运维要看的数
+    ctx.canary_issue_limit = config.canary_issue_limit
+    ctx.canary_issue_window_s = config.canary_issue_window_s
+    if args.canary:
+        print(f"Canary: 已启用  签发配额: "
+              f"{config.canary_issue_limit}/{int(config.canary_issue_window_s)}s/身份"
+              f"{'（已关闭）' if not config.canary_issue_limiter else ''}")
     serve(ctx, config)
     return 0
 

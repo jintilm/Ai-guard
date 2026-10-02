@@ -11,16 +11,20 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-# 事件类型：检测 / Canary 泄漏 / 记忆写入 / API 请求 / 代理转发 / 人工复核 / 自定义
+# 事件类型：检测 / Canary 泄漏 / Canary 签发 / 记忆写入 / API 请求 / 代理转发 /
+# 人工复核 / 自定义
 KIND_SCAN = "scan"
 KIND_LEAK = "leak"
+#: 令牌**签发**（与 KIND_LEAK 分开：签发不是泄漏，但「谁签了多少」必须可查）
+KIND_CANARY = "canary"
 KIND_MEMORY = "memory"
 KIND_API = "api"
 KIND_PROXY = "proxy"
 KIND_REVIEW = "review"
 KIND_CUSTOM = "custom"
 
-EVENT_KINDS = (KIND_SCAN, KIND_LEAK, KIND_MEMORY, KIND_API, KIND_PROXY, KIND_REVIEW, KIND_CUSTOM)
+EVENT_KINDS = (KIND_SCAN, KIND_LEAK, KIND_CANARY, KIND_MEMORY, KIND_API, KIND_PROXY,
+               KIND_REVIEW, KIND_CUSTOM)
 
 # 复核事件特有字段（收进 extra，与代理同款做法：不另起一套记录类型）
 REVIEW_EXTRA_FIELDS = ("verdict", "reviewer", "memory_absorbed", "linked_level", "top_pattern")
@@ -115,7 +119,32 @@ class AuditEvent:
 
     @property
     def is_blocking(self) -> bool:
-        return self.action == "block" or self.kind == KIND_LEAK
+        """**这个请求被拦下了吗**（只认请求处置）。
+
+        此前 `or self.kind == KIND_LEAK` 把「输出里出现了 Canary 令牌」也算成
+        拦截 —— 那是**响应侧**发生的事，与请求是否被拒无关。两者混在一个数里，
+        报表上就会出现「拦了 5 次」而实际只拒了 2 次。响应侧的结论分别看
+        `outbound_acted`（真做了处置）与 `leaked`（令牌确实露了）。
+        """
+        return self.action == "block"
+
+    @property
+    def outbound_acted(self) -> bool:
+        """响应出去时**真的做了处置**吗（脱敏 / 替换 / 拒收）。
+
+        「流式只能事后告警」（`warned`）**不算**：内容已经发出去了，
+        把它算成「处置了」就是自欺 —— 审计 note 里也明写「无法撤回」。
+        """
+        return (self.extra or {}).get("outbound") in {
+            OUTBOUND_REDACTED, OUTBOUND_REPLACED, OUTBOUND_REJECTED,
+        }
+
+    @property
+    def leaked(self) -> bool:
+        """Canary 令牌真的出现在输出里了吗（不论事后有没有处置）。"""
+        if self.kind == KIND_LEAK:
+            return True
+        return (self.extra or {}).get("outbound") in {OUTBOUND_REPLACED, OUTBOUND_WARNED}
 
 
 def event_from_scan(result, *, text: str = "", user: str = "",
