@@ -5,15 +5,15 @@
     "missed": []
   },
   "benign": {
-    "n": 5584,
+    "n": 5586,
     "groups": {
       "corpus": {
         "n": 5449,
         "flagged": 0
       },
       "repo": {
-        "n": 135,
-        "flagged": 3
+        "n": 137,
+        "flagged": 4
       }
     },
     "flagged": [
@@ -39,6 +39,16 @@
         ]
       },
       {
+        "source": "test_network_robustness.py",
+        "group": "repo",
+        "kinds": [
+          "aws_access_key"
+        ],
+        "masked": [
+          "AKIA…LE"
+        ]
+      },
+      {
         "source": "test_output_secrets.py",
         "group": "repo",
         "kinds": [
@@ -55,7 +65,7 @@
         "masked": [
           "AKIA…LE",
           "xoxb…Wx",
-          "AKIA…LE"
+          "sk-a…ts"
         ]
       }
     ],
@@ -76,6 +86,14 @@
           "aws_access_key": 1
         }
       },
+      "test_network_robustness.py": {
+        "n": 1,
+        "fp": 1,
+        "group": "repo",
+        "kinds": {
+          "aws_access_key": 1
+        }
+      },
       "test_output_secrets.py": {
         "n": 1,
         "fp": 1,
@@ -88,7 +106,7 @@
           "google_api_key": 1,
           "github_token": 1,
           "gitlab_token": 1,
-          "private_key": 1,
+          "private_key": 4,
           "bearer_header": 1
         }
       }

@@ -15,7 +15,7 @@ from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
 from prompt_ids.memory.detector import MemoryDetector
-from prompt_ids.output import redact, scan_secrets, summary
+from prompt_ids.output import MAX_HITS, redact, scan_text
 
 MAX_TEXT_CHARS = 50_000
 MAX_BATCH = 200
@@ -150,11 +150,61 @@ def _optional_key(payload: Any, name: str, default=None):
     return payload.get(name, default) if isinstance(payload, dict) else default
 
 
+def _require_bool(payload: Any, name: str, default: bool) -> bool:
+    """布尔字段必须是 JSON 布尔。
+
+    `bool(payload["is_attack"])` 会把字符串 `"false"` 判成 **True** ——
+    于是一条良性文本被当成「已确认攻击」写进记忆库与复核语料，
+    之后所有相似请求都被判高危。`1`/`0` 也不接受：它们与 `"1"` 混用时，
+    调用方自己都说不清写的是什么。
+    """
+    if not isinstance(payload, dict):
+        return default
+    value = payload.get(name, default)
+    if not isinstance(value, bool):
+        raise ApiError(400, "bad_request", f"{name} 必须是 JSON 布尔 true/false")
+    return value
+
+
+def _require_int(payload: Any, name: str, default: int, *, low: int | None = None,
+                 high: int | None = None) -> int:
+    """整数字段做类型 + 范围校验，让 ValueError 变成 400 而不是 500。"""
+    if not isinstance(payload, dict):
+        return default
+    value = payload.get(name, default)
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ApiError(400, "bad_request", f"{name} 必须是整数")
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        raise ApiError(400, "bad_request", f"{name} 必须是整数")
+    if low is not None and number < low:
+        raise ApiError(400, "bad_request", f"{name} 不能小于 {low}")
+    if high is not None and number > high:
+        raise ApiError(400, "bad_request", f"{name} 不能大于 {high}")
+    return number
+
+
+def _require_str(payload: Any, name: str, default: str = "", *, choices=None) -> str:
+    value = payload.get(name, default) if isinstance(payload, dict) else default
+    if value is None:
+        value = default
+    if not isinstance(value, str):
+        raise ApiError(400, "bad_request", f"{name} 必须是字符串")
+    if choices and value not in choices:
+        raise ApiError(400, "bad_request", f"{name} 只能是 {sorted(choices)}")
+    return value
+
+
 # ---------------------------------------------------------------- 处理器
 def handle_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     text = _require_text(payload)
-    user = str(_optional_key(payload, "user", "api") or "api")
-    policy = _optional_key(payload, "policy", None)
+    user = _require_str(payload, "user", "api") or "api"
+    # policy 原样透传给 PolicyEngine：`[]`/`{}` 会变成 `TypeError: unhashable` → 500。
+    # 这里先做类型校验，未知策略名交给 PolicyEngine.resolve（它会响亮回退并可见）。
+    policy = payload.get("policy") if isinstance(payload, dict) else None
+    if policy is not None and not isinstance(policy, str):
+        raise ApiError(400, "bad_request", "policy 必须是字符串（default/strict/permissive/log-only）")
     result = ctx.pipeline.scan(text, user=user, policy_name=policy)
     ctx.record(result)
     if ctx.audit is not None:
@@ -252,14 +302,18 @@ def handle_output_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int
     以及检测台里手贴一段输出试阈值。
     """
     text = _require_text(payload)
-    hits = scan_secrets(text)
-    ctx.record_output_scan(len(hits))
+    scan = scan_text(text)
+    ctx.record_output_scan(len(scan))
+    reported = scan.reported(MAX_HITS)
     return 200, {
-        "found": len(hits),
-        "by_kind": summary(hits),
+        "found": len(scan),
+        "by_kind": scan.by_kind,
+        # 上限只影响上报条数；脱敏走全量命中，所以「found > secrets 长度」是正常的
+        "reported": len(reported),
+        "truncated": len(reported) < len(scan),
         # 只回脱敏形态与类别：把完整凭据回吐给调用方等于凭空多一个泄露面
-        "secrets": [h.as_dict() for h in hits],
-        "redacted": redact(text, hits),
+        "secrets": [h.as_dict() for h in reported],
+        "redacted": redact(text, scan.hits),
     }
 
 
@@ -279,17 +333,29 @@ def handle_memory_add(ctx: ApiContext, payload: Any, params: dict) -> tuple[int,
         raise ApiError(400, "bad_request", "需要 text 或 texts 字段")
     if len(texts) > MAX_BATCH:
         raise ApiError(413, "payload_too_large", f"批量上限 {MAX_BATCH} 条")
-    label = int(payload.get("label", 1))
-    source = str(payload.get("source", "api"))
-    added = mem.learn_many([str(t) for t in texts], label=label, source=source)
-    return 200, {"requested": len(texts), "added": added, "total": len(mem.store)}
+    label = _require_int(payload, "label", 1, low=0, high=1)
+    source = _require_str(payload, "source", "api")
+    # 单条长度也要卡：不卡的话一条 2MB 文本就能吃掉编码器的 CPU 与 20000 条配额
+    cleaned: list[str] = []
+    for item in texts:
+        if not isinstance(item, str):
+            raise ApiError(400, "bad_request", "texts 里每一项都必须是字符串")
+        if len(item) > MAX_TEXT_CHARS:
+            raise ApiError(413, "payload_too_large",
+                           f"单条文本超过上限 {MAX_TEXT_CHARS} 字符")
+        cleaned.append(item)
+    added = mem.learn_many(cleaned, label=label, source=source)
+    return 200, {"requested": len(cleaned), "added": added, "total": len(mem.store)}
 
 
 def handle_memory_search(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     mem = _require_memory(ctx)
     text = _require_text(payload)
-    k = int(payload.get("k", 5)) if isinstance(payload, dict) else 5
-    vector = mem.encoder.encode_one(text)
+    k = _require_int(payload, "k", 5, low=1, high=20)
+    try:
+        vector = mem.encoder.encode_one(text)
+    except Exception as exc:  # 编码器不可用（模型没下载/维度不对）不该变成 500
+        raise ApiError(503, "encoder_unavailable", f"编码器不可用：{type(exc).__name__}")
     hits = mem.store.search(vector, k=min(k, 20))
     return 200, {
         "count": len(hits),
@@ -310,7 +376,8 @@ def handle_memory_feedback(ctx: ApiContext, payload: Any, params: dict) -> tuple
     """人工反馈：误报标记会写成负向记忆，下次把分数压下去。"""
     mem = _require_memory(ctx)
     text = _require_text(payload)
-    is_attack = bool(payload.get("is_attack", True))
+    # 必须是真布尔：`bool("false")` 是 True，会把良性文本写成「已确认攻击」
+    is_attack = _require_bool(payload, "is_attack", True)
     ok = mem.feedback(text, is_attack=is_attack, note="api feedback")
     return 200, {
         "recorded": ok,
@@ -361,9 +428,11 @@ def handle_review(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
     text = _require_text(payload)
     if "is_attack" not in payload:
         raise ApiError(400, "bad_request", "缺少 is_attack 字段（true=确认攻击，false=误报）")
-    is_attack = bool(payload["is_attack"])
-    reviewer = str(payload.get("reviewer") or "api")
-    note = str(payload.get("note") or "")
+    # 必须真布尔：`bool("false")` 是 True ⇒ 一条良性文本被当成「已确认攻击」
+    # 写进记忆库与复核语料，规则迭代语料与后续判定一起被污染。
+    is_attack = _require_bool(payload, "is_attack", True)
+    reviewer = _require_str(payload, "reviewer", "api")
+    note = _require_str(payload, "note", "")
 
     try:
         outcome = ctx.pipeline.review(text, is_attack=is_attack, reviewer=reviewer, note=note)
@@ -493,10 +562,16 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
     det = ctx.rule_detector
     book = det.rulebook if det and hasattr(det, "rulebook") else None
     uptime = time.time() - ctx.started_at
+    # stats 必须在锁内取**快照**：`dict(ctx.stats)` 只是浅拷贝，
+    # by_level / by_action 还是同一批 dict 对象，随后被 json.dumps 遍历，
+    # 而别的线程正在 record() 里插入 —— 序列化中途抛 RuntimeError 是真会发生的。
+    with ctx._lock:
+        stats = {k: (dict(v) if isinstance(v, dict) else v)
+                 for k, v in ctx.stats.items()}
     return 200, {
         "uptime_s": round(uptime, 1),
         "rules": book.stats() if book else {},
-        "stats": dict(ctx.stats),
+        "stats": stats,
         "detectors": ctx.pipeline.registry.names(),
         "semantic": {
             "enabled": bool(ctx.pipeline.semantic_detector and ctx.pipeline.semantic_detector.enabled),

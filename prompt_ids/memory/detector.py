@@ -82,7 +82,10 @@ class MemoryDetector(Detector):
         # 全角逗号「，」被 NFKC 转成半角就让 DeBERTa 相似度从 0.99 掉到 0.57
         self.normalizer = Normalizer()
 
-        self.last_hits: list = []
+        # `last_hits` 是**线程局部**的：它承担的是「本次检索的结果要递给
+        # contribution()」这条通道。放实例字段上时，两个并发请求会互相覆盖 ——
+        # A 的贡献分可能读到 B 的相似度，等于给错请求加减分。
+        self._tls = threading.local()
         self.learned = 0
         self.deduped = 0
         self.rejected = 0
@@ -93,6 +96,15 @@ class MemoryDetector(Detector):
         self._lock = threading.Lock()
         # 已入库的规范指纹，用于 O(1) 判重（见 _known_fps 的自愈逻辑）
         self._fp_set: set[str] = set()
+
+    @property
+    def last_hits(self) -> list:
+        """**当前线程**最近一次检索命中。别的线程读不到 —— 这是刻意的。"""
+        return getattr(self._tls, "hits", [])
+
+    @last_hits.setter
+    def last_hits(self, hits: list) -> None:
+        self._tls.hits = hits
 
     def _normalize(self, text: str) -> str:
         return self.normalizer.canonical(text or "").strip()
@@ -147,7 +159,7 @@ class MemoryDetector(Detector):
 
         self.queries += 1
         hits = self.store.search(vector, k=self.top_k)
-        self.last_hits = hits
+        self.last_hits = hits  # 线程局部，见 __init__ 处的说明
         if not hits:
             return []
 

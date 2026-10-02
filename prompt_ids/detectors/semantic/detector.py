@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -44,6 +45,7 @@ class SemanticDetector(Detector):
         backend: SemanticBackend | str | None = None,
         timeout_s: float | None = None,
         backend_kwargs: dict[str, Any] | None = None,
+        max_workers: int = 4,
     ):
         super().__init__(enabled=enabled)
         if mode not in MODES:
@@ -60,8 +62,24 @@ class SemanticDetector(Detector):
         self.errors = 0
         self.total_latency_ms = 0.0
         self.last_error: str | None = None
-        self.last_prediction: Prediction | None = None
+        # `last_prediction` 是**线程局部**的：它承担的是「本次扫描的判决要递给
+        # contribution()」这条通道，而实例字段是全进程共享的 ——
+        # 两个请求并发时，A 写完 last_prediction、B 覆盖它，A 的 contribution()
+        # 就会读到 B 的概率：良性请求继承 0.99 被 block、攻击请求继承 0.0 被放行。
+        # 「ok=False 必须弃票」那条不变量也会被跨线程破坏（读到别人的 ok）。
+        self._tls = threading.local()
         self._executor: ThreadPoolExecutor | None = None
+        self._executor_lock = threading.Lock()
+        self._max_workers = max_workers
+
+    @property
+    def last_prediction(self) -> Prediction | None:
+        """**当前线程**最近一次预测。别的线程读不到 —— 这是刻意的。"""
+        return getattr(self._tls, "prediction", None)
+
+    @last_prediction.setter
+    def last_prediction(self, prediction: Prediction | None) -> None:
+        self._tls.prediction = prediction
 
     # ---------- 构造 ----------
     def _resolve_backend(
@@ -136,7 +154,15 @@ class SemanticDetector(Detector):
         if not self.timeout_s or self.timeout_s <= 0:
             return task()
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="semantic")
+            # 懒初始化必须加锁：否则并发首访会各建一个池，其中一个泄漏。
+            # max_workers 原来是 1：所有请求的 L3 调用排成一条队，而
+            # `.result(timeout=…)` 超时**不取消已提交的任务** ——
+            # 一个慢网关调用（实测 p90 ≈ 40s）会把后面所有请求一起堵住，
+            # 代理的并发在这里等于 1。给一个小的有界池（默认 4）。
+            with self._executor_lock:
+                if self._executor is None:
+                    self._executor = ThreadPoolExecutor(
+                        max_workers=self._max_workers, thread_name_prefix="semantic")
         return self._executor.submit(task).result(timeout=self.timeout_s)
 
     # ---------- Detector 接口 ----------

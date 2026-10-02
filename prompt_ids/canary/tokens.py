@@ -15,7 +15,9 @@ import base64
 import codecs
 import secrets
 import string
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Iterable
 
@@ -142,6 +144,7 @@ class CanaryRegistry:
         tokens: Iterable[CanaryToken] | None = None,
         normalizer: Normalizer | None = None,
         max_decode_hops: int = 2,
+        max_leak_history: int = 500,
     ):
         self._tokens: dict[str, CanaryToken] = {}
         #: 签发顺序（单调递增）。**不能**只靠 issued_at 排序来定「最新」：
@@ -153,9 +156,22 @@ class CanaryRegistry:
             self.register(token)
         self.normalizer = normalizer or Normalizer()
         self.expander = DecodeExpander(max_hops=max_decode_hops, max_variants=12)
-        self.leaks: list[CanaryMatch] = []
+        # `leaks` 是定长队列：原来是无界 list，只 append 不裁剪，
+        # 而 `stats()` 每次 /v1/metrics 都要全量遍历它。
+        self.leaks: deque[CanaryMatch] = deque(maxlen=max_leak_history)
+        # 注册表加锁：`check()` 在遍历 `_tokens.values()` 的同时，
+        # `POST /v1/canary/issue` 可能正在 `register()` 插键 ——
+        # 撞上就是 `RuntimeError: dictionary changed size during iteration`（500）。
+        self._lock = threading.Lock()
         if not self._tokens:
             self.register(issue())
+
+    # ---------- 管理 ----------
+    def register(self, token: CanaryToken) -> CanaryToken:
+        with self._lock:
+            self._tokens[token.value] = token
+            self._order.setdefault(token.value, len(self._order))
+        return token
 
     # ---------- 管理 ----------
     def register(self, token: CanaryToken) -> CanaryToken:
@@ -169,7 +185,8 @@ class CanaryRegistry:
 
     @property
     def current(self) -> CanaryToken:
-        return max(self._tokens.values(), key=self._freshness)
+        with self._lock:
+            return max(self._tokens.values(), key=self._freshness)
 
     def issue(self, label: str = "", **kwargs) -> CanaryToken:
         return self.register(issue(label=label, **kwargs))
@@ -189,7 +206,11 @@ class CanaryRegistry:
         """在文本中查找任一已知令牌。返回首个命中，未命中返回 None。"""
         if not text:
             return None
-        for token in sorted(self._tokens.values(), key=self._freshness, reverse=True):
+        # 先在锁内取快照再遍历：否则与并发 register() 相撞会抛
+        # `RuntimeError: dictionary changed size during iteration`
+        with self._lock:
+            tokens = sorted(self._tokens.values(), key=self._freshness, reverse=True)
+        for token in tokens:
             match = self._match_one(token, text)
             if match:
                 self.leaks.append(match)

@@ -19,7 +19,13 @@ from typing import Any, Iterable, Sequence
 from prompt_ids.eval.metrics import markdown_table
 from prompt_ids.audit.events import REVIEW_LEVELS, AuditEvent
 
-BLOCK_ACTIONS = frozenset({"block", "sandbox"})
+#: 「算拦截」的动作集合。**不含 sandbox** ——
+#: 代理对 sandbox 是**放行 + 记审计**（HTTP 200，见 proxy/server.py 的 decide()），
+#: 只有 `--block-sandbox` 才真拦。把 sandbox 计进来会让「阻断数」虚高，
+#: 而且与 `scripts/threshold_sweep.py` 的口径（已按 sandbox 不算拦截修正）自相矛盾。
+BLOCK_ACTIONS = frozenset({"block"})
+#: 放行但仍被标记为「需要关注」的动作，报表里单独记一笔而不是混进拦截数。
+NOTICE_ACTIONS = frozenset({"sandbox", "review"})
 
 
 def review_verdict(event: AuditEvent) -> str:
@@ -195,6 +201,7 @@ class AuditSummary:
     by_decision: dict[str, int] = None  # type: ignore[assignment]
     by_source: dict[str, int] = None  # type: ignore[assignment]
     blocked: int = 0
+    noticed: int = 0
     avg_detect_ms: float = 0.0
     p95_detect_ms: float = 0.0
     span_s: float = 0.0
@@ -208,6 +215,8 @@ class AuditSummary:
             "by_decision": dict(self.by_decision or {}),
             "by_source": dict(self.by_source or {}),
             "blocked": self.blocked,
+            # 放行但被标记（sandbox / review）：不算拦截，但要看得到
+            "noticed": self.noticed,
             "avg_detect_ms": round(self.avg_detect_ms, 2),
             "p95_detect_ms": round(self.p95_detect_ms, 2),
             "span_s": round(self.span_s, 1),
@@ -240,6 +249,7 @@ def summarize(events: Sequence[AuditEvent]) -> AuditSummary:
         blocked=sum(
             1 for e in events if decision_of(e) in BLOCK_ACTIONS or e.kind == "leak"
         ),
+        noticed=sum(1 for e in events if decision_of(e) in NOTICE_ACTIONS),
         avg_detect_ms=sum(durations) / len(durations) if durations else 0.0,
         p95_detect_ms=percentile(durations, 0.95) if durations else 0.0,
         span_s=(max(timestamps) - min(timestamps)) if len(timestamps) > 1 else 0.0,
@@ -264,7 +274,8 @@ def render_report(events: Sequence[AuditEvent], title: str = "审计摘要") -> 
         return f"## {title}\n\n（无记录）"
 
     lines = [f"## {title}", ""]
-    lines.append(f"- 事件总数：**{summary.total}**，其中阻断/泄漏 **{summary.blocked}**")
+    lines.append(f"- 事件总数：**{summary.total}**，其中阻断/泄漏 **{summary.blocked}**"
+                 f"（放行但被标记 sandbox/review **{summary.noticed}**，不计入阻断）")
     lines.append(f"- 平均检测耗时 {summary.avg_detect_ms:.2f} ms，P95 {summary.p95_detect_ms:.2f} ms")
     if summary.span_s > 0:
         lines.append(f"- 时间跨度 {summary.span_s / 3600:.1f} 小时")

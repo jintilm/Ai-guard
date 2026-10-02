@@ -9,6 +9,7 @@ import json
 import os
 import threading
 import time
+import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -85,7 +86,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         self._send(status, {"error": {"code": code, "message": message}, "status": status})
 
     def _client_id(self) -> str:
-        return self.headers.get("X-API-Key") or self.client_address[0]
+        """限流的分桶键。
+
+        **不能用请求头里的 X-API-Key**：那等于「每次请求换一个 key 就是一个新桶」，
+        令牌桶形同虚设。未鉴权时只按来源 IP；鉴权开启时用**已验证**的 Key
+        （`_authorized()` 已通过），请求头里那个值只在没配 Key 时才作数。
+        """
+        if self.config.api_key:
+            return "key:" + str(self.config.api_key)
+        return "ip:" + str(self.client_address[0])
 
     # ---------- 路由入口 ----------
     def _dispatch(self, method: str, read_body: bool) -> None:
@@ -96,15 +105,18 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         # 鉴权：配置了 Key 就必须提供
         if self.config.auth_required and not self._authorized():
+            self._drain_body()
             self._error(401, "unauthorized", "缺少或错误的 API Key")
             return
 
         # 限流：按 Key 或来源 IP
         if self.config.limiter and not self.config.limiter.try_acquire(self._client_id()):
+            self._drain_body()
             self._error(429, "rate_limited", "请求过于频繁，请稍后再试")
             return
 
         payload: Any = {}
+        query = self._query_dict()
         if read_body:
             try:
                 payload = self._read_json()
@@ -112,15 +124,22 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._error(exc.status, exc.code, exc.message)
                 return
         else:
-            payload = self._query_dict()
+            payload = query
 
         try:
-            status, body = handler(self.ctx, payload, {})
+            # 查询参数**也**作为 params 传进去：`/v1/events?limit=200` 过去是无效的
+            # （params 恒为 {}），而现有守护用的断言在参数失效时同样成立，照不出来。
+            status, body = handler(self.ctx, payload, query)
         except ApiError as exc:
             self._error(exc.status, exc.code, exc.message)
             return
         except Exception as exc:  # 兜底：不让任何异常把服务打挂
-            self._error(500, "internal_error", f"{type(exc).__name__}: {exc}")
+            # **不回显异常文本**：FileNotFoundError 会带绝对路径，第三方 SDK 的异常
+            # 可能带 base_url（内网网关地址，URL 里甚至可能内嵌凭据），而本服务默认不鉴权。
+            # 完整栈写到服务端 stderr（否则就等于把异常静默吞了 —— 「详见日志」不能是空话），
+            # 客户端只拿到错误码。
+            traceback.print_exc()
+            self._error(500, "internal_error", "内部错误，详见服务端日志")
             return
         self._send(status, body)
 
@@ -131,17 +150,56 @@ class ApiHandler(BaseHTTPRequestHandler):
             provided = provided or auth[7:].strip()
         return provided == self.config.api_key
 
+    def _content_length(self) -> int:
+        """解析 Content-Length，非法值必须是 400 而不是 ValueError 冒泡。"""
+        raw = (self.headers.get("Content-Length") or "").strip()
+        if not raw:
+            return 0
+        try:
+            value = int(raw)
+        except ValueError:
+            raise ApiError(400, "bad_request", "Content-Length 不是合法整数")
+        if value < 0:
+            # rfile.read(-1) 会一直读到连接关闭 —— 一个慢连接就能永久占住一个线程
+            raise ApiError(400, "bad_request", "Content-Length 不能为负")
+        return value
+
+    def _drain_body(self) -> None:
+        """把请求体读干净再响应。
+
+        不排空的话，客户端还在发 body 时服务端写错误并关连接 → RST，
+        调用方（OpenAI SDK 等）看到的是 ConnectionResetError 而不是清晰的 4xx。
+        这个坑在 proxy 与 playground 各修过一次，REST 这侧漏了（回归）。
+        """
+        try:
+            remaining = self._content_length()
+        except ApiError:
+            return
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 65536))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+
     def _read_json(self) -> Any:
-        length = int(self.headers.get("Content-Length") or 0)
+        length = self._content_length()
+        if self.headers.get("Transfer-Encoding", "").lower().strip() == "chunked":
+            # 不支持分块：静默当空 body 会让调用方以为请求体被接收了
+            raise ApiError(411, "length_required", "不支持 Transfer-Encoding: chunked，请带 Content-Length")
         if length <= 0:
             return {}
         if length > MAX_BODY_BYTES:
-            raise ApiError(413, "payload_too_large", "请求体过大")
+            self._drain_body()
+            raise ApiError(413, "payload_too_large",
+                           f"请求体过大（{length} 字节 > 上限 {MAX_BODY_BYTES}）")
         raw = self.rfile.read(length)
         try:
             return json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise ApiError(400, "bad_request", "请求体不是合法 JSON")
+        except RecursionError:
+            # 深层嵌套 JSON 会让 json.loads 抛 RecursionError（不是 JSONDecodeError）
+            raise ApiError(400, "bad_request", "请求体嵌套过深")
 
     def _query_dict(self) -> dict:
         query = urllib.parse.urlparse(self.path).query

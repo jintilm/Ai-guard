@@ -191,7 +191,9 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                      status: int = 200, note: str = "", text: str = "",
                      segments: int = 0, trigger: str = "",
                      truncated: int = 0, dropped: int = 0,
-                     scanned_chars: int = 0, secret_kinds: dict | None = None) -> AuditEvent:
+                     scanned_chars: int = 0, secret_kinds: dict | None = None,
+                     secret_sampled: bool = False, secret_scanned_chars: int = 0,
+                     secret_capped: bool = False) -> AuditEvent:
     """代理转发事件 -> 统一 AuditEvent。
 
     代理侧历史上另有一套 AuditRecord。现在统一到同一个事件模型：
@@ -241,5 +243,12 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
             # 出站密钥扫描命中的类别与计数：**只落类别，不落原文**。
             # 密钥的脱敏形态（首尾几个字符）只出现在给客户端的告警体里，不进审计文件。
             "secret_kinds": dict(secret_kinds or {}),
+            # 出站扫描的**覆盖账**：响应侧同样要有预算，否则「扫了整个响应」这句话
+            # 在 2MB 响应上意味着 258ms 的固定开销，而实测记忆体缓冲还能顶满内存。
+            # sampled=True 表示超预算走了分层取样（不是全文扫过）。
+            "secret_sampled": bool(secret_sampled),
+            "secret_scanned_chars": int(secret_scanned_chars),
+            # capped=True：累积缓冲撞到上限，尾部**没有**被扫过
+            "secret_capped": bool(secret_capped),
         },
     )

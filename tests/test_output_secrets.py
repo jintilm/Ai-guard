@@ -14,7 +14,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from prompt_ids.core.pipeline import Pipeline
-from prompt_ids.output import SecretHit, redact, redact_bytes, scan_secrets, summary
+from prompt_ids.output import (
+    MAX_HITS,
+    SecretHit,
+    redact,
+    redact_bytes,
+    scan_secrets,
+    scan_text,
+    summary,
+)
 from prompt_ids.proxy.server import ProxyConfig, create_server
 
 AWS = "AKIAIOSFODNN7EXAMPLE"
@@ -313,6 +321,72 @@ def test_env_switch_overrides_the_default(leaky_upstream, tmp_path_factory, monk
 
 def test_default_is_on():
     assert ProxyConfig(upstream="http://x/v1", api_key="").scan_secrets is True
+
+
+# ---------------------------------------------------------------- 三条正则纪律
+def test_jwt_pattern_is_linear_on_repeated_prefix_input():
+    """`[A-Za-z0-9_-]{n,}` 后接必需分隔符 = O(L²)。
+
+    字符类含 `-`（不是 \\w），所以 `-eyJ` 重复串里**每个** `eyJ` 都是候选起点，
+    每点回溯一遍整条 run。初版无界 `{8,}`：8KB 14ms / 64KB 867ms / 256KB 14.0 秒
+    —— 而代理对**响应体**没有任何上限，且响应内容可被间接注入影响。
+    改成有界 `{7,64}/{7,512}` 后同一输入 10.7ms（线性）。
+    """
+    import time
+
+    for size in (16_000, 64_000):
+        text = "-eyJ" * (size // 4)
+        start = time.perf_counter()
+        assert scan_secrets(text) == []
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        # 线性 ⇒ 每翻一倍约 2 倍。留足余量仍能抓住平方级（那会是 4 倍）。
+        budget = {16_000: 60.0, 64_000: 150.0}[size]
+        assert elapsed_ms < budget, f"{size} 字符耗时 {elapsed_ms:.1f}ms，超过 {budget}ms"
+
+
+def test_long_real_jwt_is_still_detected():
+    """收窄段长不能让真 JWT 漏掉：RS256 签名段 base64 后 342 字符。"""
+    token = ("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLCJleHAiOjE3MDAwMDAwMDB9." + "A" * 342)
+    assert "jwt" in {h.kind for h in scan_secrets(token)}
+
+
+def test_every_pattern_is_scanned_even_after_the_report_cap_is_hit():
+    """上报上限不能变成扫描上限。
+
+    初版用 MAX_HITS 截断命中列表**并**提前 break 掉后续模式：
+    「20 个 AWS key + 一份私钥」里私钥根本没被扫，审计却写「已脱敏」。
+    """
+    many = " ".join("AKIA" + chr(66 + i) * 16 for i in range(40))
+    text = many + "\n-----BEGIN RSA PRIVATE KEY-----\nMIIEabc\n-----END RSA PRIVATE KEY-----"
+    scan = scan_text(text)
+    assert len(scan) > MAX_HITS, "构造的样本应当超过上报上限"
+    assert "private_key" in scan.by_kind, "私钥模式根本没被跑到"
+    assert "private_key" in {h.kind for h in scan.reported(MAX_HITS)}, "上报条数应被截到上限"
+    out = redact(text, scan)
+    assert "BEGIN RSA PRIVATE KEY" not in out
+
+
+def test_private_key_body_is_redacted_too():
+    """只吃 BEGIN 头 = 私钥正文原样透出（初版就是这样）。"""
+    body = "\n".join("MIIE" + "A" * 60 for _ in range(12))
+    key = f"-----BEGIN RSA PRIVATE KEY-----\n{body}\n-----END RSA PRIVATE KEY-----"
+    out = redact(key, scan_text(key).hits)
+    assert out == "[REDACTED:private_key]"
+    assert "MIIE" not in out
+
+
+def test_truncated_private_key_paste_is_still_caught():
+    """被截断粘贴的密钥片段也要能识别（END 段可选）。"""
+    partial = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA"
+    assert "private_key" in {h.kind for h in scan_secrets(partial)}
+
+
+def test_by_kind_counts_survive_the_report_cap():
+    """by_kind 是全量计数，不受上报上限影响 —— 审计靠它记账。"""
+    text = " ".join("AKIA" + "A" * 16 for _ in range(30))
+    scan = scan_text(text)
+    assert scan.by_kind["aws_access_key"] == 30
+    assert len(scan.reported(MAX_HITS)) == MAX_HITS
 
 
 def _run_cli(*args: str) -> tuple[int, str]:

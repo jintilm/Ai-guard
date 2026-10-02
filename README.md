@@ -751,9 +751,14 @@ curl -s localhost:8790/v1/scan/output -H 'Content-Type: application/json' \
 ```
 
 - **代理侧**把命中片段就地脱敏成 `[REDACTED:aws_access_key]`（字节级替换，不重新序列化
-  响应体）；流式内容已经发出去了，只能末尾补一条告警帧并记审计，审计 note 明写「无法撤回」
+  响应体）；流式内容已经发出去了，只能末尾补一条告警帧并记审计，审计 note 明写「无法撤回」。
+  告警帧排在 `data: [DONE]` **之前** —— 官方 SDK 读到 `[DONE]` 就停止消费
 - **只认结构化格式**，不扫 `api_key = xxx` 这类自由文本：后者在代码与文档里太常见，
   扫它等于自造过防御
+- **私钥按整块脱敏**（`BEGIN…END` 一起），只抹头 39 字符等于把正文送出去
+- **响应侧有预算**（`PROMPT_IDS_PROXY_MAX_RESPONSE_SCAN_CHARS`，默认 200k）：
+  出站扫描实测 0.127µs/字符，无预算时 2MB 响应要多付 252ms；加预算后 18ms，
+  超限走分层取样并把覆盖率记进审计（`secret_sampled` / `secret_scanned_chars`）
 - 审计与告警**只落类别与计数**（`extra["secret_kinds"]`），命中形态只给首尾几个字符；
   完整密钥既不回吐客户端，也不进审计文件
 - 覆盖 `tool_calls[].function.arguments` —— 「让 agent 把密钥写进配置文件」这类
@@ -1248,7 +1253,7 @@ python scripts/eval_german.py --exclude PV-C015,PV-C019,PV-H025            # 消
 ### 其他基线
 
 ```bash
-pytest tests -q            # 554 项单测全绿
+pytest tests -q            # 579 项单测全绿
 python scripts/smoke.py    # 端到端：10 条攻击 + 6 条正常语料，检出 10/10 误报 0/6
 python scripts/bench.py    # 规则/启发层延迟 P50 0.06ms（缓存命中）/ 冷调用 0.33ms
 python scripts/output_check.py     # 出站密钥扫描：16/16 合成凭据 + 真实语料 5449 条零误报
@@ -1257,10 +1262,10 @@ python scripts/eval_semantic.py --dataset data/my.jsonl   # 换自己的数据�
 ```
 
 单测分布（`pytest --collect-only`）：providers 86 · core_units 41 · proxy 42 ·
-semantic 35 · regressions 35 · audit 31 · review 32 · output_secrets 35 ·
-canary 24 · api 29 · memory 27 · web 23 · pipeline 23 · verdict 19 ·
-playground 18 · threshold_sweep 9 · rules_redos 9 · agent_bench 10 ·
-preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
+output_secrets 41 · semantic 35 · regressions 35 · audit 31 · review 32 ·
+canary 24 · api 29 · memory 27 · web 23 · pipeline 23 · network_robustness 15 ·
+verdict 19 · playground 18 · threshold_sweep 9 · concurrency 4 · rules_redos 9 ·
+agent_bench 10 · preprocess 8 · engine 7 · decoder 6 · pint_shape 5。
 
 评测报告落在 `reports/ablation.json`，可直接画图。
 `reports/ablation_public.json` 是同一套配置只在公开集上的独立复跑，用于交叉验证

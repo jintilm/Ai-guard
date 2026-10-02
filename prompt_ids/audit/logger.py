@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import io
 import os
 import threading
 import time
@@ -153,19 +154,46 @@ class AuditLogger:
 
 
 def tail_events(path: str | Path, limit: int = 20) -> list[AuditEvent]:
-    """读最后 N 条事件，避免大文件全量加载。"""
+    """读最后 N 条事件。
+
+    **真的只读尾部**：从文件末尾分块往前扫，凑够 N 行就停。
+    原来的实现是 `read_text().splitlines()[-limit:]` —— docstring 写着
+    「避免大文件全量加载」，实际把整个文件读进内存。实测 19.1MB 审计文件
+    `limit=20` 也要读满 19.1MB / 42.5ms；而 `/v1/review/patterns` 默认无鉴权、
+    无默认限流，一次 GET 就是一次全文件读。
+    """
     file = Path(path)
-    if not file.exists():
+    if not file.exists() or limit <= 0:
         return []
-    lines = file.read_text(encoding="utf-8").splitlines()
-    picked = [line for line in lines[-limit:] if line.strip()]
     import json
+
+    picked: list[bytes] = []      # **新 → 旧**（从文件尾往前扫）
+    with file.open("rb") as handle:
+        handle.seek(0, io.SEEK_END)
+        position = handle.tell()
+        tail = b""
+        while position > 0 and len(picked) < limit:
+            step = min(65536, position)
+            position -= step
+            handle.seek(position)
+            tail = handle.read(step) + tail
+            lines = tail.split(b"\n")
+            tail = lines[0]           # 第一行可能被块边界截断，留到下一轮
+            # 本块整体比已收集的更早；块内是文件顺序 → 反转后接到尾部（更新的一端）。
+            picked.extend(reversed([line for line in lines[1:] if line.strip()]))
+            del picked[limit:]
+    if tail.strip():
+        # 已经读到文件头，剩下这段是一整行（不是被截断的碎片）——
+        # 它是最早的一行，在「新→旧」顺序里排最后。
+        picked.append(tail)
+        del picked[limit:]
+    picked.reverse()
 
     events = []
     for line in picked:
         try:
-            events.append(AuditEvent.from_dict(json.loads(line)))
-        except (json.JSONDecodeError, TypeError):
+            events.append(AuditEvent.from_dict(json.loads(line.decode("utf-8", "replace"))))
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
             continue
     return events
 

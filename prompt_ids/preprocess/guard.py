@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -78,24 +79,44 @@ class RateLimiter:
 
     def __init__(self, capacity: int = 30, refill_s: float = 60.0, max_users: int = 10_000):
         self.capacity = capacity
+        self.refill_s = refill_s
         self.refill_rate = capacity / refill_s if refill_s > 0 else 0.0
         self.max_users = max_users
         self._buckets: dict[str, _Bucket] = {}
+        self._lock = threading.Lock()
+
+    def _evict(self, now: float) -> None:
+        """惰性淘汰长期不用的桶。
+
+        没有这一步的话：桶表只增不减，`max_users` 到顶后 `try_acquire`
+        对**任何新 key** 直接 False —— 攻击者用一批假 key 就能把后续所有正常
+        客户端（哪怕是同一个 IP）永久锁在 429 之外。满桶时每个已经回满的桶
+        都可以丢掉：它等价于「新建一个满桶」。
+        """
+        if len(self._buckets) < self.max_users:
+            return
+        stale = [key for key, bucket in self._buckets.items()
+                 if now - bucket.updated > self.refill_s * 2]
+        for key in stale:
+            self._buckets.pop(key, None)
 
     def try_acquire(self, user: str = "default", cost: float = 1.0) -> bool:
         now = time.monotonic()
-        bucket = self._buckets.get(user)
-        if bucket is None:
-            if len(self._buckets) >= self.max_users:
+        with self._lock:
+            bucket = self._buckets.get(user)
+            if bucket is None:
+                self._evict(now)
+                if len(self._buckets) >= self.max_users:
+                    return False
+                bucket = _Bucket(tokens=self.capacity, updated=now)
+                self._buckets[user] = bucket
+            bucket.tokens = min(self.capacity,
+                                bucket.tokens + (now - bucket.updated) * self.refill_rate)
+            bucket.updated = now
+            if bucket.tokens < cost:
                 return False
-            bucket = _Bucket(tokens=self.capacity, updated=now)
-            self._buckets[user] = bucket
-        bucket.tokens = min(self.capacity, bucket.tokens + (now - bucket.updated) * self.refill_rate)
-        bucket.updated = now
-        if bucket.tokens < cost:
-            return False
-        bucket.tokens -= cost
-        return True
+            bucket.tokens -= cost
+            return True
 
     def remaining(self, user: str = "default") -> float:
         bucket = self._buckets.get(user)
