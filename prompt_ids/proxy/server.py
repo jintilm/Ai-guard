@@ -1212,7 +1212,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _relay_and_audit_no_input_text(self, path: str, body: bytes, note: str,
                                        *, input_kind: str) -> None:
-        """**输入**侧无文本可扫时的通路：**取回响应 → 检查 → 落审计 → 再回给客户端**。
+        """**输入**侧无文本可扫时的通路。**按是否流式分两条路。**
+
+        - `stream: true` ⇒ 逐帧转发 + 收尾时检查累积的转写文本
+          （`_stream_passthrough`）。⚠ 不能走缓冲路径：缓冲整段等于把
+          **流式语义破坏掉** —— 调用方还在等增量结果，却一次拿到全部。
+        - 非流式 ⇒ 取回 → 检查 → 落审计 → 再回给客户端。
 
         两个顺序问题，都是被 `tests/test_transcript_scan.py` 抓出来的：
 
@@ -1220,12 +1225,16 @@ class ProxyHandler(BaseHTTPRequestHandler):
            （不是 JSON），所以它们**总是**走这条路。若在这里提前返回，
            响应侧检查永远不会跑 —— 而音频里的注入恰恰只能从响应侧抓到
            （输入侧是字节，没有文本可扫）。第一版就是这么写的。
-        2. **审计必须早于响应落盘**：先回响应再落审计的话，客户端可能先看到 200，
-           而审计记录还没写进文件 —— 于是「请求已处理」与「已留痕」之间有一个窗口。
-           审计日志的价值恰恰在于事后追责，那个窗口里出的事查不出来。
-           所以这里先缓冲响应体、检查、落审计，最后才回给客户端。
-           （转写响应体很小，缓冲它没有代价；流式响应不走这条路径。）
+        2. **审计必须早于响应落盘**（非流式路径）：先回响应再落审计的话，
+           客户端可能先看到 200，而审计记录还没写进文件 —— 于是
+           「请求已处理」与「已留痕」之间有一个窗口，而审计日志的价值
+           恰恰在于事后追责。
         """
+        # ⚠ 流式必须先分派：**缓冲整段等于把流式语义破坏掉** ——
+        #   调用方还在等增量结果，却一次拿到全部。
+        if _wants_stream(path, body):
+            self._stream_passthrough(path, body, note, input_kind=input_kind)
+            return
         status_code, headers, data = self._fetch_passthrough("POST", body)
         if status_code == 0:
             self._audit_passthrough(path, None, note, status=0, scanned=False,
@@ -1244,6 +1253,123 @@ class ProxyHandler(BaseHTTPRequestHandler):
             **({"transcript_scan": transcript_scan} if transcript_scan else {}))
         self._relay_response(status_code, headers)
         self.wfile.write(data)
+
+
+    def _stream_passthrough(self, path: str, body: bytes, note: str, *,
+                            input_kind: str) -> None:
+        """直通路径的**流式**响应：逐帧转发 + 收尾时检查转写文本。
+
+        与聊天路径的 `_stream_body` 同一套纪律（**不写第二套**）：
+
+        1. **按完整帧转发，且最后一帧扣住** —— 告警帧必须排在
+           `data: [DONE]` **之前**：官方 SDK 与任何合规 SSE 解析器读到
+           `[DONE]` 就停止消费，追加在后面的帧会被丢弃
+           （= 最常见的用法收不到告警）。而 `[DONE]` 在读到流尾之前
+           无法与别的帧区分，所以每帧都先扣住，收到下一帧再发上一帧。
+        2. **累积缓冲有上限**（`max_response_scan_chars`）——
+           `timeout_s` 是每次 socket 操作的超时，一个稳定吐数据的长音频流
+           永远不会超时 ⇒ 无界累积就是内存无界增长。超限后停止累积
+           （仍照常转发，只是不再扫尾部）并如实记账。
+        3. **跨帧拼接**（`StreamTranscriptScanner`）—— 逐帧扫必然漏掉
+           「拆成两个 delta 发出来」的载荷。
+
+        ⚠ **流式只能告警、不能拦**：内容已经发出去了。与 Canary/密钥的
+        出站扫描是同一个取舍，所以审计 detail 里必须写明「已发出，无法撤回」
+        —— 别把它读成已拦住。
+        """
+        from prompt_ids.proxy.passthrough_out import (
+            StreamTranscriptScanner,
+            extract_transcript_segments,
+        )
+
+        url = self._upstream_url(path)
+        headers = self._build_headers()
+        scanner = StreamTranscriptScanner(
+            budget_chars=self.config.max_response_scan_chars)
+        started = time.perf_counter()
+        try:
+            status, resp_headers, chunks, _ms, close_upstream = post_stream(
+                url, body, headers, self.config.timeout_s)
+        except UpstreamError as exc:
+            self._audit_passthrough(path, None, note, status=exc.status,
+                                    scanned=False, input_kind=input_kind)
+            self._send_json(exc.status, exc.payload)
+            return
+        self._relay_response(status, resp_headers)
+
+        pending = bytearray()
+        held: bytes = b""
+        notices = b""
+        record: dict[str, Any] = dict(scanner.account())
+        try:
+            for chunk in chunks:
+                if not chunk:
+                    continue
+                pending.extend(chunk)
+                while True:
+                    cut = pending.find(b"\n\n")
+                    if cut < 0:
+                        break
+                    frame = bytes(pending[: cut + 2])
+                    del pending[: cut + 2]
+                    scanner.feed_frame(frame)
+                    if held:
+                        self.wfile.write(held)
+                        self.wfile.flush()
+                    held = frame
+            if pending:
+                scanner.feed_frame(bytes(pending))
+
+            transcript = scanner.text
+            record = dict(scanner.account())
+            if transcript.strip():
+                segments, seg_note = extract_transcript_segments({"text": transcript})
+                if segments:
+                    scan = scan_segments(self.config.pipeline_instance, segments,
+                                         budget_chars=self.config.max_total_scan_chars)
+                    record.update({
+                        "segments": len(segments),
+                        "chars": scan.scanned_chars,
+                        "level": scan.result.level.value,
+                        "action": scan.result.action.value,
+                        "score": round(scan.result.score, 2),
+                        "patterns": [f.pattern_id for f in scan.result.findings][:10],
+                        "flagged": scan.result.action.value != "pass",
+                        "note": seg_note,
+                    })
+                    if record["flagged"]:
+                        # 告警帧必须排在 [DONE] 之前（见 docstring 第 1 条）
+                        notices = _transcript_warning_event(record)
+            elif record["checked_chars"] == 0:
+                record["note"] = "流式转写里没有可扫的文本增量"
+        except (BrokenPipeError, ConnectionResetError):
+            record = dict(scanner.account())
+            record["note"] = "客户端中途断开（已发出的内容无法撤回）"
+        finally:
+            try:
+                if notices:
+                    self.wfile.write(notices)
+                    self.wfile.flush()
+                if held:
+                    self.wfile.write(held)
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            close_upstream()
+
+        detail = ""
+        if record.get("flagged"):
+            detail = (f"流式转写检出注入 {record['level']}"
+                      f"（内容已发出，无法撤回，只能事后告警；"
+                      f"已扫 {record.get('checked_chars', 0)} 字符"
+                      + ("，**超出预算的尾部未被扫描**）" if record.get("capped") else "）"))
+        # ⚠ `outbound=warned` 而不是别的：内容**已经发出去了**，说成「已处置」
+        # 是自欺（与 Canary/密钥的流式处置同一口径）。
+        self._audit_passthrough(
+            path, None, note, status=status, scanned=False, input_kind=input_kind,
+            detect_ms=(time.perf_counter() - started) * 1000,
+            decision="allow", reason=detail, transcript_scan=record,
+            **({"outbound": OUTBOUND_WARNED} if record.get("flagged") else {}))
 
     def _scan_transcript_response(self, path: str, body: bytes,
                                   _request_body: bytes) -> dict[str, Any]:
@@ -1302,7 +1428,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
                            decision: str = "allow", reason: str = "",
                            segments: int = 0, text: str = "",
                            input_kind: str = "",
-                           transcript_scan: dict[str, Any] | None = None) -> None:
+                           transcript_scan: dict[str, Any] | None = None,
+                           outbound: str = OUTBOUND_NONE) -> None:
         """直通路径也落审计。
 
         此前直通请求**一条事件都不写** —— 于是「请求总数」只统计被检测的调用，
@@ -1311,6 +1438,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
         「没扫」与「扫了没命中」才分得开。
         """
         extra = {"scanned": bool(scanned), "passthrough": True}
+        if outbound and outbound != OUTBOUND_NONE:
+            # 流式检出注入属于**出站**处置（内容已发出），与请求处置正交 ——
+            # 不记的话，报表里这条事件看起来像「什么都没发生就放行了」。
+            extra["outbound"] = outbound
         # ⚠ **扫过**也要记形态：`mixed` 意味着只有文本部分被检测，
         # 说成「已扫描」是误导（token id 部分根本没看）。
         # 空字符串 = 聊天路径那种分段检测，没有「单一 input」可言。
@@ -1321,6 +1452,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # 这与「decision / outbound 两个正交维度」是同一个教训的第三次应用。
         if transcript_scan:
             extra["transcript_scan"] = dict(transcript_scan)
+        # ⚠ **出站处置与请求处置正交**（同一个教训的第三次应用）：
+        #   请求放行了、但响应里的转写被判注入 —— 只看 `decision` 会漏掉，
+        #   报表里那条事件看起来像「什么都没发生就放行了」。
+        #   ⚠ 流式只能是 `warned`：内容**已经发出去了**，算成「已处置」是自欺。
+        if outbound and outbound != OUTBOUND_NONE:
+            extra["outbound"] = outbound
         if scan is not None:
             extra.update({
                 "segments": segments,
@@ -1456,6 +1593,50 @@ def _leak_event(leak) -> bytes:
     return b"data: " + json.dumps(
         {"prompt_ids_warning": "canary_leak", "leak": leak.as_dict(public=True)}, ensure_ascii=False
     ).encode("utf-8") + b"\n\n"
+
+
+def _wants_stream(path: str, body: bytes) -> bool:
+    """这个直通请求要的是不是 SSE 流。
+
+    ⚠ **multipart 请求体不是 JSON**（音频转写就是 multipart），所以不能只
+    解析 JSON body —— 那样 `stream: true` 这个字段**永远读不到**，
+    流式请求会被当成非流式缓冲转发，客户端等增量结果却一次拿到全部。
+    所以要从 multipart 里粗扫一层 `stream` 标记。
+    """
+    try:
+        payload = json.loads(body.decode("utf-8", "replace"))
+    except (ValueError, UnicodeDecodeError):
+        payload = None
+    if isinstance(payload, dict):
+        return bool(payload.get("stream"))
+    if b"stream" in body[:8192]:
+        # multipart: name="stream" 后面跟 true
+        lowered = body[:8192].lower()
+        return (b'name="stream"' in lowered or b"name=stream" in lowered) and \
+            (b"true" in lowered)
+    return False
+
+
+def _transcript_warning_event(record: dict) -> bytes:
+    """流式转写检出注入时补的告警帧。**只给判定与命中规则，不给转写原文。**
+
+    沿用 `_leak_event` / `_secret_event` 的帧形态（`data: ` 前缀 + 空行结尾），
+    且**必须排在 `data: [DONE]` 之前** —— 官方 SDK 与合规 SSE 解析器读到
+    `[DONE]` 就停止消费，追加在后面的帧会被丢弃。
+
+    ⚠ 「内容已发出，无法撤回」这句话必须出现在 frame 里：调用方看到告警后
+    很容易以为「被拦下了」，而实际上转写音频/文本已经出去了。
+    """
+    return b"data: " + json.dumps({
+        "prompt_ids_warning": "transcript_injection",
+        "note": "转写内容中检出提示词注入；内容已发出，无法撤回",
+        "level": record.get("level", ""),
+        "action": record.get("action", ""),
+        "score": record.get("score", 0),
+        "patterns": record.get("patterns", []),
+        "checked_chars": record.get("checked_chars", 0),
+        "capped": record.get("capped", False),
+    }, ensure_ascii=False).encode("utf-8") + b"\n\n"
 
 
 def create_server(config: ProxyConfig) -> ThreadingHTTPServer:

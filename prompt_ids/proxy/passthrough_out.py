@@ -36,6 +36,7 @@
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
 #: 响应里可能出现的**转写/译文**文本字段。
@@ -101,3 +102,115 @@ def extract_transcript_segments(payload: dict[str, Any]) -> tuple[list, str]:
 def is_transcript_path(path: str) -> bool:
     """这个路径的响应里是否有转写/译文文本。"""
     return path in ("/v1/audio/transcriptions", "/v1/audio/translations")
+
+
+# ---------------------------------------------------------------- 流式转写
+#: 转写流里常见的结束标记。⚠ 必须**在发出去之前**判断：OpenAI / Anthropic 的
+#: 官方 SDK 与任何合规 SSE 解析器读到 `[DONE]` 就停止消费，
+#: 追加在它后面的帧会被丢弃 —— 也就是「最常见的用法收不到告警」。
+STREAM_DONE = b"data: [DONE]"
+
+
+class StreamTranscriptScanner:
+    """逐帧累积转写文本，**跨帧拼接**后在收尾时一次性检测。
+
+    ## 为什么「收尾才检测」而不是「每帧检测」
+
+    因为流式的处置只能是**告警**（内容已发出、无法撤回）。既然必须等到最后才能
+    定性，那就没有必要每帧都跑一次规则 —— 而每帧跑一次会把
+    「一半文字」当独立文本判定，**必然误报**（"ignore all previous" 单独看是
+    正常英文）。
+
+    ## 为什么必须跨帧拼接
+
+    逐帧取内容再拼接，与出站密钥扫描是**同一条纪律**（见 `output/secrets.py`）：
+    帧与帧之间隔着 `}\n\ndata: {`，线上根本不存在连续的注入串，
+    逐帧扫必然漏掉「拆成两个 delta 发出来」的载荷。
+    ⚠ 拼接时**不能加任何分隔符** —— 加了就等于自己把它拆断。
+
+    ## 累积必须有上限
+
+    `timeout_s` 是每次 socket 操作的超时，一个稳定吐数据的长音频流**永远不会
+    超时** ⇒ 无界累积就是内存无界增长。超限后停止累积（仍照常转发，
+    只是不再扫尾部）并如实记账 —— 「扫了前 200KB、后面没看」必须说出来。
+    """
+
+    def __init__(self, *, budget_chars: int = 200_000) -> None:
+        self.budget_chars = max(0, int(budget_chars))
+        self._chunks: list[str] = []
+        self._chars = 0
+        self.capped = False
+        self.frames = 0
+        self.done_seen = False
+
+    def feed_frame(self, frame: bytes) -> None:
+        """喂一帧**完整的** SSE 帧（含 `data: ` 前缀与结尾空行）。"""
+        self.frames += 1
+        if STREAM_DONE in frame:
+            self.done_seen = True
+        for line in frame.split(b"\n"):
+            line = line.strip()
+            if not line.startswith(b"data:"):
+                continue
+            body = line[5:].strip()
+            if not body or body == b"[DONE]":
+                continue
+            try:
+                obj = json.loads(body.decode("utf-8", "replace"))
+            except ValueError:
+                continue        # 非 JSON 的帧（注释/心跳）不参与文本累积
+            pieces: list[str] = []
+            _walk_stream(obj, pieces)
+            for piece in pieces:
+                self._add(piece)
+
+    def _add(self, text: str) -> None:
+        if not text or self.capped:
+            return
+        room = self.budget_chars - self._chars
+        if room <= 0:
+            self.capped = True
+            return
+        if len(text) > room:
+            self._chunks.append(text[:room])
+            self._chars = self.budget_chars
+            self.capped = True
+            return
+        self._chunks.append(text)
+        self._chars += len(text)
+
+    @property
+    def text(self) -> str:
+        """累积到的转写文本（**无分隔符**拼接）。"""
+        return "".join(self._chunks)
+
+    def account(self) -> dict[str, Any]:
+        """审计用的覆盖账：扫了多少、有没有被截断、有没有看到结束标记。"""
+        return {
+            "streamed": True,
+            "frames": self.frames,
+            "checked_chars": self._chars,
+            "capped": self.capped,
+            "done_seen": self.done_seen,
+            "budget_chars": self.budget_chars,
+        }
+
+
+def _walk_stream(obj: Any, out: list[str]) -> None:
+    """从一帧 JSON 里取文本增量。
+
+    Whisper 的流式形态是 `{"type": "transcript.text.delta", "delta": "..."}`，
+    也有网关直接发 `{"text": "..."}`。两种都收，**逐帧追加、不覆盖**。
+    """
+    if not isinstance(obj, dict):
+        return
+    for key in ("delta", "text", "transcript"):
+        value = obj.get(key)
+        if isinstance(value, str) and value.strip():
+            out.append(value)
+            return
+    for key in ("choices", "segments", "data"):
+        inner = obj.get(key)
+        if isinstance(inner, (dict, list)):
+            _walk_stream(inner, out) if isinstance(inner, dict) else [
+                _walk_stream(item, out) for item in inner if isinstance(item, dict)]

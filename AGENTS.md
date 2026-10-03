@@ -988,13 +988,31 @@ TLS · `X-Forwarded-For`（缺它则按 IP 限流把**所有人**算成一个桶
 - 顺带把 `PASSTHROUGH_NO_TEXT` 里「未覆盖」这种**半承诺**改掉了
   —— 要么说清为什么扫不到，要么给出**已经做完**的配套动作。
 
-### 8. 仍未修
+### 8. 流式转写（`stream: true`）的响应侧 ✅
+
+`prompt_ids/proxy/server.py::_stream_passthrough` + `passthrough_out.StreamTranscriptScanner`。
+
+- **逐帧转发、最后一帧扣住** —— 告警帧必须排在 `data: [DONE]` **之前**：
+  官方 SDK 与任何合规 SSE 解析器读到 `[DONE]` 就停止消费，追加在后面的帧会被丢弃
+  （= **最常见的用法收不到告警**）。与 `_stream_body`（聊天/密钥）同一套纪律。
+- **跨帧拼接**且**不加任何分隔符** —— 逐帧扫必然漏掉「拆成两个 delta 发出来」的
+  载荷；帧与帧之间隔着 `}\n\ndata: {`，线上根本不存在连续串。
+- **累积有上限**（`max_response_scan_chars`）—— `timeout_s` 是每次 socket 操作
+  的超时，一个稳定吐数据的长音频流**永远不会超时** ⇒ 无界累积就是内存无界增长。
+  超限后停止累积（仍照常转发，只是不再扫尾部）并**如实记 `capped`**。
+- **收尾才检测**（不是每帧）—— 流式只能告警，既然必须等最后才能定性，
+  每帧跑一次规则只会拿「一半文字」当独立文本判定，必然误报
+  （"ignore all previous" 单独看是正常英文）。
+- ⚠ **不修改内容**，只告警；`outbound=warned` 而非「已处置」。
+
+⚠ 顺带发现并修掉一个**更早存在**的缺陷：直通路径此前**整段缓冲**响应，
+`stream: true` 等于被当非流式处理 —— **流式语义直接被破坏**（调用方等增量结果，
+却一次拿到全部）。现在 `_wants_stream()` 先分派，multipart 也要能读出
+`stream` 标记（**只解析 JSON 的话这个字段永远读不到**）。
+
+### 9. 仍未修
 
 1. **Linux CI 腿未实跑** —— 本机无 docker，双平台都没跑过。CI 会替我们回答。
-2. **流式转写（`stream: true`）的响应侧未覆盖** —— 逐帧 delta 走 SSE 通路，
-   与「拿到整个响应体再扫」是两套代码。已在 `passthrough_out.py` 的
-   docstring 里**明写 `not_checked`**（守护
-   `test_streaming_transcription_is_declared_as_unchecked` 钉的就是这一条）。
 
 - **CI 已补**（双平台矩阵）。⚠ Linux 腿未验证。
 - ⚠ **`AGENTS.md` 现在入库了**（用户 2026-10 决定）⇒ 引用纪律与方法学

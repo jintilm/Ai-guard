@@ -1490,7 +1490,10 @@ agent_bench 10 · rules_redos 9 · preprocess 8 · engine 7 · decoder 6 · pint
 （扫不到），但**输出是模型生成的文本** —— 音频注入是已知的弱面。
 只判定不改写（改写会让调用方拿到「用户没说过的…」），结论落审计
 `extra["transcript_scan"]`，与请求侧 `decision` 正交。
-⚠ 流式转写（`stream: true`）未覆盖，已在 docstring 里明写。
+**流式（`stream: true`）也覆盖**：逐帧转发 + **跨帧拼接**（不加分隔符，否则
+「拆成两个 delta 的注入」必然漏）+ **有界累积**（长音频流永不超时 ⇒ 无界累积
+就是内存无界增长）+ 告警帧排在 `data: [DONE]` **之前**
+（官方 SDK 读到 `[DONE]` 就停止消费）。流式只能**告警**：`outbound=warned`。
 
 **token id 形态的 `input`** ✅ 不再静默跳过：审计记 `extra["input_kind"]`
 （`text` / `token_ids` / `mixed` / `empty` / `no_text_field` / `not_json`）。
