@@ -6,8 +6,8 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 BLOCK_LEVELS = frozenset({"high", "critical"})
 
@@ -20,7 +20,7 @@ class Confusion:
     fn: int = 0
 
     @classmethod
-    def from_pairs(cls, y_true: Iterable[int], y_pred: Iterable[int]) -> "Confusion":
+    def from_pairs(cls, y_true: Iterable[int], y_pred: Iterable[int]) -> Confusion:
         tp = fp = tn = fn = 0
         for truth, pred in zip(y_true, y_pred):
             if truth == 1 and pred == 1:

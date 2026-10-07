@@ -78,7 +78,9 @@ class DebertaEncoder(TextEncoder):
             return self._backend
         try:
             from prompt_ids.detectors.semantic.local import LocalModelBackend
-        except Exception:
+        # 说明（抑制见下一行行尾的 noqa）：没装 transformers/torch 时退回别的后端，
+        # 不该让整个记忆层不可用。
+        except Exception:  # noqa: BLE001
             return None
         return LocalModelBackend()
 

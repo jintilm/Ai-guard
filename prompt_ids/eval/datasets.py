@@ -8,9 +8,9 @@ from __future__ import annotations
 import csv
 import json
 import random
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Sequence
 
 INJECTION = 1
 BENIGN = 0
@@ -182,10 +182,10 @@ class Dataset:
     def labels(self) -> list[int]:
         return [s.label for s in self.samples]
 
-    def attacks(self) -> "Dataset":
+    def attacks(self) -> Dataset:
         return Dataset(tuple(s for s in self.samples if s.is_attack))
 
-    def benign(self) -> "Dataset":
+    def benign(self) -> Dataset:
         return Dataset(tuple(s for s in self.samples if not s.is_attack))
 
     def counts(self) -> dict[str, int]:
@@ -201,14 +201,14 @@ class Dataset:
             acc[s.category] = acc.get(s.category, 0) + 1
         return dict(sorted(acc.items(), key=lambda kv: -kv[1]))
 
-    def split(self, ratio: float = 0.7, seed: int = 42) -> tuple["Dataset", "Dataset"]:
+    def split(self, ratio: float = 0.7, seed: int = 42) -> tuple[Dataset, Dataset]:
         """按比例随机切分（训练/测试）。"""
         items = list(self.samples)
         random.Random(seed).shuffle(items)
         cut = int(len(items) * max(0.0, min(1.0, ratio)))
         return Dataset(tuple(items[:cut])), Dataset(tuple(items[cut:]))
 
-    def filter_sources(self, include: Sequence[str] = (), exclude: Sequence[str] = ()) -> "Dataset":
+    def filter_sources(self, include: Sequence[str] = (), exclude: Sequence[str] = ()) -> Dataset:
         """按 source 字段筛选，用来隔离训练集与留出集。
 
         本项目约定 `deepset_test` 全程不参与任何训练/调参；训练脚本必须显式
@@ -231,12 +231,12 @@ class Dataset:
             acc[sample.source] = acc.get(sample.source, 0) + 1
         return dict(sorted(acc.items(), key=lambda kv: -kv[1]))
 
-    def concat(self, other: "Dataset") -> "Dataset":
+    def concat(self, other: Dataset) -> Dataset:
         return Dataset(self.samples + other.samples)
 
     # ---------- 加载外部数据 ----------
     @classmethod
-    def from_jsonl(cls, path: str | Path, text_key: str = "text", label_key: str = "label") -> "Dataset":
+    def from_jsonl(cls, path: str | Path, text_key: str = "text", label_key: str = "label") -> Dataset:
         """每行一个 JSON：{"text": "...", "label": 1}。"""
         rows: list[Sample] = []
         with Path(path).open("r", encoding="utf-8") as fh:
@@ -257,7 +257,7 @@ class Dataset:
         return cls(tuple(rows))
 
     @classmethod
-    def from_csv(cls, path: str | Path, text_col: str = "text", label_col: str = "label") -> "Dataset":
+    def from_csv(cls, path: str | Path, text_col: str = "text", label_col: str = "label") -> Dataset:
         rows: list[Sample] = []
         with Path(path).open("r", encoding="utf-8", newline="") as fh:
             for row in csv.DictReader(fh):
@@ -273,7 +273,7 @@ class Dataset:
 
     @classmethod
     def from_seeds(cls, attacks: Sequence[tuple[str, str]] | None = None,
-                   benign: Sequence[str] | None = None) -> "Dataset":
+                   benign: Sequence[str] | None = None) -> Dataset:
         rows = [_attack(t, c) for t, c in (attacks or _ATTACK_SEEDS)]
         rows += [_benign(t) for t in (benign or _BENIGN_SEEDS)]
         return cls(tuple(rows))

@@ -18,7 +18,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-
 from prompt_ids.api.app import ApiContext, handle_canary_issue, handle_metrics
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry, mask_token

@@ -9,11 +9,11 @@
     match = registry.check(model_output)   # 命中即证明提示已泄露
 """
 from prompt_ids.canary.tokens import (
+    DEFAULT_PREFIX,
+    CanaryError,
     CanaryMatch,
     CanaryRegistry,
     CanaryToken,
-    CanaryError,
-    DEFAULT_PREFIX,
     issue,
 )
 

@@ -23,20 +23,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from prompt_ids.audit import AuditLogger, event_from_proxy
-from prompt_ids.audit.events import KIND_PROXY, AuditEvent
 from prompt_ids.audit.events import (
+    KIND_PROXY,
     OUTBOUND_NONE,
     OUTBOUND_REDACTED,
     OUTBOUND_REJECTED,
     OUTBOUND_REPLACED,
     OUTBOUND_WARNED,
+    AuditEvent,
 )
 from prompt_ids.canary.tokens import CanaryRegistry
-from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
-from prompt_ids.preprocess.guard import RateLimiter, fingerprint
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, ScanResult, level_rank
 from prompt_ids.net import warn_if_exposed
+from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
+from prompt_ids.preprocess.guard import RateLimiter, fingerprint
 from prompt_ids.proxy import trajectory
 from prompt_ids.proxy.forward import UpstreamError, forward_headers, post_json, post_stream
 

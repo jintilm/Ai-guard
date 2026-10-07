@@ -17,8 +17,8 @@ from prompt_ids.canary.tokens import (
     CanaryRegistry,
     issue,
 )
-from prompt_ids.proxy.server import ProxyConfig, create_server
 from prompt_ids.core.pipeline import Pipeline
+from prompt_ids.proxy.server import ProxyConfig, create_server
 
 LEAK_TEXT = "泄露的机密标识符"
 

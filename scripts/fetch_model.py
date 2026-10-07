@@ -49,7 +49,7 @@ def main() -> int:
                 "*.model",
             ],
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"下载失败：{exc}", file=sys.stderr)
         print("若网络不通，可手工用浏览器打开下方地址下载后放到缓存目录：", file=sys.stderr)
         print(f"  {os.environ['HF_ENDPOINT']}/{args.model}/tree/main", file=sys.stderr)
@@ -66,7 +66,7 @@ def main() -> int:
     t0 = time.perf_counter()
     try:
         backend.warmup()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"加载失败：{exc}", file=sys.stderr)
         return 1
     print(f"加载耗时 {time.perf_counter() - t0:.1f}s")

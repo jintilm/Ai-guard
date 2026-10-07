@@ -14,9 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.core.pipeline import PipelineConfig, create_pipeline  # noqa: E402
-from prompt_ids.eval.metrics import markdown_table  # noqa: E402
-from prompt_ids.memory import faiss_available  # noqa: E402
+from prompt_ids.core.pipeline import PipelineConfig, create_pipeline
+from prompt_ids.eval.metrics import markdown_table
+from prompt_ids.memory import faiss_available
 
 # deepset 真实攻击样本对：见过 A，能否认出 B
 PAIRS = [

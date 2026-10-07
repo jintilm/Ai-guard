@@ -1,8 +1,8 @@
 import pytest
 
-from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
-from prompt_ids.core.types import DETECTOR_RULE, Action, Finding, Level
 from prompt_ids.core.policy import Policy, PolicyEngine
+from prompt_ids.core.types import DETECTOR_RULE, Action, Finding, Level
+from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
 
 
 def _finding(pid: str, weight: float, confidence: float = 0.9, detector: str = DETECTOR_RULE):

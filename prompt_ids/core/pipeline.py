@@ -5,6 +5,7 @@ import copy
 import time
 from dataclasses import dataclass
 
+from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.core.policy import PolicyEngine
 from prompt_ids.core.types import Action, Finding, Level, ScanResult
 from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
@@ -15,7 +16,6 @@ from prompt_ids.detectors import (
     RuleDetector,
     SemanticDetector,
 )
-from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.detectors.base import Detector
 from prompt_ids.memory.detector import MemoryDetector
 from prompt_ids.preprocess import Preprocessor
@@ -141,7 +141,7 @@ class Pipeline:
             started = time.perf_counter()
             try:
                 warm()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # 预加载失败不回滚：运行期各层会自行降级，主链路不能因为
                 # 一个可选依赖装不上就起不来
                 continue

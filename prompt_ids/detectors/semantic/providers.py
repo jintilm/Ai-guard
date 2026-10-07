@@ -688,7 +688,7 @@ def error_excerpt(exc: urllib.error.HTTPError) -> str:
     """从 HTTP 错误响应体里抠出可读的一行（各家错误 JSON 形状不一，做容错）。"""
     try:
         raw = exc.read().decode("utf-8", errors="replace")
-    except Exception:  # pragma: no cover - 读不到 body 时不该再炸一次
+    except Exception:  # noqa: BLE001  # pragma: no cover - 读不到 body 时不该再炸一次
         return ""
     try:
         obj = json.loads(raw)

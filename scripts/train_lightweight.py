@@ -43,8 +43,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.eval.datasets import BUILTIN, Dataset  # noqa: E402
-from prompt_ids.eval.metrics import Confusion, markdown_table  # noqa: E402
+from prompt_ids.eval.datasets import BUILTIN, Dataset
+from prompt_ids.eval.metrics import Confusion, markdown_table
 
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "models" / "lightweight.joblib"
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports"
@@ -173,7 +173,7 @@ def main() -> int:
         return 2
 
     try:
-        import joblib  # noqa: F401
+        import joblib
         import sklearn  # noqa: F401
     except ImportError:
         print("缺少 scikit-learn/joblib，请先 pip install scikit-learn", file=sys.stderr)

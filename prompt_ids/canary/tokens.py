@@ -18,8 +18,8 @@ import string
 import threading
 import time
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from prompt_ids.preprocess.decoder import DecodeExpander
 from prompt_ids.preprocess.normalizer import Normalizer, strip_invisible
@@ -92,7 +92,7 @@ class _SearchContext:
     decoded: tuple[tuple[str, str], ...] = ()
 
     @classmethod
-    def build(cls, text: str, normalizer: Normalizer, expander: DecodeExpander) -> "_SearchContext":
+    def build(cls, text: str, normalizer: Normalizer, expander: DecodeExpander) -> _SearchContext:
         decoded = tuple(
             (variant.kind, _normalize(variant.text, normalizer))
             for variant in expander.expand(text)
@@ -130,15 +130,15 @@ class CanaryToken:
         try:
             out.append(("base64", base64.b64encode(self.value.encode()).decode()))
             out.append(("base64_secret", base64.b64encode(secret.encode()).decode()))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         try:
             out.append(("hex", self.value.encode().hex()))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         try:
             out.append(("rot13", codecs.encode(self.value, "rot_13")))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         return out
 
@@ -297,7 +297,7 @@ class CanaryRegistry:
         self.leaks.extend(matches)
         return matches
 
-    def _match_cheap(self, token: CanaryToken, context: "_SearchContext") -> CanaryMatch | None:
+    def _match_cheap(self, token: CanaryToken, context: _SearchContext) -> CanaryMatch | None:
         """退役令牌的匹配路径：原文 + 归一化 + 自身变体，**不做文本解码展开**。
 
         解码展开是匹配里最贵的一步，而它针对的是「percent / unicode 转义」这类
@@ -325,7 +325,7 @@ class CanaryRegistry:
             self._norm_cache[token.value] = cached
         return cached
 
-    def _match_one(self, token: CanaryToken, context: "_SearchContext") -> CanaryMatch | None:
+    def _match_one(self, token: CanaryToken, context: _SearchContext) -> CanaryMatch | None:
         """在**已构建好的**搜索上下文里匹配一个令牌。
 
         顺序即成本（从便宜到贵）：原文子串 → 归一化子串 → 令牌自身的编码变体 →

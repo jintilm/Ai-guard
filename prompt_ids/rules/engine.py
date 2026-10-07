@@ -25,7 +25,7 @@ try:  # 标准库引擎，永远兜底
     import re as _re
 
     _RE_ERRORS = (_re.error,)
-except Exception:  # pragma: no cover - 不可能发生
+except Exception:  # noqa: BLE001  # pragma: no cover - 标准库都不在才发生
     _RE_ERRORS = (Exception,)
 
 _REGEX_MOD = None
@@ -33,7 +33,7 @@ try:
     import regex as _regex  # type: ignore[import-not-found]
 
     _REGEX_MOD = _regex
-except Exception:  # pragma: no cover - 未安装时退回 re
+except Exception:  # noqa: BLE001  # pragma: no cover - 未安装时退回 re
     _REGEX_MOD = None
 
 

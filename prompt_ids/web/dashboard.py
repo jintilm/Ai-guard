@@ -21,11 +21,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # noqa: E402 - 只为静态检查解析 `_make_context` 的返回标注
+if TYPE_CHECKING:
     from prompt_ids.api.app import ApiContext
 
-from prompt_ids.eval.datasets import Dataset  # noqa: E402
-from prompt_ids.rules.loader import RuleBook  # noqa: E402
+from prompt_ids.eval.datasets import Dataset
+from prompt_ids.rules.loader import RuleBook
 
 # .../prompt_ids/web/dashboard.py -> parents[2] 才是项目根
 ROOT = Path(__file__).resolve().parents[2]
@@ -1758,7 +1758,7 @@ def _make_context(
     memory: bool = False,
     audit_path: str = "",
     review_corpus_path: str = "",
-) -> "ApiContext":
+) -> ApiContext:
     """给检测台建一个真正的流水线 —— 和 CLI / REST 用同一套装配逻辑。
 
     这里刻意收显式关键字参数而不是收 argparse.Namespace：
@@ -1854,7 +1854,7 @@ def serve(out: Path, port: int, refresh_s: int, ablation: Path, audit: Path | No
     if open_browser:
         try:
             webbrowser.open(url)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     try:
         while True:

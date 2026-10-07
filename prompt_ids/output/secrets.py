@@ -37,8 +37,8 @@ r"""出站密钥扫描 —— 模型输出里不该出现的第三方凭据。
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 #: 命中 → (类别名, 模式)。全部是**结构化格式**，不含「api_key = xxx」这类自由文本形态：
 #: 后者在代码、文档、示例配置里太常见，扫它等于自造过防御。

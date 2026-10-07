@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
@@ -396,7 +397,10 @@ def handle_memory_search(ctx: ApiContext, payload: Any, params: dict) -> tuple[i
     k = _require_int(payload, "k", 5, low=1, high=20)
     try:
         vector = mem.encoder.encode_one(text)
-    except Exception as exc:  # 编码器不可用（模型没下载/维度不对）不该变成 500
+    except Exception as exc:  # noqa: BLE001
+        # 编码器不可用（模型没下载 / 维度不对 / 向量库没装）不该变成 500：
+        # 这些都是**部署状态问题**，不是请求错误，返回 503 让调用方能重试。
+        # 兜底捕获是因为可选依赖抛的异常类型不统一（faiss / torch / numpy 各不同）。
         raise ApiError(503, "encoder_unavailable", f"编码器不可用：{type(exc).__name__}")
     hits = mem.store.search(vector, k=min(k, 20))
     return 200, {

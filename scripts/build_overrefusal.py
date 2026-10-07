@@ -87,7 +87,7 @@ def _fetch(repo: str, filename: str, *, offline: bool) -> Path:
     try:
         with urllib.request.urlopen(url, timeout=120) as response:
             target.write_bytes(response.read())
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[下载失败] {url}\n  {type(exc).__name__}: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
     print(f"  -> {target.name}（{target.stat().st_size / 1024:.0f} KB）")
@@ -98,7 +98,7 @@ def _rows(path: Path, kind: str) -> list[dict]:
     if kind == "csv":
         with path.open(encoding="utf-8", errors="replace", newline="") as handle:
             return list(csv.DictReader(handle))
-    import pyarrow.parquet as pq   # noqa: PLC0415  只在需要时导入
+    import pyarrow.parquet as pq
 
     return pq.read_table(path).to_pylist()
 

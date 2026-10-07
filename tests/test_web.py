@@ -168,7 +168,7 @@ def test_dashboard_has_indirect_injection_card(dashboard):
 def test_dashboard_does_not_embed_indirect_miss_snippets(dashboard):
     """reports/indirect.json 里有原文片段（misses），整份塞进 HTML 会让看板
     从 57KB 涨到 140KB —— 而且等于把评测语料抄进静态页面。只取聚合数字。"""
-    from prompt_ids.web.dashboard import DEFAULT_ABLATION, collect, REPORT
+    from prompt_ids.web.dashboard import DEFAULT_ABLATION, REPORT, collect
 
     indirect = REPORT / "indirect.json"
     if not indirect.exists():

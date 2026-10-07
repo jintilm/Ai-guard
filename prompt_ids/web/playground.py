@@ -238,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
             return True
         return path == f"/{os.path.basename(self.state.dashboard_path)}"
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if self._is_dashboard_path(parsed.path):
             self._send_html()
@@ -338,7 +338,7 @@ class Handler(BaseHTTPRequestHandler):
             "error": "缺少或错误的客户端 Key（X-API-Key）",
             "hint": "检测台的 JSON 路由需要鉴权；看板 HTML 本身不需要"})
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         parsed = urlparse(self.path)
         if self._needs_key(parsed.path) and not authorized(self.headers, self.state.client_key):
             self._reject_unauthorized()

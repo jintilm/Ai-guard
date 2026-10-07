@@ -48,7 +48,6 @@ from prompt_ids.detectors.semantic.providers import (
     build_url,
     diagnose,
     fallbacks_from_env,
-    get as get_provider,
     http_error_text,
     list_models,
     parse_fallbacks,
@@ -61,6 +60,9 @@ from prompt_ids.detectors.semantic.providers import (
     resolve_model,
     resolve_provider,
     split_model_spec,
+)
+from prompt_ids.detectors.semantic.providers import (
+    get as get_provider,
 )
 
 __all__ = [

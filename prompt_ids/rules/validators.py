@@ -21,7 +21,7 @@
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 _B64_ALPHABET = frozenset(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"

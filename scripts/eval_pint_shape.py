@@ -41,7 +41,12 @@ from eval_semantic import CachedSemanticBackend, build_pipeline, stratified_slic
 
 from prompt_ids.core.types import Level  # noqa: E402
 from prompt_ids.eval.datasets import Dataset  # noqa: E402
-from prompt_ids.eval.metrics import BLOCK_LEVELS, Confusion, latency_stats, markdown_table  # noqa: E402
+from prompt_ids.eval.metrics import (  # noqa: E402
+    BLOCK_LEVELS,
+    Confusion,
+    latency_stats,
+    markdown_table,
+)
 
 REPORT_DIR = ROOT / "reports"
 

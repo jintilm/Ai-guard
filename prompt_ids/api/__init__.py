@@ -4,10 +4,10 @@
 """
 from prompt_ids.api.app import (
     API_SPEC,
-    ApiContext,
-    ApiError,
     OPENAPI,
     ROUTES,
+    ApiContext,
+    ApiError,
     handle_canary_check,
     handle_canary_issue,
     handle_metrics,

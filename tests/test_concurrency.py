@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import threading
 
-
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
 from prompt_ids.detectors.semantic.detector import SemanticDetector
 
@@ -70,7 +69,7 @@ def test_contribution_is_scoped_to_the_current_scan():
             detector.predict(text)     # 写 last_prediction
             written.wait(timeout=10)    # 两个线程都写完
             results[tag] = detector.contribution()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(f"{tag}: {type(exc).__name__}: {exc}")
 
     threads = [

@@ -52,7 +52,9 @@ class LocalModelBackend(SemanticBackend):
             return self._device
         try:
             import torch
-        except Exception:
+        # 说明（抑制见下一行行尾的 noqa）：torch 缺失/装坏/版本不兼容都可能抛不同类型，
+        # 而「拿不到 GPU」只是一个降级结果，不该让整个层起不来。
+        except Exception:  # noqa: BLE001
             return -1
         if getattr(torch, "cuda", None) and torch.cuda.is_available():
             return 0
@@ -96,7 +98,7 @@ class LocalModelBackend(SemanticBackend):
         self._pipeline = None
         try:
             import torch
-        except Exception:
+        except Exception:  # noqa: BLE001
             return
         if getattr(torch, "cuda", None) and torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -142,7 +144,9 @@ class LocalModelBackend(SemanticBackend):
                 outputs = model(**batch, output_hidden_states=True)
             hidden = outputs.hidden_states[-1]
             vectors = hidden[:, 0, :].float().cpu().numpy()  # CLS
-        except Exception:
+        # 说明（抑制见下一行行尾的 noqa）：编码失败 ⇒ 记忆层降级到 numpy 暴力检索
+        # （AGENTS.md「faiss 未装是预期状态不是 bug」）。
+        except Exception:  # noqa: BLE001
             return None
         if normalize:
             norms = np.linalg.norm(vectors, axis=1, keepdims=True)
@@ -157,7 +161,10 @@ class LocalModelBackend(SemanticBackend):
         started = time.perf_counter()
         try:
             probability, label = self._score_one(text)
-        except Exception as exc:
+        # 说明（抑制见下一行行尾的 noqa）：torch 推理抛的异常类型随输入/版本而变，
+        # 而本层必须**弃票**（ok=False）而不是把异常抛给主链路
+        # —— 否则一个后端故障会变成整条扫描失败。
+        except Exception as exc:  # noqa: BLE001
             return Prediction(
                 0.0, f"本地推理失败：{exc}", self.name,
                 (time.perf_counter() - started) * 1000, ok=False,

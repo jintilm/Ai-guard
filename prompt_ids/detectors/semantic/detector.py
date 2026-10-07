@@ -132,7 +132,12 @@ class SemanticDetector(Detector):
             prediction = Prediction(
                 0.0, self.last_error, self.backend.name, self.timeout_s * 1000, ok=False
             )
-        except Exception as exc:
+        # 说明（抑制见下一行行尾的 noqa）：21 家提供商 + 自定义端点抛的异常类型各不相同
+        # （urllib / HTTPError / JSONDecodeError / KeyError…），
+        # 而**每一类都必须走同一条弃票路径**：ok=False ⇒
+        # contribution() 返回 None。漏掉任何一类都会让后端故障
+        # 变成整条扫描抛异常。
+        except Exception as exc:  # noqa: BLE001
             self.errors += 1
             self.last_error = str(exc)[:200]
             prediction = Prediction(

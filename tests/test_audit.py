@@ -344,9 +344,9 @@ def test_proxy_event_shares_scan_schema(logfile):
 
     断言两条事件的顶层键集合一致，且代理特有字段只出现在 extra 里。
     """
+    from prompt_ids.audit.events import KIND_PROXY, KIND_SCAN, event_from_proxy
     from prompt_ids.audit.logger import AuditLogger
     from prompt_ids.audit.query import decision_of
-    from prompt_ids.audit.events import KIND_PROXY, KIND_SCAN, event_from_proxy
 
     pipeline = create_pipeline()
     logger = AuditLogger(logfile)

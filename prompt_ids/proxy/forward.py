@@ -10,7 +10,7 @@ import json
 import time
 import urllib.error
 import urllib.request
-from typing import Iterator
+from collections.abc import Iterator
 
 # 逐跳首部不能转发，否则客户端会解析错乱
 _HOP_BY_HOP = frozenset({

@@ -267,8 +267,7 @@ def test_reviewed_text_never_lands_in_audit_log(tmp_path):
 
 def test_review_patterns_endpoint_exposes_ledger_and_suspects(tmp_path):
     """读数端：台账 + 嫌疑榜 + 语料状态，一次返回。"""
-    from prompt_ids.api.app import ApiContext, handle_review_patterns
-    from prompt_ids.api.app import resolve
+    from prompt_ids.api.app import ApiContext, handle_review_patterns, resolve
     from prompt_ids.audit.logger import AuditLogger
 
     assert resolve("GET", "/v1/review/patterns") is handle_review_patterns
@@ -445,8 +444,8 @@ def test_review_rejects_empty_text():
 
 # ---------------------------------------------------------------- HTTP 层
 def test_review_endpoints_over_http(tmp_path):
-    from tests.test_api import _free_port, _request, _start  # 复用现成的 HTTP 夹具
     from prompt_ids.api.server import ApiServerConfig
+    from tests.test_api import _free_port, _request, _start  # 复用现成的 HTTP 夹具
 
     audit_path = tmp_path / "audit.jsonl"
     ctx = ApiContext(

@@ -10,7 +10,8 @@ import binascii
 import codecs
 import html
 import re
-from typing import Callable, NamedTuple
+from collections.abc import Callable
+from typing import NamedTuple
 
 from prompt_ids.core.types import Variant
 
@@ -74,7 +75,7 @@ def _decode_percent(text: str) -> str | None:
             tmp = decoded.replace("+", " ")
             if tmp != decoded:
                 decoded = tmp
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     return decoded if decoded != text else None
 
@@ -102,7 +103,7 @@ def _decode_unicode_escape(text: str) -> str | None:
     try:
         decoded = codecs.decode(text.encode("utf-8", "surrogateescape"), "unicode_escape", "replace")
         decoded = decoded.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     return decoded if decoded != text else None
 
@@ -116,7 +117,7 @@ def _decode_html_entity(text: str) -> str | None:
             lambda m: html.unescape(m.group(0)),
             text,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     return decoded if decoded != text else None
 
@@ -172,7 +173,9 @@ class DecodeExpander:
                         break
                     try:
                         produced = step.fn(node.text)
-                    except Exception:
+                    # 说明（抑制见下一行行尾的 noqa）：单个解码变体失败**不该让整个预处理放弃**
+                    # 其余变体 —— 否则一个畸形输入就丢掉全部检出机会。
+                    except Exception:  # noqa: BLE001
                         continue
                     if not produced or produced in seen:
                         continue

@@ -18,12 +18,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.core.pipeline import Pipeline, PipelineConfig  # noqa: E402
-from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector  # noqa: E402
-from prompt_ids.eval.datasets import INJECTION  # noqa: E402
-from prompt_ids.eval.metrics import BLOCK_LEVELS, Confusion, markdown_table  # noqa: E402
-from prompt_ids.preprocess.guard import Guard  # noqa: E402
-from prompt_ids.rules.loader import load_rules  # noqa: E402
+from prompt_ids.core.pipeline import Pipeline, PipelineConfig
+from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector
+from prompt_ids.eval.datasets import INJECTION
+from prompt_ids.eval.metrics import BLOCK_LEVELS, Confusion, markdown_table
+from prompt_ids.preprocess.guard import Guard
+from prompt_ids.rules.loader import load_rules
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "public_deepset.jsonl"
 

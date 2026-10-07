@@ -13,21 +13,10 @@
       },
       "repo": {
         "n": 163,
-        "flagged": 4
+        "flagged": 3
       }
     },
     "flagged": [
-      {
-        "source": "dashboard.py",
-        "group": "repo",
-        "kinds": [
-          "aws_access_key"
-        ],
-        "masked": [
-          "AKIA…LE",
-          "AKIA…LE"
-        ]
-      },
       {
         "source": "test_api.py",
         "group": "repo",
@@ -70,14 +59,6 @@
       }
     ],
     "by_source": {
-      "dashboard.py": {
-        "n": 1,
-        "fp": 1,
-        "group": "repo",
-        "kinds": {
-          "aws_access_key": 2
-        }
-      },
       "test_api.py": {
         "n": 1,
         "fp": 1,

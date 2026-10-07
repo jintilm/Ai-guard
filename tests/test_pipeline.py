@@ -56,8 +56,8 @@ def test_clip_truncates_long_evidence():
 
 
 def det_ctx(text: str):
-    from prompt_ids.detectors import DetectorContext
     from prompt_ids.core.types import Variant
+    from prompt_ids.detectors import DetectorContext
 
     return DetectorContext(raw=text, canonical=text, variants=[Variant(kind="original", text=text)])
 

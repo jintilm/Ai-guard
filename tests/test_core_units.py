@@ -18,8 +18,8 @@ from prompt_ids.eval.metrics import Confusion, markdown_table, percentile
 from prompt_ids.preprocess.guard import (
     Guard,
     GuardConfig,
-    LRUCache,
     LengthRejected,
+    LRUCache,
     fingerprint,
 )
 from prompt_ids.preprocess.normalizer import Normalizer

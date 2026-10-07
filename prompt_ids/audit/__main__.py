@@ -30,7 +30,19 @@ from prompt_ids.audit.query import (
 
 
 def _fmt_ts(ts: float) -> str:
-    return datetime.fromtimestamp(ts).strftime("%m-%d %H:%M:%S") if ts else "-"
+    """把 Unix 时间戳格式化成**本地时间**的可读串。
+
+    ⚠ 消 DTZ006 时**必须用本地时区而不是 UTC**：本项目全链路都是本地时间
+    （审计事件存 `time.time()`、看板用 `datetime.now()`），换成 UTC 会让
+    显示时间与机器上的钟差几小时，且**零报错**。
+
+    「naive 时间」的隐患是真实的（跨时区比较会算错），所以用 `astimezone()`
+    转成带 tzinfo 的本地时间对象：显示结果与原来逐字节相同，
+    对象本身也不再是无时区的。
+    """
+    if not ts:
+        return "-"
+    return datetime.fromtimestamp(ts).astimezone().strftime("%m-%d %H:%M:%S")
 
 
 def cmd_summary(args: argparse.Namespace) -> int:

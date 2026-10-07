@@ -25,7 +25,7 @@ class Prediction:
     #: 会把规则层证据打 75 折（p=0 → 乘性因子 0.75），凭空制造漏报。
     ok: bool = True
 
-    def clamp(self) -> "Prediction":
+    def clamp(self) -> Prediction:
         p = min(1.0, max(0.0, self.probability))
         if p == self.probability:
             return self

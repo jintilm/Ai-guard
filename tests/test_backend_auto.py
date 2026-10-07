@@ -14,7 +14,6 @@
 """
 from __future__ import annotations
 
-
 from prompt_ids.detectors.semantic import (
     AUTO_PREFERENCE,
     DEGRADED_CALL_FAIL_SHARE,

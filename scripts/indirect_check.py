@@ -29,14 +29,15 @@ import json
 import sys
 import time
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from prompt_ids.core.pipeline import Pipeline, PipelineConfig  # noqa: E402
-from prompt_ids.core.types import Level  # noqa: E402
-from prompt_ids.proxy.server import (  # noqa: E402
+from prompt_ids.core.pipeline import Pipeline, PipelineConfig
+from prompt_ids.core.types import Level
+from prompt_ids.proxy.server import (
     ProxyConfig,
     clip_segment,
     extract_segments,

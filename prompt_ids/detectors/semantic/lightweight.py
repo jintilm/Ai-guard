@@ -61,12 +61,15 @@ class LightweightBackend(SemanticBackend):
             return Prediction(0.0, "轻量模型未训练或依赖缺失", self.name, ok=False)
         try:
             model = self.load()
-        except Exception as exc:
+        # 说明（抑制见下一行行尾的 noqa）：sklearn / joblib / numpy 的加载异常类型不一，
+        # 一律降级为 ok=False（弃票）而不是让扫描失败。
+        except Exception as exc:  # noqa: BLE001
             self._load_error = str(exc)
             return Prediction(0.0, f"轻量模型加载失败：{exc}", self.name, ok=False)
         try:
             probability = float(model.predict_proba([text])[0][1])
-        except Exception as exc:
+        # 说明（抑制见下一行行尾的 noqa）：同上（推理失败 ⇒ 弃票）。
+        except Exception as exc:  # noqa: BLE001
             return Prediction(0.0, f"轻量模型推理失败：{exc}", self.name, ok=False)
         elapsed = (time.perf_counter() - started) * 1000
         return Prediction(probability, f"TF-IDF+LR p={probability:.3f}", self.name, elapsed)

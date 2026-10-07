@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +17,7 @@ try:  # 可选依赖
     import faiss
 
     _FAISS_OK = True
-except Exception:  # pragma: no cover - 未安装时走 numpy 分支
+except Exception:  # noqa: BLE001  # pragma: no cover - 未安装时走 numpy 分支
     faiss = None
     _FAISS_OK = False
 
@@ -39,7 +39,7 @@ class MemoryItem:
         return json.dumps(asdict(self), ensure_ascii=False)
 
     @classmethod
-    def from_line(cls, line: str) -> "MemoryItem":
+    def from_line(cls, line: str) -> MemoryItem:
         return cls(**json.loads(line))
 
 
@@ -131,7 +131,7 @@ class VectorStore:
         return path
 
     @classmethod
-    def load(cls, directory: str | Path, dim: int | None = None) -> "VectorStore":
+    def load(cls, directory: str | Path, dim: int | None = None) -> VectorStore:
         path = Path(directory)
         index_file = path / "index.faiss"
         if index_file.exists() and _FAISS_OK:

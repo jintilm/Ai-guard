@@ -50,6 +50,55 @@ include = ["prompt_ids*"]
 [tool.setuptools.package-data]
 prompt_ids = ["rules/*.yaml"]
 
+[tool.ruff]
+# ⚠ 本节是 2026-10 补的，根因是**之前完全没有 ruff 配置** ——
+#   没配置就用「ruff 当前版本的默认规则集」，而默认集随版本变化：
+#   本地 0.15.13 不含 I/UP/DTZ/BLE/RUF，CI 上较新版本含
+#   ⇒ 表现为「本地 ruff 0 条、CI 报 11 条」，且下个 ruff 版本还会再红。
+#   现在显式钉死，让「本地 == CI」成为配置保证而不是版本巧合。
+#
+#   加规则集的流程照此（别直接抄上面的清单）：
+#     1. 写清每一条**为什么**要（不为了「全绿」而为了「某类缺陷看得见」）；
+#     2. 先 `--select` 跑一遍看基线条数；
+#     3. **逐条读上下文**改 —— 有意为之的（兜底 catch、带引号的注解）
+#        加 `# noqa` 并写明理由，不要为了过 lint 删掉行为；
+#     4. 跑全量 pytest 确认「lint 变绿」与「代码还对」同时成立；
+#     5. 才写进这里。
+#
+#   基线（2026-10 清零）：85 → 0
+#   （42×F401 · 18×E741 · 11×F841 · 6×E702 · 5×F541 · 3×F811）。
+#   期间查出两个不是风格问题的：F811（core/pipeline.py 重复导入
+#   SemanticDetector）与 F841（proxy 直通路径算了 text 却没用 ——
+#   说明那条路径**没有把文本传给审计**，指纹与 chat 路径不同源）。
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# 先保持 ruff 的默认集（E4,E7,E9,F）—— 显式写出是为了「不依赖默认」，
+# 否则将来 ruff 改默认值又是一次「本地绿 CI 红」。
+select = [
+    "E4",    # pycodestyle：导入相关
+    "E7",    # pycodestyle：语句
+    "E9",    # pycodestyle：语法错误
+    "F",     # pyflakes：未用名/未用导入/重复定义
+
+    # 以下六条是 CI 实际报出来的那批，逐条理由见 [tool.ruff] 上方注释。
+    "UP037", # 注解里的引号是多余的（需有 from __future__ import annotations）
+    "UP035", # typing.Iterable/Sequence/Callable 已废弃 → collections.abc
+    "I001",  # import 顺序：乱序的 import 会在合并冲突与自动修复时放大
+    "DTZ006",# fromtimestamp() 不带 tz → naive/aware 混用会算错
+    "BLE001",# 盲捕 Exception：**信号**，不是自动改 —— 有意的兜底要写 noqa
+    "RUF100",# 多余的 noqa 会掩盖真实的抑制需求
+]
+# 有意保留的兜底 catch（server.py 的 HTTP 最外圈、app.py 的编码器不可用）
+# 已逐处加 `# noqa: BLE001` 并写明理由。`required-noqa` 刻意**不开**：
+# 开了之后每条机械问题都要写 noqa，反而噪音更大。
+
+[tool.ruff.lint.per-file-ignores]
+# 测试夹具里故意写凭据形态（密钥扫描器的合成素材）与故意用漏洞路径字符串，
+# 改动它们等于删掉测试素材。
+"tests/*" = ["S", "BLE001"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

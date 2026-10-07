@@ -234,7 +234,8 @@ def test_three_services_can_run_side_by_side_with_auth(upstream, tmp_path):
     """
     from prompt_ids.api.app import ApiContext
     from prompt_ids.api.server import ApiServerConfig, create_api_server
-    from prompt_ids.proxy.server import ProxyConfig, create_server as create_proxy
+    from prompt_ids.proxy.server import ProxyConfig
+    from prompt_ids.proxy.server import create_server as create_proxy
     from prompt_ids.web.playground import serve as serve_web
 
     proxy = create_proxy(ProxyConfig(
@@ -301,7 +302,8 @@ def test_health_endpoints_need_no_credentials_either_service(upstream, tmp_path)
     """三个服务的 `/healthz` 都不鉴权 —— 编排探针不该需要业务凭据。"""
     from prompt_ids.api.app import ApiContext
     from prompt_ids.api.server import ApiServerConfig, create_api_server
-    from prompt_ids.proxy.server import ProxyConfig, create_server as create_proxy
+    from prompt_ids.proxy.server import ProxyConfig
+    from prompt_ids.proxy.server import create_server as create_proxy
     from prompt_ids.web.playground import serve as serve_web
 
     proxy = create_proxy(ProxyConfig(

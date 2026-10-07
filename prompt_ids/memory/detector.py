@@ -131,7 +131,7 @@ class MemoryDetector(Detector):
             return
         try:
             warm()
-        except Exception:
+        except Exception:  # noqa: BLE001
             # 预加载失败不回滚：运行期 encode 会失败并让本层静默降级
             pass
 
@@ -151,7 +151,7 @@ class MemoryDetector(Detector):
 
         try:
             vector = self.encoder.encode_one(text)
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.last_hits = []
             return []
 
@@ -252,7 +252,7 @@ class MemoryDetector(Detector):
 
         try:
             vector = self.encoder.encode_one(text)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
 
         # 可选的近重复闸门（默认 1.0 关闭，理由见 __init__ 的说明）
@@ -318,7 +318,7 @@ class MemoryDetector(Detector):
         encoder_kind: str = "auto",
         backend=None,
         **kwargs,
-    ) -> "MemoryDetector":
+    ) -> MemoryDetector:
         store = VectorStore.load(directory)
         encoder = build_encoder(encoder_kind, backend=backend)
         return cls(store=store, encoder=encoder, **kwargs)

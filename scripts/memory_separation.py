@@ -69,12 +69,12 @@ def main() -> int:
 
     import numpy as np
 
-    def vector_of(text: str) -> "np.ndarray":
+    def vector_of(text: str) -> np.ndarray:
         return mem.encoder.encode_one(mem._normalize(text))
 
     try:
         anchor = vector_of(ANCHOR)
-    except Exception as exc:  # pragma: no cover - 环境问题
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - 环境问题
         print(f"编码失败：{exc}")
         return 2
 
@@ -88,7 +88,7 @@ def main() -> int:
     for label, text, malicious in CASES:
         try:
             similarity = float(np.dot(anchor, vector_of(text)))
-        except Exception as exc:  # pragma: no cover - 环境问题
+        except Exception as exc:  # noqa: BLE001  # pragma: no cover - 环境问题
             print(f"{label:<22}   编码失败：{exc}")
             continue
         rows.append((similarity, label, malicious))

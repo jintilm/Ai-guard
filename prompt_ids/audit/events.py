@@ -98,7 +98,7 @@ class AuditEvent:
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AuditEvent":
+    def from_dict(cls, data: dict[str, Any]) -> AuditEvent:
         extra = data.get("extra")
         return cls(
             ts=float(data.get("ts", 0.0)),

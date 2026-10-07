@@ -51,11 +51,14 @@ jobs:
             note: "未验证：本项目至今未在任何 Linux 机器上跑过单测，首次跑通前不要引用为跨平台结论。"
 
     steps:
+      # ⚠ 必须用 v5/v6：v4/v5 跑在 Node.js 20 上，而 GitHub 已于 2025-09
+      # 弃用该运行时并强制改到 Node 24（日志里那条 Node.js 20 is deprecated）。
+      # 别降级 —— 官方随时会停掉 Node 20 目标的版本。
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: 装 Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           # 只缓存 pip 下载，不缓存 site-packages —— 后者会把本机的
@@ -88,6 +91,23 @@ jobs:
         #   期间真查出两个不是风格问题的：F811（core/pipeline.py 重复导入
         #   SemanticDetector）与 F841（proxy 直通路径算了 `text` 却没用 ——
         #   说明那条路径**没有把文本传给审计**，指纹与 chat 路径不同源）。
+        #
+        # ⚠ **规则集在 pyproject 的 [tool.ruff] 里，不靠 ruff 的默认值**。
+        #   2026-10 踩过：当时没有那份配置，于是「本地 ruff 0 条 / CI 报 11 条」，
+        #   根因是**默认规则集随 ruff 版本变化**（本地 0.15.13 不含 I/UP/DTZ/BLE/RUF，
+        #   CI 上装到的较新版本含）。这类失败的恶劣之处：
+        #     ① 看着像「CI 环境有问题」，实际是配置缺失；
+        #     ② 下个 ruff 版本还会再红（本地无法提前发现）；
+        #     ③ 本地永远复现不了 —— 而本项目的纪律就是「本地绿不等于对」。
+        #   ⇒ 加规则时同步改 [tool.ruff] 的 select，让「本地 == CI」成为配置保证。
+        #
+        # 本轮（2026-10）清零的第二批：27×I001 · 21×UP037 · 10×UP035 ·
+        # 66×RUF100（机械，`--fix`，改完全量 pytest 782 项全绿）
+        # 与 28×BLE001 —— 后者**逐处人工读上下文**：全部是「可选依赖缺失 /
+        # 后端加载失败 / 解码变体生成跳过 / 兜底清理」的有意降级路径，
+        # 逐处加 `# noqa: BLE001` 并写清「为什么必须捕获全部」。
+        # 刻意不一律 noqa：加 noqa 让 lint 变绿与「这个捕获是对的」是两件事，
+        # 本项目基线清零时 F841 真查出过 bug（proxy 直通路径没把文本传给审计）。
         #
         # 只查 prompt_ids scripts tests，不查 data/：data/raw/ 是下载来的第三方语料，
         # 对它跑 lint 只会产出与本项目无关的噪声。

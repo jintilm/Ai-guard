@@ -153,7 +153,7 @@ class AuditLogger:
             pass
 
     # ---------- 上下文管理 ----------
-    def __enter__(self) -> "AuditLogger":
+    def __enter__(self) -> AuditLogger:
         return self
 
     def __exit__(self, *exc) -> None:

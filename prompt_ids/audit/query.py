@@ -12,11 +12,11 @@ from __future__ import annotations
 import json
 import time
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
-from prompt_ids.eval.metrics import markdown_table
 from prompt_ids.audit.events import (
     KIND_LEAK,
     LEGACY_OUTBOUND_DECISIONS,
@@ -28,6 +28,7 @@ from prompt_ids.audit.events import (
     REVIEW_LEVELS,
     AuditEvent,
 )
+from prompt_ids.eval.metrics import markdown_table
 
 #: 「算拦截」的动作集合。**不含 sandbox** ——
 #: 代理对 sandbox 是**放行 + 记审计**（HTTP 200，见 proxy/server.py 的 decide()），

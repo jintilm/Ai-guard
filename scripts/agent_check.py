@@ -30,9 +30,9 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline  # noqa: E402
-from prompt_ids.core.types import Level  # noqa: E402
-from prompt_ids.proxy.server import (  # noqa: E402
+from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
+from prompt_ids.core.types import Level
+from prompt_ids.proxy.server import (
     ProxyConfig,
     extract_segments,
     scan_segments,

@@ -41,19 +41,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.core.pipeline import Pipeline, PipelineConfig  # noqa: E402
-from prompt_ids.core.verdict import FusionConfig  # noqa: E402
-from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector  # noqa: E402
-from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend  # noqa: E402
-from prompt_ids.detectors.semantic.detector import SemanticDetector  # noqa: E402
-from prompt_ids.detectors.semantic.factory import build_backend  # noqa: E402
-from prompt_ids.eval.datasets import BUILTIN, Dataset, source_label  # noqa: E402
-from prompt_ids.eval.metrics import BLOCK_LEVELS, Confusion, latency_stats, markdown_table  # noqa: E402
-from prompt_ids.preprocess.guard import Guard  # noqa: E402
-from prompt_ids.rules.loader import RuleBook  # noqa: E402
-from prompt_ids.detectors.semantic.detector import (  # noqa: E402
+from prompt_ids.core.pipeline import Pipeline, PipelineConfig
+from prompt_ids.core.verdict import FusionConfig
+from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector
+from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
+from prompt_ids.detectors.semantic.detector import (
     DEGRADED_CALL_FAIL_SHARE as _DEGRADED_CALL_FAIL_SHARE,
 )
+from prompt_ids.detectors.semantic.detector import SemanticDetector
+from prompt_ids.detectors.semantic.factory import build_backend
+from prompt_ids.eval.datasets import BUILTIN, Dataset, source_label
+from prompt_ids.eval.metrics import (
+    BLOCK_LEVELS,
+    Confusion,
+    latency_stats,
+    markdown_table,
+)
+from prompt_ids.preprocess.guard import Guard
+from prompt_ids.rules.loader import RuleBook
 
 REPORT_DIR = Path(__file__).resolve().parent.parent / "reports"
 

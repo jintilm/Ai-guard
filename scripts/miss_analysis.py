@@ -19,11 +19,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.core.pipeline import PipelineConfig, create_pipeline  # noqa: E402
-from prompt_ids.core.types import Variant  # noqa: E402
-from prompt_ids.detectors import DetectorContext  # noqa: E402
-from prompt_ids.eval.datasets import BUILTIN, Dataset  # noqa: E402
-from prompt_ids.eval.metrics import markdown_table  # noqa: E402
+from prompt_ids.core.pipeline import PipelineConfig, create_pipeline
+from prompt_ids.core.types import Variant
+from prompt_ids.detectors import DetectorContext
+from prompt_ids.eval.datasets import BUILTIN, Dataset
+from prompt_ids.eval.metrics import markdown_table
 
 _STOPWORDS = {
     "the", "a", "an", "and", "or", "to", "of", "in", "for", "on", "with", "is", "are",

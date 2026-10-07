@@ -177,7 +177,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ApiError as exc:
             self._error(exc.status, exc.code, exc.message)
             return
-        except Exception:  # 兜底：不让任何异常把服务打挂
+        except Exception:  # noqa: BLE001
+        # 兜底：不让任何异常把服务打挂。**刻意捕获全部异常** ——
+        # 这一层是 HTTP 处理的最外圈，漏掉任何一类都会让连接直接断掉，
+        # 而「服务进程死了」比「这一次请求 500」严重得多。
+        # 具体异常已在上面的分支里各自处理过了。
             # **不回显异常文本**：FileNotFoundError 会带绝对路径，第三方 SDK 的异常
             # 可能带 base_url（内网网关地址，URL 里甚至可能内嵌凭据），而本服务默认不鉴权。
             # 完整栈写到服务端 stderr（否则就等于把异常静默吞了 —— 「详见日志」不能是空话），

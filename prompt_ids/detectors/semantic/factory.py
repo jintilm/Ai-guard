@@ -20,10 +20,12 @@ from prompt_ids.detectors.semantic.llm import LLMBackend, diagnose_llm
 from prompt_ids.detectors.semantic.local import DEFAULT_MODEL, LocalModelBackend
 from prompt_ids.detectors.semantic.providers import (
     PROVIDERS,
-    get as get_provider,
     provider_names,
     resolve_provider,
     split_model_spec,
+)
+from prompt_ids.detectors.semantic.providers import (
+    get as get_provider,
 )
 
 #: 非 LLM 的本地后端关键字

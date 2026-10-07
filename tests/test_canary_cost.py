@@ -17,7 +17,6 @@ from __future__ import annotations
 import base64
 import time
 
-
 from prompt_ids.canary.tokens import CanaryRegistry
 
 BENIGN = "这是一段普通的模型输出，不含任何令牌。" * 20
@@ -117,14 +116,14 @@ def test_concurrent_issue_and_check_do_not_crash():
         try:
             for _ in range(200):
                 registry.issue("flood")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(f"issue: {type(exc).__name__}: {exc}")
 
     def checker() -> None:
         try:
             for _ in range(200):
                 registry.check(BENIGN)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(f"check: {type(exc).__name__}: {exc}")
 
     threads = [threading.Thread(target=issuer), threading.Thread(target=checker),

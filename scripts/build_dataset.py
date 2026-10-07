@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from prompt_ids.eval.datasets import INJECTION, BENIGN, Sample  # noqa: E402
+from prompt_ids.eval.datasets import BENIGN, INJECTION, Sample
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"

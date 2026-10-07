@@ -613,7 +613,7 @@ def test_lru_cache_is_consistent_under_concurrency():
                 key = f"k{(offset + i) % 32}"
                 cache.get(key)
                 cache.put(key, i)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
 
     threads = [th.Thread(target=worker, args=(n,)) for n in range(8)]
@@ -757,7 +757,7 @@ def test_client_disconnect_still_writes_audit(weird_upstream, tmp_path):
             method="POST", headers={"Content-Type": "application/json"})
         try:
             urllib.request.urlopen(request, timeout=5).read()
-        except Exception:  # noqa: BLE001 - 断连/超时都算
+        except Exception:
             pass
         _time.sleep(0.3)
         assert audit_path.exists()

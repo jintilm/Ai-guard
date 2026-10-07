@@ -383,7 +383,7 @@ def emit_scan(*, result: Any, user: str = "default", policy: str = "",
         attributes["semantic_degraded"] = bool(semantic.get("degraded"))
 
     kept, dropped = sanitize(attributes)
-    with out._lock:                       # noqa: SLF001 - 同模块内部协作
+    with out._lock:
         out.counters.dropped_attributes += dropped
     trace = trace_id or new_trace_id()
     kept["trace_id"] = trace
@@ -412,7 +412,7 @@ def emit_decision(*, decision: str, extra: dict[str, Any] | None = None,
         return None
     payload = {"decision": decision, "route": route, **(extra or {})}
     kept, dropped = sanitize(payload)
-    with out._lock:                       # noqa: SLF001
+    with out._lock:
         out.counters.dropped_attributes += dropped
     trace = trace_id or new_trace_id()
     now = time.time_ns()
