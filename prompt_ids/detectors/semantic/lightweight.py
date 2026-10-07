@@ -8,11 +8,14 @@
 """
 from __future__ import annotations
 
-import importlib.util as importlib_util
 import time
 from pathlib import Path
 
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
+
+# 共用同一个「能不能 import」的判据（含异常兜底），理由见
+# local.py 的 _importable docstring —— CI 上因为 find_spec 抛异常崩过。
+from prompt_ids.detectors.semantic.local import _importable
 
 # .../prompt_ids/detectors/semantic/lightweight.py -> parents[3] 才是项目根。
 # 这里原先写成 parents[2]，指向 prompt_ids/models/，而训练脚本写到 <项目根>/models/，
@@ -22,7 +25,7 @@ DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[3] / "models" / "lightweig
 
 
 def _sklearn_ready() -> bool:
-    return importlib_util.find_spec("sklearn") is not None and importlib_util.find_spec("joblib") is not None
+    return _importable("sklearn") and _importable("joblib")
 
 
 class LightweightBackend(SemanticBackend):

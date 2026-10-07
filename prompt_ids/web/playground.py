@@ -53,6 +53,25 @@ STREAM_HEARTBEAT_S = 15
 STREAM_MAX_S = 900
 
 
+#: 「客户端已断开」的异常集合。
+#:
+#: ⚠ **必须包含 `ConnectionAbortedError`**（2026-10 在 Windows CI 上被抓到）：
+#: 浏览器关标签页时，Windows 抛的是 `ConnectionAbortedError`
+#: （WinError 10053 "An established connection was aborted by the software
+#: in your host machine"），**不是** `ConnectionResetError`。
+#:
+#: 只捕 BrokenPipe/ConnectionReset 时，SSE 心跳那次 write 会把异常抛到
+#: `socketserver.process_request_thread`，于是：
+#:   ① 每个跑过 SSE 的测试 stderr 都多出一整段 traceback
+#:      （CI 日志里刷屏的噪声）；
+#:   ② 断言「stderr 为空」的守护随之失败 —— 而它报出来的位置是**别的文件**
+#:      （`test_net_exposure.py`），完全指不到真正的原因。
+#:      这正是本项目反复在修的那类「报错指不到真因」。
+#:
+#: 三个异常语义相同：对端没了 ⇒ SSE 连接该结束了，不是错误。
+_CLIENT_GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+
+
 class PlaygroundState:
     """进程内共享状态：一个流水线、一个统计计数器。"""
 
@@ -299,7 +318,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._write_sse(event)
                 if not fresh:
                     self._write_sse({"type": "heartbeat", "seq": sent})
-        except (BrokenPipeError, ConnectionResetError):
+        except _CLIENT_GONE:
             pass          # 浏览器关掉标签页 —— 正常路径，不是错误
         finally:
             try:

@@ -10,14 +10,28 @@
 """
 from __future__ import annotations
 
-import importlib.util as importlib_util
 from abc import ABC, abstractmethod
 
 import numpy as np
 
 
 def _numpy_ready() -> bool:
-    return importlib_util.find_spec("numpy") is not None
+    """numpy 是本模块的**硬依赖**（顶层就 import 了），所以这里恒为 True。
+
+    ⚠ **这个函数与其下面的 `if not _numpy_ready(): return NullEncoder()`
+    是不可达的死代码**（2026-10 发现并记录在此）。原因：
+    numpy 在 `pyproject.toml` 的 `[project].dependencies` 里而不是某个 extra
+    —— 2026-10 专门修过一次「numpy 只声明在 `[memory]` extra 导致
+    `pip install .` 连纯规则层都起不来」的问题。
+    于是 numpy 缺失时**本模块根本 import 不了**，`_numpy_ready()` 无从调用。
+
+    保留它而不是删掉：将来若真要把 numpy 变回可选依赖，这里就是那个开关。
+    但**现在不要根据它的返回值写新逻辑** —— 它不反映任何真实状态。
+
+    （刻意**不用** `_importable()`：那是为了 transformers/torch/sklearn 这类
+    真正可选的依赖设计的，而 numpy 不是可选项。）
+    """
+    return True
 
 
 class TextEncoder(ABC):

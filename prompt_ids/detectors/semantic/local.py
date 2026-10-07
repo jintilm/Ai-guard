@@ -5,7 +5,9 @@ protectai/deberta-v3-base-prompt-injection-v2 约 700MB，CPU 单次推理 50-20
 """
 from __future__ import annotations
 
-import importlib.util as importlib_util
+# ⚠ 用 `importlib` 而不是 `importlib.util`：下面要的是
+#   `import_module()`（真 import），`importlib.util` 别名里没有它。
+import importlib
 import os
 import threading
 import time
@@ -20,8 +22,32 @@ DEFAULT_ENDPOINT = "https://hf-mirror.com"
 INJECTION_LABELS = frozenset({"INJECTION", "INJECT", "1", "LABEL_1", "MALICIOUS", "POSITIVE"})
 
 
+def _importable(name: str) -> bool:
+    """这个可选依赖**能不能真的 import**。
+
+    ⚠ **刻意不用 `importlib.util.find_spec()`**（2026-10 在 CI 上被抓到崩）：
+    `find_spec` 内部会遍历 `sys.meta_path`，**任何 finder 抛出的异常都会向上
+    传播**（标准库文档明确列了这点）。于是一个损坏的 `.pth`、打包不完整的
+    dist、或用户自装的 import hook，就能把「依赖没装」变成
+    「异常一路抛到 CLI 顶层」⇒ 退出码 1，**而且是在做任何判定之前**。
+
+    `find_spec` 还有第二个问题：它只证明「包目录存在」，不证明「能加载」——
+    装了一半（缺 .so、缺子模块）会被判成可用，炸在运行时。
+
+    真正的 import 同时解决两点：判据更严，且异常被就地吞掉。
+    语义与项目其它地方一致 —— **可选依赖缺失永远只是降级，不是失败**。
+    """
+    try:
+        importlib.import_module(name)
+    except BaseException:  # noqa: BLE001 - 含 ImportError/AttributeError 等
+        # 刻意捕获 BaseException：这里的用途是「这个依赖能不能用」，
+        # 任何失败（含 SyntaxError、SystemExit）都等价于「不能用」。
+        return False
+    return True
+
+
 def _transformers_ready() -> bool:
-    return importlib_util.find_spec("transformers") is not None and importlib_util.find_spec("torch") is not None
+    return _importable("transformers") and _importable("torch")
 
 
 class LocalModelBackend(SemanticBackend):
