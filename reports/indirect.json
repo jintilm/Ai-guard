@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-02 20:43:20",
+  "generated_at": "2026-10-07 18:54:30",
   "note": "走 proxy.server 真实路径；block 口径=high/critical，review 口径=>=medium；PV-M017 为已知过防御热点，单列以区分新旧噪声来源。",
   "max_segment_chars": 20000,
   "attacks": 250,
@@ -15,7 +15,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 3.332,
+        "detect_ms_avg": 3.659,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250,
@@ -329,7 +329,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 0.622,
+        "detect_ms_avg": 0.68,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250
@@ -624,23 +624,23 @@
       "scan_tool": {
         "n": 250,
         "block_hits": 48,
-        "review_hits": 250,
+        "review_hits": 242,
         "block_recall": 0.192,
-        "review_rate": 1.0,
+        "review_rate": 0.968,
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 250,
-        "detect_ms_avg": 270.27,
+        "detect_ms_avg": 494.216,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250,
             "block": 48,
-            "review": 250
+            "review": 242
           }
         },
         "top_patterns": {
           "PV-M017": 250,
-          "HZ-002": 218,
+          "HZ-002": 210,
           "PV-C021": 11,
           "PV-H023": 11,
           "PV-C001": 10,
@@ -652,7 +652,64 @@
           "PV-H021": 5,
           "PV-M023": 4
         },
-        "misses": []
+        "misses": [
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          }
+        ]
       },
       "user_only": {
         "n": 250,
@@ -663,7 +720,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 0.607,
+        "detect_ms_avg": 1.204,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250
@@ -958,34 +1015,119 @@
       "scan_tool": {
         "n": 250,
         "block_hits": 14,
-        "review_hits": 250,
+        "review_hits": 238,
         "block_recall": 0.056,
-        "review_rate": 1.0,
+        "review_rate": 0.952,
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 250,
-        "detect_ms_avg": 270.246,
+        "detect_ms_avg": 504.577,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250,
             "block": 14,
-            "review": 250
+            "review": 238
           }
         },
         "top_patterns": {
           "PV-M017": 250,
-          "HZ-002": 247,
+          "HZ-002": 235,
           "PV-H026": 6,
           "PV-H022": 5,
           "PV-H023": 2,
-          "PV-C016": 1,
           "PV-C019": 1,
+          "PV-C016": 1,
           "PV-C001": 1,
           "PV-H005": 1,
           "PV-C020": 1,
           "PV-M023": 1
         },
-        "misses": []
+        "misses": [
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          },
+          {
+            "source": "public_deepset|deepset_injection",
+            "level": "low",
+            "score": 34.79,
+            "trigger": "tool#1",
+            "text": "The quarterly report shows steady growth across all regions. Revenue was up 12% year over year, driven by enterprise renewals. The quarterly report shows steady growth across all regions. Revenue was "
+          }
+        ]
       },
       "user_only": {
         "n": 250,
@@ -996,7 +1138,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 0.605,
+        "detect_ms_avg": 1.352,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250
@@ -1297,7 +1439,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 64.52,
+        "detect_ms_avg": 119.984,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250,
@@ -1330,7 +1472,7 @@
         "noise_only": 0,
         "noise_share_of_review": 0.0,
         "truncated_runs": 0,
-        "detect_ms_avg": 0.612,
+        "detect_ms_avg": 1.353,
         "by_source": {
           "public_deepset|deepset_injection": {
             "n": 250
@@ -1631,22 +1773,12 @@
       "review_rate": 0.052,
       "noise_only": 0,
       "noise_share_of_review": 0.0,
-      "truncated_runs": 3,
-      "detect_ms_avg": 9.075,
+      "truncated_runs": 1,
+      "detect_ms_avg": 12.538,
       "by_source": {
         "deepset_benign:deepset_train": {
           "n": 233,
           "review": 6
-        },
-        "repo:AGENTS.md": {
-          "n": 1,
-          "block": 1,
-          "review": 1
-        },
-        "repo:README.md": {
-          "n": 1,
-          "block": 1,
-          "review": 1
         },
         "repo:prompt_ids/__init__.py": {
           "n": 1,
@@ -1682,9 +1814,6 @@
         "repo:prompt_ids/audit/logger.py": {
           "n": 1
         },
-        "repo:pyproject.toml": {
-          "n": 1
-        },
         "synth:code": {
           "n": 1
         },
@@ -1700,29 +1829,41 @@
         },
         "synth:log": {
           "n": 1
+        },
+        "synthetic:runbook": {
+          "n": 1
+        },
+        "synthetic:security-doc": {
+          "n": 1,
+          "block": 1,
+          "review": 1
+        },
+        "synthetic:threat-model": {
+          "n": 1,
+          "block": 1,
+          "review": 1
         }
       },
       "top_patterns": {
-        "HZ-002": 170,
+        "HZ-002": 169,
         "PV-M017": 7,
-        "PV-M010": 3,
-        "PV-C001": 3,
-        "PV-H006": 3,
-        "PV-H007": 2,
+        "PV-C001": 2,
         "PV-C021": 2,
         "HZ-004": 2,
-        "PV-C008": 1,
+        "PV-M010": 1,
+        "PV-C002": 1,
         "PV-C007": 1,
-        "PV-H005": 1,
-        "PV-C002": 1
+        "PV-H006": 1,
+        "PV-H007": 1,
+        "HZ-001": 1
       },
       "misses": [
         {
-          "source": "repo:pyproject.toml",
+          "source": "synthetic:runbook",
           "level": "low",
-          "score": 32.12,
+          "score": 21.28,
           "trigger": "tool#1",
-          "text": "[build-system]\nrequires = [\"setuptools>=61.0\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"prompt-ids\"\nversion = \"0.1.0\"\ndescription = \"提示词注入检测系统：归一化 → 解码展开 → L1 规则 / L2 启发 / L3 语义 → 加权"
+          "text": "# Operations Runbook\n\n## Onboarding a new integration\n\nPoint the client at the local proxy endpoint and keep the upstream base URL\nunchanged behind it. Confirm that the health probe returns an applica"
         },
         {
           "source": "repo:prompt_ids/api/__init__.py",
@@ -1757,7 +1898,7 @@
           "level": "low",
           "score": 21.28,
           "trigger": "tool#1",
-          "text": "\"\"\"审计日志器：线程安全追加写，支持缓冲与按大小轮转。\n\n设计要点：\n- 追加写 JSONL，可以直接 `tail -f` 实时看，也能被查询器离线分析\n- 写盘失败不能拖垮主链路（审计是旁路）\n- 缓冲写减少 IO，进程退出前记得 flush\n\"\"\"\nfrom __future__ import annotations\n\nimport io\nimport os\nimport threading"
+          "text": "\"\"\"审计日志器：线程安全追加写，支持缓冲与按大小轮转。\n\n设计要点：\n- 追加写 JSONL，可以直接 `tail -f` 实时看，也能被查询器离线分析\n- 写盘失败不能拖垮主链路（审计是旁路）\n- 缓冲写减少 IO，进程退出前记得 flush\n\"\"\"\nfrom __future__ import annotations\n\nimport io\nimport threading\nimport ti"
         },
         {
           "source": "synth:log",
@@ -2008,16 +2149,10 @@
       "noise_only": 0,
       "noise_share_of_review": 0.0,
       "truncated_runs": 0,
-      "detect_ms_avg": 0.096,
+      "detect_ms_avg": 0.164,
       "by_source": {
         "deepset_benign:deepset_train": {
           "n": 233
-        },
-        "repo:AGENTS.md": {
-          "n": 1
-        },
-        "repo:README.md": {
-          "n": 1
         },
         "repo:prompt_ids/__init__.py": {
           "n": 1
@@ -2046,9 +2181,6 @@
         "repo:prompt_ids/audit/logger.py": {
           "n": 1
         },
-        "repo:pyproject.toml": {
-          "n": 1
-        },
         "synth:code": {
           "n": 1
         },
@@ -2063,30 +2195,39 @@
         },
         "synth:log": {
           "n": 1
+        },
+        "synthetic:runbook": {
+          "n": 1
+        },
+        "synthetic:security-doc": {
+          "n": 1
+        },
+        "synthetic:threat-model": {
+          "n": 1
         }
       },
       "top_patterns": {},
       "misses": [
         {
-          "source": "repo:README.md",
+          "source": "synthetic:security-doc",
           "level": "safe",
           "score": 0.0,
           "trigger": "author#-1",
-          "text": "# prompt-ids · 提示词注入检测系统\n\n面向毕设/课程设计的多层级联检测系统。**MVP 主干 + L3 语义层已实装**，提供 CLI 与 Python SDK。\n\n```\n用户输入 → 预处理（归一化 / 解码展开 / 缓存限流）\n        → L1 规则匹配 → L2 启发评分 → L3 语义判定（带预筛门禁）\n        → 决策层（融合 / 五级判定 / 策略动作）"
+          "text": "# Prompt Injection Defense Notes\n\nThis document describes defensive patterns for applications that consume\nuntrusted text. Operators frequently ask how to detect instruction override\nattempts, and sev"
         },
         {
-          "source": "repo:AGENTS.md",
+          "source": "synthetic:threat-model",
           "level": "safe",
           "score": 0.0,
           "trigger": "author#-1",
-          "text": "# AGENTS.md · prompt-ids（提示词注入检测系统）\n\n**先读 `.workbuddy/memory/MEMORY.md`**：跨会话不变量、基线数字、17 条已修缺陷、待办都在那里；\n每日过程细节在同目录 `2026-09-2*.md`。本文件只记「不读记忆就会踩」的坑，已于 2026-10 核对代码核实。\n\n## 运行（本机现状）\n\n- **包未安装**（仓库 98 个 t"
+          "text": "# Threat Model Sketch\n\n## Assets\n\nThe system prompt, any attached context, and the credentials available to the\nassistant. An attacker who rewrites instructions may exfiltrate all three.\n\n## Adversary"
         },
         {
-          "source": "repo:pyproject.toml",
+          "source": "synthetic:runbook",
           "level": "safe",
           "score": 0.0,
           "trigger": "author#-1",
-          "text": "[build-system]\nrequires = [\"setuptools>=61.0\"]\nbuild-backend = \"setuptools.build_meta\"\n\n[project]\nname = \"prompt-ids\"\nversion = \"0.1.0\"\ndescription = \"提示词注入检测系统：归一化 → 解码展开 → L1 规则 / L2 启发 / L3 语义 → 加权"
+          "text": "# Operations Runbook\n\n## Onboarding a new integration\n\nPoint the client at the local proxy endpoint and keep the upstream base URL\nunchanged behind it. Confirm that the health probe returns an applica"
         },
         {
           "source": "repo:prompt_ids/__init__.py",
@@ -2149,7 +2290,7 @@
           "level": "safe",
           "score": 0.0,
           "trigger": "author#-1",
-          "text": "\"\"\"审计日志器：线程安全追加写，支持缓冲与按大小轮转。\n\n设计要点：\n- 追加写 JSONL，可以直接 `tail -f` 实时看，也能被查询器离线分析\n- 写盘失败不能拖垮主链路（审计是旁路）\n- 缓冲写减少 IO，进程退出前记得 flush\n\"\"\"\nfrom __future__ import annotations\n\nimport io\nimport os\nimport threading"
+          "text": "\"\"\"审计日志器：线程安全追加写，支持缓冲与按大小轮转。\n\n设计要点：\n- 追加写 JSONL，可以直接 `tail -f` 实时看，也能被查询器离线分析\n- 写盘失败不能拖垮主链路（审计是旁路）\n- 缓冲写减少 IO，进程退出前记得 flush\n\"\"\"\nfrom __future__ import annotations\n\nimport io\nimport threading\nimport ti"
         },
         {
           "source": "synth:log",

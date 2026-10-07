@@ -18,11 +18,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HTML = ROOT / "reports" / "dashboard.html"
 
-#: 优先用 PATH 上的 node，再退回本机已知位置（别把开发机的路径写死成唯一解）
+#: 优先用 PATH 上的 node（`shutil.which`），再退回**平台标准安装位置**。
+#:
+#: ⚠ 绝不写死某个开发机的路径 —— 那等于把本机用户名、盘符、包管理器的
+#:   私有目录发布到公开仓库里（既泄露信息，也让别人的 checkout 里
+#:   留一段永不生效的死代码）。
 NODE_CANDIDATES = (
     "node",
-    r"D:\Software\nodejs\node.exe",
-    r"C:\Users\lin\.workbuddy\binaries\node\versions\22.22.2-3\node.exe",
+    # Windows 的标准安装位置（nodejs.org MSI 默认路径）
+    r"C:\Program Files\nodejs\node.exe",
+    r"C:\Program Files (x86)\nodejs\node.exe",
+    "/usr/local/bin/node",
+    "/usr/bin/node",
+    "/opt/homebrew/bin/node",
 )
 
 

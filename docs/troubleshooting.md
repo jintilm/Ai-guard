@@ -11,7 +11,7 @@
 ```bash
 pip install -e .                        # 之后才有 prompt-ids 命令
 python -m prompt_ids.cli "..."          # 模块形式，完全等价
-python E:/Code/Ai-guard/scripts/smoke.py  # 脚本自己会 sys.path.insert 项目根
+python scripts/smoke.py                  # 脚本自己会 sys.path.insert 项目根
 ```
 
 ### `ModuleNotFoundError: No module named 'prompt_ids'`

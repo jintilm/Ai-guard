@@ -133,7 +133,8 @@ def main() -> int:
 
     langs = sorted({lang for lang, _ in old})
     lang_names = {"zh": "中文", "de": "德语", "en": "英语/其他"}
-    report: dict = {"dataset": args.dataset, "n": len(rows), "languages": {}}
+    # ⚠ 只记文件名，不记绝对路径（理由同 `engine_ab.py`）。
+    report: dict = {"dataset": Path(args.dataset).name, "n": len(rows), "languages": {}}
 
     print("攻击样本：L2 特征命中率（词表 en+zh → +de）")
     attack_rows = []

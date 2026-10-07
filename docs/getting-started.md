@@ -5,8 +5,8 @@
 需要 **Python ≥ 3.11**。
 
 ```bash
-git clone <repo-url>
-cd Ai-guard
+git clone https://github.com/<owner>/prompt-ids.git
+cd prompt-ids
 
 pip install -e .                      # 核心：规则层 + 启发层，零重依赖
 pip install -e ".[speed]"            # 可选：规则层加速（装不上会自动退回标准库 re）

@@ -11,7 +11,8 @@
 #   而不是替一个未验证的平台背书。两个平台的差异（路径分隔符、代码页、
 #   文件锁、时序精度）恰恰是最容易出静默失效的地方 ——
 #   本仓库已经吃过一次亏：Windows 的 time.time() 只有 15.625ms 分辨率，
-#   令 canary 轮换在同一个 tick 内静默失效（见 AGENTS.md「测试」一节）。
+#   令 canary 轮换在同一个 tick 内静默失效。回归测试
+#   `test_canary_current_is_newest_even_within_one_clock_tick` 钉住了这一条。
 #
 # ⚠ 这里**不跑**任何需要 API Key 或联网下数据集的脚本。
 #   build_overrefusal.py / build_pint_shape.py / eval_semantic.py / agent_check.py

@@ -1,10 +1,10 @@
 {
-  "dataset": "E:\\Code\\Ai-guard\\data\\public_combined.jsonl",
+  "dataset": "public_combined.jsonl",
   "n": 732,
   "attacks": 301,
   "semantic_backend": "",
   "semantic_calls": 0,
-  "elapsed_ms": 1145.0,
+  "elapsed_ms": 1235.6,
   "level_mix": {
     "safe": 137,
     "low": 478,

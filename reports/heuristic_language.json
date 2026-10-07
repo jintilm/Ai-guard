@@ -1,5 +1,5 @@
 {
-  "dataset": "E:\\Code\\Ai-guard\\data\\full.jsonl",
+  "dataset": "full.jsonl",
   "n": 817,
   "languages": {
     "de": {
@@ -19,7 +19,7 @@
         "hz001_rate": 0.1395,
         "hz_any_rate": 0.9651,
         "mean_hz_subscore": 23.26,
-        "mean_score_delta": 16.48,
+        "mean_score_delta": 16.44,
         "flips_up": 64,
         "flips_into_block": 0
       }
@@ -41,8 +41,8 @@
         "hz001_rate": 0.2358,
         "hz_any_rate": 0.9634,
         "mean_hz_subscore": 25.71,
-        "mean_score_delta": 18.85,
-        "flips_up": 182,
+        "mean_score_delta": 17.65,
+        "flips_up": 169,
         "flips_into_block": 1
       }
     },
@@ -63,8 +63,8 @@
         "hz001_rate": 0.4737,
         "hz_any_rate": 0.6842,
         "mean_hz_subscore": 22.34,
-        "mean_score_delta": 6.91,
-        "flips_up": 4,
+        "mean_score_delta": 5.61,
+        "flips_up": 3,
         "flips_into_block": 0
       }
     }

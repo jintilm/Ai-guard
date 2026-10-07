@@ -43,4 +43,4 @@ critical → block    拦截
 反过来，L3 会把正常的 RAG 系统提示误判成注入（实测 6 条里误判 3~5 条），
 所以代理对 `system` 消息**默认只走规则层**。
 
-完整的实测数字与引用纪律见 [AGENTS.md](../AGENTS.md) 与 [README](../README.md)。
+更完整的实测数字与工程纪律见 [README_Pr.md](../README_Pr.md)。

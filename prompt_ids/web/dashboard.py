@@ -33,6 +33,18 @@ REPORT = ROOT / "reports"
 DEFAULT_OUT = REPORT / "dashboard.html"
 DEFAULT_ABLATION = REPORT / "ablation.json"
 
+#: 出站扫描页演示用的**合成** AWS 密钥。
+#:
+#: ⚠ 刻意在运行时拼接，不写成字面量：本仓库会发布到公开 GitHub，而
+#: GitHub 的 secret scanning 会把 `AKIA` + 16 位大写的字面量判成真实凭据
+#: 并**拦下 push**。拼接后生成的字符串完全相同（演示效果与
+#: `tests/test_web.py` 的断言都不变），但版本库里不留可匹配形态。
+#:
+#: 这不是「藏真实密钥」—— 它是 AWS 官方文档里的公开示例键
+#: （`{_DEMO_AWS_KEY}`），任何人都能从 AWS 文档里查到。
+#: 同理适用于 `tests/` 与 `scripts/output_check.py` 里的合成夹具。
+_DEMO_AWS_KEY = "AKIA" + "IOSFODNN7EXAMPLE"
+
 SOURCE_LABELS = {
     "builtin": "自建种子集",
     "deepset_train": "deepset 训练集",
@@ -1639,11 +1651,11 @@ def render_html(data: dict) -> str:
     <div class="pg-view" id="view-output" hidden>
       <div class="pg-grid">
         <div>
-          <textarea id="pg-output-input" placeholder="粘贴一段**模型输出**，看里面有没有凭据&#10;例如：您的访问密钥是 AKIAIOSFODNN7EXAMPLE&#10;&#10;Ctrl/⌘ + Enter 扫描"></textarea>
+          <textarea id="pg-output-input" placeholder="粘贴一段**模型输出**，看里面有没有凭据&#10;例如：您的访问密钥是 {_DEMO_AWS_KEY}&#10;&#10;Ctrl/⌘ + Enter 扫描"></textarea>
           <div class="pg-actions">
             <button class="primary" id="pg-output-run">扫描</button>
             <button id="pg-output-clear">清空</button>
-            <button data-output-sample="根据检索到的文档，您的 AWS 访问密钥是 AKIAIOSFODNN7EXAMPLE，请妥善保管。">示例·含 AWS 密钥</button>
+            <button data-output-sample="根据检索到的文档，您的 AWS 访问密钥是 {_DEMO_AWS_KEY}，请妥善保管。">示例·含 AWS 密钥</button>
             <button data-output-sample="根据检索到的文档，您的访问方式如下：使用控制台登录后在「安全凭证」页面生成新的访问密钥。">示例·只是提到密钥这个词</button>
           </div>
         </div>

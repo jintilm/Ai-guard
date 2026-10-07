@@ -75,7 +75,8 @@ def benign_texts() -> list[tuple[str, str, str]]:
                 continue
             out.append((path.name, row["text"], "corpus"))
     for path in sorted(ROOT.glob("**/*.py")) + sorted(ROOT.glob("prompt_ids/rules/*.yaml")) + \
-            [ROOT / "README.md", ROOT / "AGENTS.md", ROOT / ".env.example"]:
+            [ROOT / "README.md", ROOT / "README_Pr.md", ROOT / "docs/README.md",
+             ROOT / ".env.example"]:
         if not path.exists() or "__pycache__" in path.parts:
             continue
         if ".workbuddy" in path.parts or path.resolve() == Path(__file__).resolve():

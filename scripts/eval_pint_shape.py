@@ -185,7 +185,8 @@ def main() -> int:
         # 响亮失败：静默跳过会让「少跑了一组」这件事看不出来
         raise SystemExit(f"未知组 {unknown}；可选：{list(groups)}")
 
-    report: dict = {"dataset": args.dataset, "n": len(data), "attacks": attacks, "groups": {}}
+    # ⚠ 只记文件名，不记绝对路径（理由同 `engine_ab.py`）。
+    report: dict = {"dataset": Path(args.dataset).name, "n": len(data), "attacks": attacks, "groups": {}}
     for name in wanted:
         print(f"  运行 {name} ...")
         spec = dict(groups[name])

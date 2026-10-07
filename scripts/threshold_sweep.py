@@ -223,7 +223,8 @@ def main() -> int:
     level_mix = Counter(r["level"] for r in rows)
 
     report = {
-        "dataset": args.dataset,
+        # ⚠ 只记文件名，不记绝对路径（理由同 `engine_ab.py`）。
+        "dataset": Path(args.dataset).name,
         "n": len(rows),
         "attacks": attacks,
         "semantic_backend": args.semantic_backend or "",

@@ -176,7 +176,10 @@ def main() -> int:
             "engine_b": "regex",
             "eq_method": "per-sample finding fingerprint",
             "regex_version": rule_engine.info().get("regex_version"),
-            "dataset": str(args.dataset),
+            # ⚠ 只记文件名：`args.dataset` 可能是绝对路径，
+            # 写进报告就等于把本机目录结构带进版本库（发布到公开仓库时
+            # 会暴露盘符与用户名）。`agent_check.py` 早就是这个写法。
+            "dataset": Path(args.dataset).name,
             "sections": sections,
             "failures": failures,
             "verdict": "identical" if not failures else "mismatch",
