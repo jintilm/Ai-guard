@@ -8,6 +8,19 @@
         → 决策层（融合 / 五级判定 / 策略动作）
 ```
 
+许可与出处：
+本项目代码 [MIT](LICENSE) ·
+`data/` 下转发的第三方数据集各有其许可，见 **[THIRD_PARTY_DATA.md](THIRD_PARTY_DATA.md)**
+（OR-Bench 与 XSTest 是 CC-BY-4.0，署名要求在里面）·
+工程纪律与引用口径见 [AGENTS.md](AGENTS.md)。
+
+📖 **使用文档在 [`docs/`](docs/README.md)** ——
+[快速上手](docs/getting-started.md)（装 / 跑通第一条 / 四个入口怎么选）·
+[部署与运维](docs/operations.md)（接入方式 / 安全三道门 / 配置项 / 监控）·
+[API 参考](docs/api.md)（19 条 REST 路由 + SDK）·
+[故障排查](docs/troubleshooting.md)（按症状组织）。
+本 README 是项目总览与实测数据；**要动手用就直接看 docs/。**
+
 ## 安装
 
 ```bash
@@ -937,6 +950,19 @@ python scripts/agent_check.py --semantic                          # agent 面评
 虚高 **+0.1009**（召回 0.8167 → 1.0000，全是背下来的）。所以引用轻量模型的数字时
 只能取中间那行；`reports/lightweight.json` 由脚本自动落盘，换了数据集要重跑
 （报告文件会悄悄过期）。
+
+> ⚠ **`models/lightweight.joblib` 不在版本库里**（`.gitignore` 挡着）。两个理由：
+> ① 它的 TF-IDF 词表**派生自评测语料**，入库等于把语料统计第二次带进仓库；
+> ② 入库的二进制会与报告里的数字**悄悄漂移** —— 陈旧模型配新数字。
+>
+> 所以 clone 之后要用 `--semantic-backend lightweight`，得先自己训一次：
+>
+> ```bash
+> python scripts/train_lightweight.py --only --dataset data/full.jsonl --holdout deepset_test
+> ```
+>
+> 裸跑（不带 `--dataset`）会**拒绝执行并退出 2**：它只会拿 85 条内置种子集训练，
+> 却覆盖生产模型。要小跑请显式 `--force` 或 `--out` 到临时路径。
 
 ## PINT 形状基准（多语种 + 过防御）
 

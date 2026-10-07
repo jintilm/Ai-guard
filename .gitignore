@@ -22,7 +22,23 @@ venv/
 
 # 运行期产物（审计日志等）
 logs/
+# 复核语料含原文，刻意不入库（审计层只存指纹，队列只给指纹）
 data/review_corpus.jsonl
-# 复核语料含原文，刻意不入库
 data/review_mined.jsonl
-# 复核语料含原文，刻意不入库
+
+# 训练产物：可由 `python scripts/train_lightweight.py` 重建，且它的
+# TF-IDF 词表**派生自评测语料** —— 入库等于把语料统计第二次带进仓库；
+# 而 README 引用的数字又会与入库的二进制产生漂移（陈旧模型 vs 新数字）。
+*.joblib
+models/
+
+# 编辑器 / 操作系统 / 临时文件
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+*.log
+*.tmp
+*.bak
