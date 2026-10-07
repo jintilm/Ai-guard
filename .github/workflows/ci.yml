@@ -112,6 +112,25 @@ jobs:
         # 只查 prompt_ids scripts tests，不查 data/：data/raw/ 是下载来的第三方语料，
         # 对它跑 lint 只会产出与本项目无关的噪声。
 
+      # ⚠ 诊断步骤（2026-10 加，**非闸门**）：有一条子进程用例
+      #   `test_cli_output_scan_is_a_separate_mode_from_input_scanning`
+      #   在本机全绿、只有 Windows CI 报 `assert 1 == 0`（退出码 1 = 未捕获异常）。
+      #
+      #   已排除：缺 transformers/torch（真 venv 复现不出）· 本机 .env
+      #   （清掉后仍复现不出）· 中文参数的编码路径 · 调用顺序 · 工作目录。
+      #   ⇒ 只能靠 CI 上**真实的 traceback**定位。而原版 `_run_cli`
+      #   只返回 returncode，把 stderr 丢进黑洞 —— 于是连查三轮都只能猜。
+      #
+      #   这一步把那条用例单独跑一遍并打印 stderr：它失败时 CI 日志里
+      #   会直接出现异常内容，不必再等「单测」那步的 `assert 1 == 0`。
+      #   定位后**删掉这一步**（它是临时诊断，不是常设检查）。
+      - name: 诊断（子进程 CLI 用例）
+        continue-on-error: true
+        run: |
+          python -m pytest tests/test_output_secrets.py -k separate_mode -x --tb=long
+          python -c "import subprocess,sys; r=subprocess.run([sys.executable,'-m','prompt_ids.cli','文档里的示例密钥 AKIAIOSFODNN7EXAMPLE 是公开的样例'],capture_output=True,text=True,encoding='utf-8',errors='replace'); print('rc=',r.returncode); print('STDERR>>>'); print(r.stderr); print('<<<STDERR')"
+        # ⚠ 上面那句中文命令行是**故意**的：它复刻失败用例的参数原样。
+
       - name: packaging 自检（package-data 有没有真的装进去）
         run: python -m prompt_ids.cli --rules-stats
         # 这条是**闸门**而不是装饰：prompt_ids/rules/*.yaml 是 package-data，

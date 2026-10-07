@@ -396,6 +396,15 @@ def test_by_kind_counts_survive_the_report_cap():
 
 
 def _run_cli(*args: str) -> tuple[int, str]:
+    """跑一次 CLI，返回 (退出码, stdout)。
+
+    ⚠ **失败时把 stderr 一起报出来**（2026-10 加）。原版只返回
+    `proc.returncode`，于是一条子进程以退出码 1 挂掉时，断言里只看到
+    `assert 1 == 0` —— **异常内容被丢进黑洞**，排查只能靠猜。
+    同一个失败在 CI 上连查三轮都没能本地复现，就是因为看不到 traceback。
+    教训与项目里其它几处一致：**报错要指到真正的原因**，
+    而「只报退出码」是最常见的断链点。
+    """
     import subprocess
     import sys
     from pathlib import Path
@@ -405,6 +414,11 @@ def _run_cli(*args: str) -> tuple[int, str]:
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         cwd=str(Path(__file__).resolve().parent.parent),
     )
+    if proc.returncode not in (0, 2, 3):
+        raise AssertionError(
+            f"CLI 异常退出（rc={proc.returncode}）args={args}\n"
+            f"--- stderr ---\n{proc.stderr}\n"
+            f"--- stdout ---\n{proc.stdout}")
     return proc.returncode, proc.stdout
 
 
