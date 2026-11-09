@@ -37,7 +37,7 @@ from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
 from prompt_ids.auth import authorized
-from prompt_ids.net import warn_if_exposed
+from prompt_ids.net import send_security_headers, warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
 
@@ -156,6 +156,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
+        send_security_headers(self.send_header)
         self.end_headers()
         self.wfile.write(payload)
 
@@ -170,6 +171,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        send_security_headers(self.send_header)
         self.end_headers()
         self.wfile.write(body)
 
@@ -295,6 +297,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")   # 别让反代缓冲住这条流
         self.send_header("Connection", "close")
+        send_security_headers(self.send_header)
         self.end_headers()
         try:
             self._write_sse({"type": "hello", "seq": self.state.seq,

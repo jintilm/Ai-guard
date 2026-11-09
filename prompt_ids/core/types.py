@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -103,6 +104,20 @@ class ScanResult:
     @property
     def is_blocked(self) -> bool:
         return self.action in (Action.BLOCK, Action.SANDBOX)
+
+    def detached(self) -> ScanResult:
+        """返回一个**不共享可变成员**的副本。
+
+        缓存命中时必须用它。`copy.copy` 是浅拷贝：`findings` 与 `latency_ms`
+        仍指向缓存里那一份，调用方随手 `result.findings.append(...)` 或
+        `result.latency_ms["x"] = 1`，改的就是**缓存本身** —— 下一次命中会读到
+        上次调用方留下的脏数据，而且没有任何报错。`Finding` 是 frozen 的，
+        所以列表逐元素复制即可；`skipped` 是 tuple，天然不可变。
+        """
+        clone = copy.copy(self)
+        clone.findings = list(self.findings)
+        clone.latency_ms = dict(self.latency_ms)
+        return clone
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -140,12 +140,32 @@ _DECODERS: tuple[DecoderStep, ...] = (
     DecoderStep("percent", _decode_percent),
     DecoderStep("base64", _decode_base64),
     DecoderStep("hex", _decode_hex),
+)
+
+#: **默认关闭**的解码器 —— 只有显式 `enabled=(..., "rot13")` 才会跑。
+#:
+#: rot13 曾经在默认集合里，实测是纯亏：跨 6 个数据集（约 3700 条）统计
+#: 「仅在 rot13 变体命中、其余变体不命中」的样本，结果是 **0 条**；
+#: 而它给每条样本都加一个 24 变体配额里的名额 ⇒ 规则层 243.6ms → 134.6ms
+#: （省 44.7%），换来的检出是零。原因不难理解：rot13 不是「编码」而是
+#: **替换密码**，攻击者没有任何动机用它 —— 它既不绕过过滤器也不省 token，
+#: 而 base64/hex/percent 这些能真正藏住字面串。
+#:
+#: 保留实现是因为：① 它是 `Variant.kind` 的合法取值，删掉会改变对外枚举；
+#: ② 需要时一行参数就能开回来，不用改代码。
+_OPT_IN_DECODERS: tuple[DecoderStep, ...] = (
     DecoderStep("rot13", _decode_rot13, strict=False),
 )
 
+_ALL_DECODERS: tuple[DecoderStep, ...] = _DECODERS + _OPT_IN_DECODERS
+
 
 class DecodeExpander:
-    """BFS 展开解码变体。max_hops 控制层数，max_variants 控制总量。"""
+    """BFS 展开解码变体。max_hops 控制层数，max_variants 控制总量。
+
+    `enabled` 缺省 = 只跑 `_DECODERS`（不含 rot13）；显式给出名字集合时
+    从**全部**解码器里挑 —— 所以 `enabled=("rot13",)` 依然可用。
+    """
 
     def __init__(
         self,
@@ -155,8 +175,17 @@ class DecodeExpander:
     ):
         self.max_hops = max_hops
         self.max_variants = max_variants
-        names = set(enabled) if enabled is not None else None
-        self.steps = [s for s in _DECODERS if names is None or s.name in names]
+        if enabled is None:
+            self.steps = list(_DECODERS)
+        else:
+            names = set(enabled)
+            unknown = names - {s.name for s in _ALL_DECODERS}
+            if unknown:
+                # 静默忽略拼错的名字 = 「我明明开了却什么都没发生」，
+                # 与本项目其他地方的未知枚举同名失败（见 rule 的 validator）。
+                raise ValueError(f"未知解码器：{sorted(unknown)}；"
+                                 f"可用：{sorted(s.name for s in _ALL_DECODERS)}")
+            self.steps = [s for s in _ALL_DECODERS if s.name in names]
 
     def expand(self, text: str) -> list[Variant]:
         """返回去重后的变体集合，第一个恒为原文（kind=original）。"""

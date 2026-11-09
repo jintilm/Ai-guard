@@ -40,6 +40,42 @@ import sys
 LOOPBACK_NAMES = frozenset({"localhost", "localhost.localdomain", ""})
 
 
+#: 三个 HTTP 入口的**每一个**响应都该带的头。
+#:
+#: 这项此前只在 REST API 的 `_send` 里生效（`api/server.py`），代理与检测台
+#: 一个都没有 —— 而它们才是「有交互面板」的那个：
+#:
+#: - `X-Frame-Options` / CSP `frame-ancestors`：检测台能被 iframe 嵌进任意站点
+#:   ⇒ 点击劫持。面板上的按钮会**签发 canary 令牌**、**改写判定结果**
+#:   （`/v1/review` 会把一条样本标成 attack 写进记忆库），
+#:   嵌一层透明 iframe 就能诱导运维人员点下去。
+#: - `X-Content-Type-Options: nosniff`：浏览器不许嗅探 Content-Type，
+#:   否则任何被回显成 `text/plain` 的内容都能变成 HTML/JS。
+#: - `Referrer-Policy`：看板 URL 可能带查询参数（如 `?last_seq=`），不外泄。
+#:
+#: CSP 故意只用 `frame-ancestors` / `base-uri` 两条：**不限制资源加载**。
+#: 加上 `default-src 'self'` 会连带禁掉看板里的内联 `<script>`/`<style>`
+#: （整个检测台是内联写在一个 HTML 里的）—— 那是把安全头加成了白屏。
+SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'none'"),
+    ("Referrer-Policy", "no-referrer"),
+)
+
+
+def send_security_headers(send_header, *, skip: frozenset[str] = frozenset()) -> None:
+    """把 `SECURITY_HEADERS` 逐个交给 `send_header`。
+
+    `skip` 是小写头名集合：代理转发上游响应时用它跳过上游**已经**给过的头，
+    免得同一个头出现两次（部分客户端对重复的 `X-Frame-Options` 会直接拒绝）。
+    """
+    for name, value in SECURITY_HEADERS:
+        if name.lower() in skip:
+            continue
+        send_header(name, value)
+
+
 def is_loopback(host: str) -> bool:
     """`host` 是否只监听本机。
 

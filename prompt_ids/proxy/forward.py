@@ -12,12 +12,23 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 
+from prompt_ids.auth import HEADER as CLIENT_AUTH_HEADER
+
 # 逐跳首部不能转发，否则客户端会解析错乱
 _HOP_BY_HOP = frozenset({
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailer", "transfer-encoding", "upgrade", "content-length",
     "host", "accept-encoding",
 })
+
+#: **本服务自己的**客户端凭据头，永不转发给上游。
+#:
+#: 客户端带 `X-API-Key` 是来证明「我有权调这个代理」的，与上游没有任何关系。
+#: 转发出去的后果不只是「多一个无意义的头」：
+#: - 不少网关看到不认识的 `X-API-Key` 会直接 401，症状看起来像**上游坏了**；
+#: - 而它就是代理的鉴权口令 —— 一旦上游（或其日志、其错误回显）把它记下来，
+#:   拿到它的人就能直接调用这个代理。凭据只该单向流动。
+_NEVER_FORWARD = frozenset({CLIENT_AUTH_HEADER.lower()})
 
 
 class UpstreamError(Exception):
@@ -27,17 +38,35 @@ class UpstreamError(Exception):
         self.body = body
 
 
-def forward_headers(headers) -> dict[str, str]:
-    """挑选可转发的请求头，并去掉逐跳字段。"""
+def forward_headers(headers, client_key: str = "") -> dict[str, str]:
+    """挑选可转发的请求头，并去掉逐跳字段与**本服务自己的**凭据。
+
+    `client_key` 非空时，`Authorization` 若恰好等于它（`Bearer` 形式或裸值），
+    也一并剥掉：`auth.authorized` 允许用 Bearer 承载客户端凭据，
+    否则那条路径会把同一个口令透传给上游 —— 与 `X-API-Key` 同一个洞。
+    只剥**完全相等**的值，所以真正的上游令牌不受影响。
+    """
     out: dict[str, str] = {}
     for key, value in headers.items():
-        if key.lower() in _HOP_BY_HOP:
+        lowered = key.lower()
+        if lowered in _HOP_BY_HOP or lowered in _NEVER_FORWARD:
             continue
-        if key.lower().startswith("x-") and key.lower().startswith("x-prompt-ids"):
+        if lowered.startswith("x-prompt-ids"):
+            continue
+        if client_key and lowered == "authorization" and _same_secret(value, client_key):
             continue
         out[key] = value
     out["accept-encoding"] = "identity"  # 避免拿到 gzip 后要额外解压
     return out
+
+
+def _same_secret(value: str, client_key: str) -> bool:
+    """`Authorization` 的值是不是本服务的客户端口令。"""
+    text = (value or "").strip()
+    if text.lower().startswith("bearer "):
+        text = text[7:].strip()
+    return bool(text) and text == client_key
+
 
 
 def post_json(

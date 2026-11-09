@@ -35,7 +35,7 @@ from prompt_ids.audit.events import (
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, ScanResult, level_rank
-from prompt_ids.net import warn_if_exposed
+from prompt_ids.net import send_security_headers, warn_if_exposed
 from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
 from prompt_ids.preprocess.guard import RateLimiter, fingerprint
 from prompt_ids.proxy import trajectory
@@ -513,6 +513,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        send_security_headers(self.send_header)
         self.end_headers()
         self.wfile.write(body)
 
@@ -528,10 +529,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if body_modified:
             skip |= {"etag", "content-md5", "digest", "content-digest"}
         self.send_response(status)
+        sent: set[str] = set()
         for key, value in headers.items():
             if key.lower() in skip:
                 continue
+            sent.add(key.lower())
             self.send_header(key, value)
+        # 上游没给的头补上；给了就以上游为准（别让同一个头发两遍）
+        send_security_headers(self.send_header, skip=frozenset(sent))
         self.end_headers()
 
     # ---------- 路由 ----------
@@ -566,6 +571,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Retry-After", str(retry))
         self.send_header("Content-Length", str(len(body)))
+        send_security_headers(self.send_header)
         self.end_headers()
         self.wfile.write(body)
 
@@ -611,8 +617,26 @@ class ProxyHandler(BaseHTTPRequestHandler):
             raise ValueError("Content-Length 不能为负")
         return value
 
+    def _body_length(self) -> int:
+        """**要排空的字节数**。拒绝路径专用，任何异常都退化成 0。
+
+        与 `_content_length()` 的区别只有一个：不抛。拒绝路径（401 / 429）本身
+        就是在处理非法请求，此时再抛 ValueError 只会把「清晰的 4xx」变成
+        traceback + 空响应 —— 这正是 `len("Content-Length 字符串")` 那个 bug
+        的另一种表现形式。
+        """
+        try:
+            return self._content_length()
+        except ValueError:
+            return 0
+
     def _drain(self, length: int) -> None:
-        """把请求体分块读干净（不装进内存），避免回 RST。"""
+        """把请求体分块读干净（不装进内存），避免回 RST。
+
+        `length` 必须是**字节数**。传 `Content-Length` 的字符串长度（例如
+        `len("200065") == 6`）只会读掉开头的几个字节就回响应并关连接，
+        客户端剩余 body 写不出去 ⇒ `ConnectionAbortedError`。
+        """
         remaining = length
         while remaining > 0:
             chunk = self.rfile.read(min(remaining, 65536))
@@ -669,7 +693,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def _reject_unauthorized(self) -> None:
         """401。**先排空 body 再响应**，否则客户端收到的是 RST 而不是 401
         （与 413 / 411 同一个坑，本项目已因此复发三次）。"""
-        self._drain(len(self.headers.get("Content-Length") or 0) or 0)
+        self._drain(self._body_length())
         if self.headers.get("Transfer-Encoding", "").lower().strip() == "chunked":
             self._drain_chunked()
         self._send_json(401, {"error": {
@@ -684,7 +708,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
         # 限流在**读 body 之前**判：否则被限流的请求仍然能把 2MB body 灌进代理
         if self._rate_limited():
-            self._drain(len(self.headers.get("Content-Length") or 0) or 0)
+            self._drain(self._body_length())
             self._too_many_requests()
             return
         try:
@@ -812,7 +836,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     # ---------- 转发 ----------
     def _build_headers(self) -> dict[str, str]:
-        headers = forward_headers(self.headers)
+        # `client_key` 传进去是为了剥掉「用 Bearer 承载的客户端口令」——
+        # 它是本服务的鉴权凭据，不该出现在上游的请求里（`X-API-Key` 同理，
+        # 已在 `forward_headers` 内部无条件剥掉）。
+        headers = forward_headers(self.headers, client_key=self.config.client_key)
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         headers["Content-Type"] = "application/json"

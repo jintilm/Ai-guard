@@ -19,7 +19,7 @@ from prompt_ids.api.app import (
     ApiError,
     resolve,
 )
-from prompt_ids.net import warn_if_exposed
+from prompt_ids.net import send_security_headers, warn_if_exposed
 from prompt_ids.preprocess.guard import RateLimiter
 
 DEFAULT_PORT = 8790
@@ -104,7 +104,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("X-Content-Type-Options", "nosniff")
+        send_security_headers(self.send_header)
         self.end_headers()
         self.wfile.write(body)
 
@@ -298,6 +298,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        send_security_headers(self.send_header)
         self.end_headers()
 
 

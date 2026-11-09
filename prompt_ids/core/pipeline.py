@@ -1,7 +1,6 @@
 """流水线编排：层串联、短路、超时、缓存。"""
 from __future__ import annotations
 
-import copy
 import time
 from dataclasses import dataclass
 
@@ -290,9 +289,11 @@ class Pipeline:
         if self.config.enable_cache:
             cached = self.guard.cache.get(cache_key)
             if cached is not None:
-                hit_result: ScanResult = copy.copy(cached)
+                # `detached()` 而不是 `copy.copy`：浅拷贝会让 findings /
+                # latency_ms 与缓存条目**共用同一个对象**，调用方一改就污染缓存
+                # （实测：给返回结果 append 一个元素，第三次扫描就读到了它）。
+                hit_result: ScanResult = cached.detached()
                 hit_result.cached = True
-                hit_result.latency_ms = dict(cached.latency_ms)
                 hit_result.latency_ms["total_cached"] = (time.perf_counter() - started) * 1000.0
                 return hit_result
 
