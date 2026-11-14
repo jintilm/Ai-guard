@@ -1,3 +1,5 @@
+[English](README_EN.md) | 中文
+
 # prompt-ids
 
 <p align="center">
