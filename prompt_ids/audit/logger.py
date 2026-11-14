@@ -124,8 +124,8 @@ class AuditLogger:
             self._pending.clear()
         except OSError:
             # 审计失败不能影响主流程，宁可丢日志也不让服务挂掉
+            self.dropped += len(self._pending)
             self._pending.clear()
-            self.dropped += 1
 
     def _rotate_if_needed(self) -> None:
         if not self.max_bytes or not self.path.exists():

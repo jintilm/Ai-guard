@@ -50,7 +50,7 @@ def strip_invisible(text: str) -> str:
 
 
 def fold_spacing(text: str) -> str:
-    """剥离字符间插入的空白<｜hy_place▁holder▁no▁813｜>分隔。用于生成「挤压」变体，不改动原文语义。"""
+    """剥离字符间插入的空白/分隔。用于生成「挤压」变体，不改动原文语义。"""
     return "".join(ch for ch in text if ch not in _SEPARATORS)
 
 

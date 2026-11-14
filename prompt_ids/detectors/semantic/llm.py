@@ -33,7 +33,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 import urllib.error
 import urllib.request
@@ -100,8 +99,26 @@ User text:
 ---"""
 
 _SYSTEM_PROMPT = "You output strict JSON only."
-#: 裁判返回的第一个 JSON 对象（各家会包 markdown 代码块，所以要搜而不是直接 parse）
-_JSON_BLOCK = re.compile(r"\{[^{}]*\}", re.DOTALL)
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """从模型输出里抽出第一个完整的 JSON 对象。
+
+    裁判经常把结果包在 markdown 代码块里，甚至 reason 里带大括号。
+    用 json.JSONDecoder 逐个 `{` 尝试解析，能正确处理嵌套对象与字符串中的大括号，
+    而不是像旧的扁平 JSON 正则那样只吃一层大括号。
+    """
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            obj, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            return obj
+    return None
 
 #: 配置类错误：同一个端点重试没有意义，直接换下一个
 _FATAL_HTTP = (400, 401, 403, 404, 422)
@@ -389,8 +406,8 @@ class LLMBackend(SemanticBackend):
         单独暴露 `parsed` 是给 `llm_check.py` 用的：只看概率的话，
         "真的调通了" 和 "每条都退化成 0.5 中立" 分不开 —— 后者曾是假通过的来源。
         """
-        match = _JSON_BLOCK.search(content)
-        if not match:
+        obj = _extract_json_object(content)
+        if obj is None:
             if not content.strip() and finish_reason == "length":
                 # 最恶劣的一类静默失效：推理模型把 max_tokens 烧在 reasoning_content 上，
                 # content 为空 → 每条样本都退化成 0.5 中立，而外面看起来"调用成功"。
@@ -400,10 +417,6 @@ class LLMBackend(SemanticBackend):
                     f"或用 PROMPT_IDS_LLM_EXTRA_BODY 关闭思考链）"
                 ), False
             return 0.5, f"裁判返回非 JSON：{content[:80]}", False
-        try:
-            obj = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return 0.5, f"裁判 JSON 解析失败：{match.group(0)[:80]}", False
         verdict = bool(obj.get("injection", False))
         confidence = float(obj.get("confidence", 0.5) or 0.5)
         confidence = min(1.0, max(0.0, confidence))

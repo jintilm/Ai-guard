@@ -260,7 +260,10 @@ def handle_scan_batch(ctx: ApiContext, payload: Any, params: dict) -> tuple[int,
         cleaned.append(item)
 
     user = str(_optional_key(payload, "user", "api") or "api")
-    results = [ctx.pipeline.scan(t, user=user) for t in cleaned]
+    policy = payload.get("policy")
+    if policy is not None and not isinstance(policy, str):
+        raise ApiError(400, "bad_request", "policy 必须是字符串（default/strict/permissive/log-only）")
+    results = [ctx.pipeline.scan(t, user=user, policy_name=policy) for t in cleaned]
     for r, t in zip(results, cleaned):
         ctx.record(r)
         if ctx.audit is not None:
@@ -722,12 +725,96 @@ OPENAPI = {
     "paths": {},
 }
 
+_SCAN_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "number"},
+        "level": {"type": "string", "enum": ["safe", "low", "medium", "high", "critical"]},
+        "action": {"type": "string", "enum": ["pass", "log", "review", "sandbox", "block"]},
+        "findings": {"type": "array"},
+        "explained": {"type": "string"},
+        "fingerprint": {"type": "string"},
+        "latency_ms": {"type": "object"},
+        "skipped": {"type": "array"},
+    },
+}
+
+_REQUEST_BODIES: dict[str, dict[str, Any]] = {
+    "/v1/scan": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+            "text": {"type": "string"},
+            "user": {"type": "string"},
+            "policy": {"type": "string",
+                       "enum": ["default", "strict", "permissive", "log-only"]},
+        },
+    },
+    "/v1/scan/batch": {
+        "type": "object",
+        "required": ["texts"],
+        "properties": {
+            "texts": {"type": "array", "items": {"type": "string"}},
+            "user": {"type": "string"},
+            "policy": {"type": "string",
+                       "enum": ["default", "strict", "permissive", "log-only"]},
+        },
+    },
+    "/v1/scan/output": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {"text": {"type": "string"}},
+    },
+    "/v1/canary/issue": {
+        "type": "object",
+        "properties": {"label": {"type": "string"}},
+    },
+    "/v1/canary/check": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {"text": {"type": "string"}},
+    },
+    "/v1/memory/add": {
+        "type": "object",
+        "properties": {
+            "texts": {"type": "array", "items": {"type": "string"}},
+            "text": {"type": "string"},
+            "label": {"type": "integer", "enum": [0, 1]},
+            "source": {"type": "string"},
+        },
+    },
+    "/v1/memory/search": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {"text": {"type": "string"}, "k": {"type": "integer"}},
+    },
+    "/v1/memory/feedback": {
+        "type": "object",
+        "required": ["text", "is_attack"],
+        "properties": {
+            "text": {"type": "string"},
+            "is_attack": {"type": "boolean"},
+        },
+    },
+    "/v1/review": {
+        "type": "object",
+        "required": ["text", "is_attack"],
+        "properties": {
+            "text": {"type": "string"},
+            "is_attack": {"type": "boolean"},
+            "reviewer": {"type": "string"},
+            "note": {"type": "string"},
+        },
+    },
+}
+
 
 def _build_openapi() -> dict[str, Any]:
-    """从 ROUTES 生成 paths。
+    """从 ROUTES 生成 paths，并给核心端点补上请求/响应 schema。
 
     `/v1/openapi.json` 原先返回的是空 paths —— 一个宣称自己是 OpenAPI 文档、
     却不列任何端点的接口，比没有这个接口更糟（客户端会当成「就这些」）。
+    现在至少让 `/v1/scan` 系列有可供客户端生成代码用的契约形状。
     """
     spec = dict(OPENAPI)
     paths: dict[str, Any] = {}
@@ -736,11 +823,22 @@ def _build_openapi() -> dict[str, Any]:
             continue
         operation = handler.__doc__ or ""
         summary = operation.strip().splitlines()[0] if operation.strip() else route
-        paths.setdefault(route, {})[verb.lower()] = {
+        op_spec: dict[str, Any] = {
             "summary": summary,
             "responses": {"200": {"description": "成功"}},
         }
+        if verb == "POST" and route in _REQUEST_BODIES:
+            op_spec["requestBody"] = {
+                "required": True,
+                "content": {"application/json": {"schema": _REQUEST_BODIES[route]}},
+            }
+        if route in ("/v1/scan", "/v1/scan/batch"):
+            op_spec["responses"]["200"]["content"] = {
+                "application/json": {"schema": _SCAN_RESULT_SCHEMA}
+            }
+        paths.setdefault(route, {})[verb.lower()] = op_spec
     spec["paths"] = paths
+    spec["components"] = {"schemas": {"ScanResult": _SCAN_RESULT_SCHEMA}}
     return spec
 
 

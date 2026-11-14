@@ -110,7 +110,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         runner = Path(tmp) / "runner.js"
         runner.write_text(HARNESS + script + FOOTER, encoding="utf-8")
-        proc = subprocess.run([node, str(runner)], capture_output=True, text=True, timeout=90)
+        proc = subprocess.run([node, str(runner)], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=90)
 
     if proc.returncode != 0:
         print("JS 执行失败：")
