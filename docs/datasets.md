@@ -108,7 +108,9 @@ python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --ma
 两组失败均来自同一篇文档的三个良性引用变体，网关返回 **HTTP 406 + HTML**，
 因此失败并非随机缺失；生产管线在这些样本上按语义弃票处理。
 对成功判决的子集单独统计也会改变人群，不能把它当成无偏修正。
-模型列表接口返回 HTTP 502，但裁判接口的正常请求能返回合法 JSON。
+该网关不支持模型列表查询，需指定模型名直接调用；模型可用性以
+`POST /v1/chat/completions` 返回有效判决为准。列表请求曾返回 HTTP 502，
+这不能作为模型不可用的依据，也不计入上述裁判调用失败率。
 
 最终报告复用了每组 21 条成功预测，只补跑每组 3 条失败样本；
 `model_calls_this_run` 不包含先前缓存的请求，`uncached_latency_ms` 也仅描述本次未命中缓存的调用。
@@ -186,8 +188,11 @@ blocked 9/12 attacks. Benign blocking, including semantic-abstention paths, was 
 
 Each strategy failed on the same three benign quotation variants with **HTTP 406 and HTML**,
 a 12.5% abstention rate. Among successful verdicts, benign blocking was 3/9 and 2/9;
-this subset changes the population and is not an unbiased correction. The model-list
-endpoint returned HTTP 502 while ordinary classification requests produced valid JSON.
+this subset changes the population and is not an unbiased correction. This gateway does
+not support model listing: specify the model and call `POST /v1/chat/completions` directly.
+Availability is established by valid classification responses. The HTTP 502 observed on
+the unsupported listing endpoint does not establish model unavailability and is excluded
+from the classification failure rate above.
 The final report reused 21 successful predictions per strategy and retried three failures
 per strategy. `model_calls_this_run` excludes earlier cached calls, and uncached latency
 describes only requests made during that resumed run. The paired group-macro recall

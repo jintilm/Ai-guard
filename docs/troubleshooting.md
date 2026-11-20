@@ -144,8 +144,15 @@ PROMPT_IDS_LLM_USER_AGENT="Mozilla/5.0" python scripts/llm_check.py
 **静默假成功，比 502 更危险。** 通常是 `base_url` **漏了 `/v1` 前缀**。
 
 ```bash
-python -m prompt_ids.cli --list-models deepseek   # 应返回 JSON 模型列表
+python scripts/llm_check.py   # 使用已配置的模型直接请求，检查是否取得有效判决
 ```
+
+### 网关不支持模型列表查询
+
+部分兼容网关仅支持直接调用指定模型，不提供 `GET /v1/models`。
+配置 `PROMPT_IDS_LLM_MODEL` 后，使用上面的 `llm_check.py` 验证实际判决即可。
+`--list-models` 是可选诊断，列表请求失败不能据此判定模型不可用。
+正常检测与后端自动选择不依赖列表请求。
 
 ### 连通但每条都退化成 p=0.5
 
