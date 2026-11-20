@@ -1,0 +1,82 @@
+{
+  "version": "rag-context-v1",
+  "seed": 20261120,
+  "counts": {
+    "rows": 1511,
+    "unique_normalized_texts": 1511,
+    "groups": 24,
+    "documents": 48,
+    "templates": 24,
+    "paired_insertions": 690,
+    "cross_split_group_overlap": 0,
+    "by_split": {
+      "dev": 1016,
+      "test": 495
+    },
+    "by_language": {
+      "en": 814,
+      "zh": 697
+    },
+    "by_kind": {
+      "clean": 131,
+      "attack": 690,
+      "quoted_attack": 690
+    },
+    "by_position": {
+      "none": 131,
+      "head": 262,
+      "middle": 262,
+      "tail": 262,
+      "random": 262,
+      "gap": 166,
+      "boundary": 166
+    },
+    "groups_by_split": {
+      "dev": 16,
+      "test": 8
+    }
+  },
+  "generator_sha256": "27be18d19004e0788d2b30b0424ae59ea2c52544339d47aaeace2da249c7ad06",
+  "inputs": {
+    "catalog.json": "b8def66536d38dd28826d22072ec96526bc66ff6b11cdb77c777b4807d865c6a",
+    "payloads.json": "a7923e629a1a45ce82eda99c5583d96f2be0c8e0e6795cd6cf4a74d43f687d18",
+    "sources.json": "c65b91658a28273c538b166cb09599abce075a553dcabf4dfdfb159e38c7c6a8"
+  },
+  "construction": {
+    "length_caps": [
+      3000,
+      12000,
+      30000
+    ],
+    "placement_budget": 3000,
+    "padding": false,
+    "detector_used_for_labels": false,
+    "split_unit": "topic + bilingual document pair + bilingual attack template",
+    "independent_unit": "group_id, not generated row",
+    "human_reviewed": false,
+    "test_frozen_before_measurement": true
+  },
+  "quality": {
+    "source_checksums_verified": true,
+    "near_duplicates": {
+      "method": "NFKC/casefold/whitespace canonicalization, character 24-shingle Jaccard",
+      "threshold": 0.85,
+      "comparisons": 512,
+      "maximum_cross_split_similarity": 0.021323,
+      "limitation": "Lexical check; semantic paraphrases are not proven independent."
+    },
+    "existing_corpus_exact_collisions": 0
+  },
+  "scope": [
+    "Public Kubernetes documentation backgrounds; synthetic attacks and quotation controls.",
+    "One source/domain; not unseen-source generalization or production traffic.",
+    "Not an AgentDojo run; attack intent labels do not measure attack success.",
+    "AI-assisted annotations, not independent human adjudication.",
+    "Benign data used to tune a detector ceases to be an untouched holdout."
+  ],
+  "file": "rag_bench.jsonl.gz",
+  "sha256": "953500c5972265cb20932604d6b640045bc607f751880dd5a716cffebe2c1795",
+  "uncompressed_sha256": "857c99b54d705b917361500a44feac709ea74933ae25554e0ae306e7b8ee273a",
+  "bytes": 2207694,
+  "uncompressed_bytes": 25997530
+}

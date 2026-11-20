@@ -241,6 +241,22 @@ python scripts/output_check.py
 引用数字时注意：公开集优先，`deepset_test` 留出集不参与调参；带 `⚠不可用`
 标记的消融组不可引用；`≥medium` 与 `≥high` 两个口径不可混比。
 
+新增 [中英文上下文 RAG 数据集](docs/datasets.md)：**1,511 条场景、24 个母组**，
+来自 48 篇公开技术文档，配有合成注入与引用攻击样例的正常对照。
+开发集 1,016 条、冻结测试集 495 条；翻译和变体按母组隔离。
+长度上限 3k/12k/30k 字符，覆盖头中尾、随机位置、采样间隙和边界。
+这是一套真实文档背景上的合成压力集，标注为 AI 辅助，尚未独立人工复核。
+
+```bash
+python -X utf8 scripts/build_rag_bench.py
+python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
+```
+
+构建默认离线，可核对来源、许可、SHA-256 和切分；显式 `--mode llm` 可配对比较
+`head` / `stratified`，支持失败标记、调用上限和缓存续跑。
+首次 LLM 试跑遇到网关 HTTP 404，暂不提供两种策略的准确率结论。
+纯良性集合若参与过规则或阈值调整，也必须视为开发数据。
+
 ## Comparison
 
 | | prompt-ids | LLM Guard / Rebuff | promptfoo |

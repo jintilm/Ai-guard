@@ -1,0 +1,7 @@
+# These bytes are checksummed against pinned upstream Git blobs.
+data/raw/rag_context/** -text
+data/rag_bench.jsonl.gz -text
+# Reconstruction inputs/manifests must not change with core.autocrlf on Windows.
+data/rag_context/*.json text eol=lf
+data/rag_bench.manifest.json text eol=lf
+reports/rag_*.json text eol=lf

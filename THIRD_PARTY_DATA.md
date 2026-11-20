@@ -17,6 +17,21 @@
 | XSTest（safe 半边） | `data/raw/jkminder__xstest-overrefusal__*.parquet` | [`jkminder/xstest-overrefusal`](https://huggingface.co/datasets/jkminder/xstest-overrefusal) | CC-BY-4.0 |
 | Lakera Gandalf | `data/raw/gandalf__*.parquet` | [`Lakera/gandalf_ignore_instructions`](https://huggingface.co/datasets/Lakera/gandalf_ignore_instructions) | MIT |
 | palMPS | `data/raw/pallms_promptinjection.txt` | [`mik0w/pallms`](https://github.com/mik0w/pallms) | 见上游仓库 |
+| Kubernetes Documentation | `data/raw/rag_context/` | [`kubernetes/website`](https://github.com/kubernetes/website/tree/542bad2ab92dd6ee7916b2b916d84cda64c77f6c) | CC-BY-4.0 |
+
+## Kubernetes 文档署名与修改
+
+Kubernetes Authors and documentation contributors, *Kubernetes Documentation*.
+固定提交 `542bad2ab92dd6ee7916b2b916d84cda64c77f6c`；逐文件来源 URL、Git blob 和
+SHA-256 见 [来源清单](data/rag_context/sources.json)。
+完整许可保存在 [LICENSE.txt](data/raw/rag_context/LICENSE.txt)，亦见
+[CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/)。
+
+派生的 `data/rag_bench.jsonl.gz` 移除了网页模板、元信息及 HTML 注释，截取正文，
+并在部分版本中插入本项目编写的合成攻击或明确引用攻击的正常对照。
+这些修改不代表 Kubernetes 项目或作者认可本项目及其结论。
+背景文档及其改编保留 CC-BY-4.0 义务；独立编写的插入模板为 MIT。
+压缩格式不改变许可与署名要求。
 
 ## 两套 CC-BY-4.0 的署名要求
 

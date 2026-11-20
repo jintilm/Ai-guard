@@ -254,6 +254,24 @@ python scripts/output_check.py
 When citing numbers, prefer public datasets, keep the `deepset_test` holdout untouched, do not
 cite groups marked `⚠不可用`, and do not mix the `>=medium` and `>=high` thresholds.
 
+The new [contextual RAG corpus](docs/datasets.md#english) provides **1,511 scenarios in
+24 parent groups**, based on 48 public English/Chinese technical documents with synthetic
+injections and benign quotation controls. Development has 1,016 rows; the frozen test split
+has 495. Translations and variants stay together. Length caps are 3k/12k/30k characters,
+with head/middle/tail, random, gap and window-boundary placements. Annotations are AI-assisted
+and have not undergone independent human review.
+
+```bash
+python -X utf8 scripts/build_rag_bench.py
+python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
+```
+
+Offline reconstruction verifies provenance, licenses, SHA-256 and group isolation.
+Explicit `--mode llm` supports paired `head` / `stratified` comparisons, call limits,
+failure reporting and resumable caches. The initial LLM pilot received HTTP 404 responses,
+so no accuracy comparison is claimed. Benign datasets used for rule/threshold tuning must
+also be treated as development data.
+
 ## Comparison
 
 | | prompt-ids | LLM Guard / Rebuff | promptfoo |

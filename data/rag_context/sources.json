@@ -1,0 +1,400 @@
+{
+  "upstream": "kubernetes/website",
+  "revision": "542bad2ab92dd6ee7916b2b916d84cda64c77f6c",
+  "license": "CC-BY-4.0",
+  "attribution": "Kubernetes Authors and documentation contributors, Kubernetes Documentation",
+  "files": [
+    {
+      "file": "LICENSE.txt",
+      "upstream_path": "LICENSE",
+      "git_blob": "da6ab6cc8f333d7e89a99812866df8f24374d47c",
+      "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "bytes": 18657,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/LICENSE"
+    },
+    {
+      "file": "pods.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/pods/_index.md",
+      "git_blob": "7ef439c12e8707771d29be3a454e9115ecde143c",
+      "sha256": "dbc592a96241fb0be96b797e704a5f8ceabc7531db7ef831539f10d132457792",
+      "bytes": 26031,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/pods/_index.md"
+    },
+    {
+      "file": "pods.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/pods/_index.md",
+      "git_blob": "ded431746812ce3b05fd2a71a6ae9982326d2f46",
+      "sha256": "b027543725d06cd993ce4fd9dc143db8d49c38b99c1e6c65cb51d35fe3e955e5",
+      "bytes": 50003,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/pods/_index.md"
+    },
+    {
+      "file": "deployments.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/controllers/deployment.md",
+      "git_blob": "4e4d7dde8cdc6b41bcd26875286b0bc673b14d2b",
+      "sha256": "ca4571585f3af4039292fdbbe127e296e1b86d44b4df52cec75dbf51c96da513",
+      "bytes": 59790,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/controllers/deployment.md"
+    },
+    {
+      "file": "deployments.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/controllers/deployment.md",
+      "git_blob": "f800d9feb8071c4b04d96ab050fa7c38d86e6714",
+      "sha256": "4e185e9ddd50c389d76865375ca3ac42fec2ddf260d51ef3ae19ef66c3f8d155",
+      "bytes": 99864,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/controllers/deployment.md"
+    },
+    {
+      "file": "statefulsets.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/controllers/statefulset.md",
+      "git_blob": "66e25af98ce290e7c2815b0b3a6f02fe7396c510",
+      "sha256": "118ca6bb4a1d290fb72142a72b93c38e164563f4112b8e2a1db207daefe630c9",
+      "bytes": 27423,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/controllers/statefulset.md"
+    },
+    {
+      "file": "statefulsets.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/controllers/statefulset.md",
+      "git_blob": "2a3ad547e6cc59f11af46785e74ced10dada7c6e",
+      "sha256": "b225a8b3e1be7e1fcb97d5893ee1693d67eb5ae4b11cf9796a46062ce018d1b9",
+      "bytes": 53500,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/controllers/statefulset.md"
+    },
+    {
+      "file": "daemonsets.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/controllers/daemonset.md",
+      "git_blob": "c484298b195e65d2922d56c99985bc39c9f82da0",
+      "sha256": "31027b1dd7994cb351332030c0a97c62ae6c33419fef3e2dd18dd679e7c7a84c",
+      "bytes": 14881,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/controllers/daemonset.md"
+    },
+    {
+      "file": "daemonsets.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/controllers/daemonset.md",
+      "git_blob": "1ffa07349c6313f84c9aaf01aa8e69b4a6ca46ec",
+      "sha256": "c3f598ceb83cad1759078203577e51ff1560f3f0ee3cc46d5f60fdd359b2eec1",
+      "bytes": 30197,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/controllers/daemonset.md"
+    },
+    {
+      "file": "jobs.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/controllers/job.md",
+      "git_blob": "43eb1e76880d5a8298131d706a6280ddd58b2f19",
+      "sha256": "1a1e12019f41a74695256a3c223fed5973b4a5c19d657e6e700068746d35de3d",
+      "bytes": 65377,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/controllers/job.md"
+    },
+    {
+      "file": "jobs.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/controllers/job.md",
+      "git_blob": "b39cad33625821e525edcece3c56c53e8f96edb7",
+      "sha256": "2a17afbe2802a203ef0671746ff512f5b9512a4fc492dbc42071ec70f6c2d4d6",
+      "bytes": 116220,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/controllers/job.md"
+    },
+    {
+      "file": "cronjobs.en.md",
+      "upstream_path": "content/en/docs/concepts/workloads/controllers/cron-jobs.md",
+      "git_blob": "e5b9a0db7be6b703a35dd3d541f25c32f65571e9",
+      "sha256": "4a8c404af0cfcb8a71a3411f68a93b7cae4d704eae57e2710a69dfd74809c26c",
+      "bytes": 14448,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/workloads/controllers/cron-jobs.md"
+    },
+    {
+      "file": "cronjobs.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/workloads/controllers/cron-jobs.md",
+      "git_blob": "0cd09d1860d1b048a3d502bcb8d106ebe8297839",
+      "sha256": "86cd08b214e78d959a8898f13b781f7fc5ad646a7186f56c6c6b86c7b98cf924",
+      "bytes": 27412,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/workloads/controllers/cron-jobs.md"
+    },
+    {
+      "file": "services.en.md",
+      "upstream_path": "content/en/docs/concepts/services-networking/service.md",
+      "git_blob": "5d8ec74bcc4652f2cf3196b3e430fe27bfa1f6e7",
+      "sha256": "4b01f14b3d462e045c734ddc52146f960b24efff4449a288762bd9720dd0a68d",
+      "bytes": 46844,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/services-networking/service.md"
+    },
+    {
+      "file": "services.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/services-networking/service.md",
+      "git_blob": "e2f3c39988e4dd7100dcc3ad53d8fb0552ad6f60",
+      "sha256": "5b934b913ea92567c95c0976e486b0e6af27485f7938ada8651eb83abafab521",
+      "bytes": 89170,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/services-networking/service.md"
+    },
+    {
+      "file": "ingress.en.md",
+      "upstream_path": "content/en/docs/concepts/services-networking/ingress.md",
+      "git_blob": "6324ee2e50f99a9fb9d2bbdcb900f3d91927850c",
+      "sha256": "b93613d1621fe883b67f79a393cf4b5f6a71f0b7f722b162388f3a21e10fa47e",
+      "bytes": 29055,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/services-networking/ingress.md"
+    },
+    {
+      "file": "ingress.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/services-networking/ingress.md",
+      "git_blob": "785083e85e581d619c37e77876aed57d40ad1bb3",
+      "sha256": "4fb2f747869121935f42076e1154c7ac3bd341be322c2e173e7918c0893512bc",
+      "bytes": 50848,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/services-networking/ingress.md"
+    },
+    {
+      "file": "network-policies.en.md",
+      "upstream_path": "content/en/docs/concepts/services-networking/network-policies.md",
+      "git_blob": "22f3515ce15eb97378d7b5bf70c5a8cfab2fdb77",
+      "sha256": "c5ab165e6c6d91f6abff48b06d57a57a600d7e8c5e91c3ced2cf0cf777e409a9",
+      "bytes": 23084,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/services-networking/network-policies.md"
+    },
+    {
+      "file": "network-policies.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/services-networking/network-policies.md",
+      "git_blob": "ee1e4f9e3f6071f92bd94964fe2e7f75f8321310",
+      "sha256": "96cefdec995097a6671ec473811308af94d4d780d9d35e35e227ad16e5d2e750",
+      "bytes": 44147,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/services-networking/network-policies.md"
+    },
+    {
+      "file": "volumes.en.md",
+      "upstream_path": "content/en/docs/concepts/storage/volumes.md",
+      "git_blob": "c24565822baeef8554fdbb0defc424bc163c7cd0",
+      "sha256": "a4b2cd28278f9ec5eb51670c9c63ddcc35138da757e8c4a8f51348f053d52df5",
+      "bytes": 32575,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/storage/volumes.md"
+    },
+    {
+      "file": "volumes.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/storage/volumes.md",
+      "git_blob": "2dc3d07abfb00263a75743bb91088a528f8030a9",
+      "sha256": "1d9c59aeaa0867bc687338ef8c741e85ba9968afe0348b4ee4c599aaf36d1512",
+      "bytes": 101474,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/storage/volumes.md"
+    },
+    {
+      "file": "persistent-volumes.en.md",
+      "upstream_path": "content/en/docs/concepts/storage/persistent-volumes.md",
+      "git_blob": "456224840f65b846f3e98727508fb1158a8fe414",
+      "sha256": "4e49991c898819b279d6aebc2161237e25b10b0997cfdc8a00b8049b13277f8e",
+      "bytes": 51392,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/storage/persistent-volumes.md"
+    },
+    {
+      "file": "persistent-volumes.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/storage/persistent-volumes.md",
+      "git_blob": "18723d0d1ca593a2b19750d4b6e2a3c06e20a86d",
+      "sha256": "ab5046b56c49f3e08aea614c1509eb29717b6914ed61ad817f1aa22c12c8bcba",
+      "bytes": 96312,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/storage/persistent-volumes.md"
+    },
+    {
+      "file": "storage-classes.en.md",
+      "upstream_path": "content/en/docs/concepts/storage/storage-classes.md",
+      "git_blob": "6c2587dbf3f2581c8b220e387c70e5e908c326ff",
+      "sha256": "4cd2d5dd45425bfbfa09108e9837112baed3f64ae1fb3f01eae57fe675cc963b",
+      "bytes": 23318,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/storage/storage-classes.md"
+    },
+    {
+      "file": "storage-classes.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/storage/storage-classes.md",
+      "git_blob": "862a1535a836ec4988a2ce2266608894220704b0",
+      "sha256": "588cd81712815a697ee92557a5fddbcd66ef8be20260d101facc54cefb96d284",
+      "bytes": 41702,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/storage/storage-classes.md"
+    },
+    {
+      "file": "configmaps.en.md",
+      "upstream_path": "content/en/docs/concepts/configuration/configmap.md",
+      "git_blob": "aa3e6ac3c18b995a2057bd1f8ca19eb6861606e7",
+      "sha256": "2e3860f6aeb7d86e6d2dd8f32493dbc1d52ce1c54606cb08455107b297a63a2a",
+      "bytes": 12932,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/configuration/configmap.md"
+    },
+    {
+      "file": "configmaps.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/configuration/configmap.md",
+      "git_blob": "663f25014a73b81c4e15cd1c45f73280607d2401",
+      "sha256": "f0fc1ee79a8517af31e372e0a3dc025a85ea51f95d3a75edb2c0fb86bbc1de9d",
+      "bytes": 24444,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/configuration/configmap.md"
+    },
+    {
+      "file": "secrets.en.md",
+      "upstream_path": "content/en/docs/concepts/configuration/secret.md",
+      "git_blob": "f10717fc581d4d149a958dc32c6e4b5ff9531218",
+      "sha256": "30bb29e4040f1464a8cb299524f51e0a1ae2279a63f45b7182b1b8faf27af194",
+      "bytes": 32981,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/configuration/secret.md"
+    },
+    {
+      "file": "secrets.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/configuration/secret.md",
+      "git_blob": "c29b48dd68ed9b8302788f262f9686f84400a9ca",
+      "sha256": "79e5ea057d12ef38d2ffb55d59acf8da2cdd4c3bc2f3202ef613b8185f1c5ab4",
+      "bytes": 72043,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/configuration/secret.md"
+    },
+    {
+      "file": "resources.en.md",
+      "upstream_path": "content/en/docs/concepts/configuration/manage-resources-containers.md",
+      "git_blob": "8c23dfc0e6202b0077fceac690c78a8f9ae3b38d",
+      "sha256": "cbb176ded47da163df33bcf0e643dc38361b19f6dc77a98302320704e20c95ac",
+      "bytes": 34575,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/configuration/manage-resources-containers.md"
+    },
+    {
+      "file": "resources.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/configuration/manage-resources-containers.md",
+      "git_blob": "25714b1a87c7ff593ac0c08a108e3c76a35b3076",
+      "sha256": "ebe15e2c074f357274b78a979b570ac0759175dbde8adf3d30c4106a6f74f834",
+      "bytes": 63662,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/configuration/manage-resources-containers.md"
+    },
+    {
+      "file": "node-assignment.en.md",
+      "upstream_path": "content/en/docs/concepts/scheduling-eviction/assign-pod-node.md",
+      "git_blob": "2e3b71391a91f17b64577d2e9b25c582f8523654",
+      "sha256": "c8a9ec85ae5aa20d7f5fc28e6e91e039f6e1f3e53346d426bfd7cc41ccb9c5b2",
+      "bytes": 32605,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/scheduling-eviction/assign-pod-node.md"
+    },
+    {
+      "file": "node-assignment.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/scheduling-eviction/assign-pod-node.md",
+      "git_blob": "15435f73bcca822f371e9c5364deb3fd4a143788",
+      "sha256": "db9b47950444400cde0ea223f62871e561ba1c5c96c9eb95482d181fac5a64df",
+      "bytes": 61466,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/scheduling-eviction/assign-pod-node.md"
+    },
+    {
+      "file": "taints.en.md",
+      "upstream_path": "content/en/docs/concepts/scheduling-eviction/taint-and-toleration.md",
+      "git_blob": "2dd515630a3f68bf10a4449a370121f0b0fddc05",
+      "sha256": "a6ab707ca9464bd810341660b9c664b3887f8bc2a7366c80299d1b92c2632586",
+      "bytes": 18885,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/scheduling-eviction/taint-and-toleration.md"
+    },
+    {
+      "file": "taints.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/scheduling-eviction/taint-and-toleration.md",
+      "git_blob": "b79f8c8fc9af4a732bf82cf97aed71f8c57a7d3a",
+      "sha256": "27c429f8da8f522bd361c162560de12cce889d920ee92d5ae39ad9b99181296f",
+      "bytes": 36341,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/scheduling-eviction/taint-and-toleration.md"
+    },
+    {
+      "file": "rbac.en.md",
+      "upstream_path": "content/en/docs/concepts/security/rbac-good-practices.md",
+      "git_blob": "11b0aa1aa169dd86d3d2f3fbc7a21262292066a1",
+      "sha256": "66a7beea269cf055a305172a472d074527c07de5051ab5eb1ac4f811df78f81b",
+      "bytes": 12407,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/security/rbac-good-practices.md"
+    },
+    {
+      "file": "rbac.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/security/rbac-good-practices.md",
+      "git_blob": "8480bbf57414a01bd45e4046bf5638d3875f7ad1",
+      "sha256": "5aa5d6c48527fbf9c47c1f816c0bb5d9ea178d5f44d90f0fe1dae08ddba7b730",
+      "bytes": 24283,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/security/rbac-good-practices.md"
+    },
+    {
+      "file": "probes.en.md",
+      "upstream_path": "content/en/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes.md",
+      "git_blob": "82fb8b2984920b3ea212eeb68b5990f3955eb08e",
+      "sha256": "bf80ca8ec4ffa9c71c06a11c515dcb34f18132b4cbe52896b5acd9b5989c6c0c",
+      "bytes": 14823,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes.md"
+    },
+    {
+      "file": "probes.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes.md",
+      "git_blob": "0ccba40638c7add09e545463e6315e4651e736d5",
+      "sha256": "1cde31b93277fa6aa65adfb7c7270adfe77333158022afd9ba0a5d2bc2e88e1c",
+      "bytes": 25579,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes.md"
+    },
+    {
+      "file": "dns.en.md",
+      "upstream_path": "content/en/docs/tasks/administer-cluster/dns-debugging-resolution.md",
+      "git_blob": "72b55df9506e88c3fb5d0b740543331b6205d85c",
+      "sha256": "9243352e9ce5ef0c474e5277d366de20aa4ee964e8300faa80b1cc0a338809f7",
+      "bytes": 10564,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/tasks/administer-cluster/dns-debugging-resolution.md"
+    },
+    {
+      "file": "dns.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/tasks/administer-cluster/dns-debugging-resolution.md",
+      "git_blob": "730d6b2c26123072bdf2c2f5193556ac0fe01a15",
+      "sha256": "2d9c10beec6a2fdd3c1277dda212ea8c75bab286da0e3f935f19b73706673dc3",
+      "bytes": 17487,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/tasks/administer-cluster/dns-debugging-resolution.md"
+    },
+    {
+      "file": "logging.en.md",
+      "upstream_path": "content/en/docs/concepts/cluster-administration/logging.md",
+      "git_blob": "e7a3724bb1cdcdc934edabba446792ca252662bb",
+      "sha256": "4bdb32d8092f2dc70cd951ce64a82386f6fb4561dc9637e73a1ec8aa4afaca5b",
+      "bytes": 17339,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/cluster-administration/logging.md"
+    },
+    {
+      "file": "logging.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/cluster-administration/logging.md",
+      "git_blob": "de1a1816a167d26c5ee0a6286a2d354d82deb505",
+      "sha256": "171b6ca42179517ca74494d4bbd8f84cfe34b4b48b98fc8988bf5c9a4d87b48c",
+      "bytes": 34238,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/cluster-administration/logging.md"
+    },
+    {
+      "file": "debug-pods.en.md",
+      "upstream_path": "content/en/docs/tasks/debug/debug-application/debug-running-pod.md",
+      "git_blob": "78d73f7c06f7ecb0391042901cb6df41680b4759",
+      "sha256": "dee562baffe542d8c6db7bb85b2f4bef247ede19e0a4ec0bd02ff78867693e88",
+      "bytes": 31245,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/tasks/debug/debug-application/debug-running-pod.md"
+    },
+    {
+      "file": "debug-pods.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/tasks/debug/debug-application/debug-running-pod.md",
+      "git_blob": "7211bb92b95c370d381f928b59afcde1feaeb3e3",
+      "sha256": "5010d58dbda465454920ac1828383b8c9acdccc9b912580fb77a4d2a95cae0be",
+      "bytes": 43645,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/tasks/debug/debug-application/debug-running-pod.md"
+    },
+    {
+      "file": "nodes.en.md",
+      "upstream_path": "content/en/docs/concepts/architecture/nodes.md",
+      "git_blob": "75840c1882456f40f5af9fc135fd5c622a84ae34",
+      "sha256": "736cdb8a99621f803441d96b1549a10ee16b6227fe7bad974a782964b1f9f7c8",
+      "bytes": 14892,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/architecture/nodes.md"
+    },
+    {
+      "file": "nodes.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/architecture/nodes.md",
+      "git_blob": "f773d966ca257899d72c113895947ba620d15019",
+      "sha256": "af6c6d612d8e9f32c20206aa7827469f3ebab4b5059a4ff8863b331d26cb7587",
+      "bytes": 29265,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/architecture/nodes.md"
+    },
+    {
+      "file": "custom-resources.en.md",
+      "upstream_path": "content/en/docs/concepts/extend-kubernetes/api-extension/custom-resources.md",
+      "git_blob": "727c35bd2a456410faf211d2b9cb3e459e1e46fd",
+      "sha256": "dcaf029d1a2a9646514bfe564ea29be439cdc0d1e002747bda9acd546c61fa13",
+      "bytes": 21761,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/en/docs/concepts/extend-kubernetes/api-extension/custom-resources.md"
+    },
+    {
+      "file": "custom-resources.zh-cn.md",
+      "upstream_path": "content/zh-cn/docs/concepts/extend-kubernetes/api-extension/custom-resources.md",
+      "git_blob": "a9c13e05a01c8544c69320a262ce57734e6a9cf6",
+      "sha256": "c571849b59757ba196f779863483c574b3550d0a6737786d2c5eefdc33d952fc",
+      "bytes": 44360,
+      "url": "https://github.com/kubernetes/website/blob/542bad2ab92dd6ee7916b2b916d84cda64c77f6c/content/zh-cn/docs/concepts/extend-kubernetes/api-extension/custom-resources.md"
+    }
+  ]
+}
