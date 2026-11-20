@@ -25,6 +25,12 @@ from prompt_ids.detectors.semantic.windowing import sample_text
 from prompt_ids.eval.datasets import Dataset, Sample
 from prompt_ids.eval.metrics import Confusion, latency_stats, percentile
 from prompt_ids.eval.rag import SEED, load_corpus, sha256
+from prompt_ids.eval.rag_sampling import (
+    SAMPLING_VERSION,
+    balanced_rows,
+    length_band,
+    sample_summary,
+)
 from scripts.eval_semantic import CachedSemanticBackend, build_pipeline, stratified_slice
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,11 +55,13 @@ def failure_kind(pipeline) -> str | None:
     return "backend_unavailable"
 
 
-def length_band(length: int) -> str:
-    return "<=3000" if length <= 3000 else "3001-12000" if length <= 12000 else ">12000"
-
-
-def select_rows(rows: list[dict], count: int) -> list[dict]:
+def select_rows(rows: list[dict], count: int, sampling: str = "balanced") -> list[dict]:
+    # scripts/rag_sampling_check.py records the old 22en/2zh pilot and verifies
+    # equal language/label quotas before adopting this default.
+    if sampling == "balanced":
+        return balanced_rows(rows, count)
+    if sampling != "legacy":
+        raise ValueError(f"Unknown sampling method: {sampling}")
     if not count or count >= len(rows):
         selected = list(rows)
     else:
@@ -153,6 +161,13 @@ def summarize(records: list[dict], semantic: bool) -> dict:
                         "degraded": share > DEGRADED_CALL_FAIL_SHARE,
                         "usable_for_comparison": bool(records) and (not semantic or successes > 0)
                         and share <= DEGRADED_CALL_FAIL_SHARE},
+        "reliability_slices": {
+            field: {value: {
+                "n": sum(r[field] == value for r in records),
+                "failed": sum(r[field] == value and r["semantic_ok"] is not True for r in records),
+            } for value in sorted({r[field] for r in records})}
+            for field in ("language", "kind", "group_id")
+        } if semantic else {},
     }
 
 
@@ -174,6 +189,17 @@ def paired_difference(records: dict[str, list[dict]]) -> dict | None:
     return {"metric": "stratified minus head, paired group-macro risk recall",
             "eligible_groups": len(delta), "risk_recall_delta": round(sum(delta) / len(delta), 4),
             "ci95": [round(percentile(draws, q), 4) for q in (0.025, 0.975)]}
+
+
+def valid_pair_analysis(records: dict[str, list[dict]]) -> dict | None:
+    if "stratified" not in records:
+        return None
+    valid = set.intersection(*({r["id"] for r in items if r["semantic_ok"] is True}
+                               for items in records.values()))
+    return {"n": len(valid), "excluded": len(records["head"]) - len(valid),
+            "note": "Conditional on both judges succeeding; excludes failures, not an unbiased correction.",
+            "results": {name: metrics([r for r in items if r["id"] in valid])
+                        for name, items in records.items()}}
 
 
 def write_report(path: Path, report: dict) -> None:
@@ -198,7 +224,9 @@ def main() -> int:
     parser.add_argument("--dataset", type=Path, default=ROOT / "data/rag_bench.jsonl.gz")
     parser.add_argument("--split", choices=("dev", "test", "all"), default="dev")
     parser.add_argument("--mode", choices=("rules", "llm"), default="rules")
-    parser.add_argument("--sample", type=int, default=0, help="stratified subset; 0 means full split")
+    parser.add_argument("--sample", type=int, default=0, help="quota-balanced subset; 0 means full split")
+    parser.add_argument("--sampling", choices=("balanced", "legacy"), default="balanced")
+    parser.add_argument("--plan-only", action="store_true", help="write sample plan without calling detectors")
     parser.add_argument("--provider", default="auto")
     parser.add_argument("--model", default="")
     parser.add_argument("--timeout", type=float, default=30)
@@ -212,7 +240,23 @@ def main() -> int:
         parser.error("Sample size must be nonnegative; timeout/budget positive; windows 1..8")
     rows, manifest = load_corpus(args.dataset)
     eligible = [r for r in rows if args.split == "all" or r["split"] == args.split]
-    selected = select_rows(eligible, args.sample)
+    try:
+        selected = select_rows(eligible, args.sample, args.sampling)
+    except ValueError as exc:
+        parser.error(str(exc))
+    selection = {"method": (SAMPLING_VERSION if args.sampling == "balanced" else "legacy-proportional")
+                 if args.sample else "full-split",
+                 "composition": sample_summary(selected),
+                 "population_note": "Balanced diagnostic quotas do not estimate corpus or production prevalence.",
+                 "selected_ids": [r["id"] for r in selected]}
+    if args.plan_only:
+        path = args.out or ROOT / f"reports/rag_sample_{args.split}.json"
+        write_report(path, {"dataset_sha256": manifest["sha256"], "split": args.split,
+                            "selection": selection,
+                            "planned_logical_calls": len(selected) * 2 if args.mode == "llm" else 0,
+                            "model_invoked": False})
+        print(json.dumps(selection["composition"], ensure_ascii=False, indent=2))
+        return 0
     if args.mode == "llm" and (args.max_llm_calls <= 0 or len(selected) * 2 > args.max_llm_calls):
         parser.error(f"This comparison needs at most {len(selected) * 2} logical calls. "
                      "Set --max-llm-calls explicitly or reduce --sample (HTTP attempts <= 2x).")
@@ -247,7 +291,8 @@ def main() -> int:
         "dataset": {"version": manifest["version"], "sha256": manifest["sha256"],
                     "split": args.split, "eligible": len(eligible), "selected": len(selected),
                     "selected_ids_sha256": sha256("\n".join(r["id"] for r in selected).encode()),
-                    "groups": len({r["group_id"] for r in selected}), "sample_seed": SEED},
+                    "groups": len({r["group_id"] for r in selected}), "sample_seed": SEED,
+                    "selection": selection},
         "method": {"mode": args.mode, "policy": "default",
                    "semantic_mode": "always" if args.mode == "llm" else None,
                    "short_circuit": False, "pipeline_budget_ms": 5000,
@@ -261,6 +306,7 @@ def main() -> int:
                    "cost_note": "Character budget is not a token count; provider token usage is not collected.",
                    "code_sha256": {name: sha256((ROOT / name).read_bytes()) for name in (
                        "scripts/eval_rag_bench.py", "scripts/eval_semantic.py",
+                       "prompt_ids/eval/rag_sampling.py",
                        "prompt_ids/core/pipeline.py", "prompt_ids/core/verdict.py",
                        "prompt_ids/detectors/semantic/llm.py")},
                    "rules_sha256": {p.name: sha256(p.read_bytes())
@@ -278,6 +324,8 @@ def main() -> int:
             for name in names if index % 2 == 0 else names[::-1]:
                 hits_before = caches[name].hits if name in caches else 0
                 result = pipelines[name].scan(row["text"])
+                detector = pipelines[name].semantic_detector
+                prediction = detector.last_prediction if detector else None
                 record = {key: row[key] for key in
                           ("id", "group_id", "split", "language", "kind", "position", "label")}
                 record.update({"length_band": length_band(row["document_chars"]),
@@ -286,6 +334,9 @@ def main() -> int:
                                "flagged": int(result.level.value in ("medium", "high", "critical")),
                                "action": result.action.value, "score": result.score,
                                "semantic_ok": result.semantic_ok,
+                               "semantic_probability": prediction.probability
+                               if prediction and prediction.ok else None,
+                               "finding_ids": sorted({f.pattern_id for f in result.findings}),
                                "failure_kind": failure_kind(pipelines[name]),
                                "latency_ms": result.latency_ms.get("total", 0),
                                "cache_hit": name in caches and caches[name].hits > hits_before,
@@ -313,6 +364,7 @@ def main() -> int:
     usable = report["complete"] and all(
         r["reliability"]["usable_for_comparison"] for r in report["results"].values())
     report["paired_difference"] = paired_difference(records) if usable else None
+    report["valid_pair_analysis"] = valid_pair_analysis(records)
     report["comparison_usable"] = usable
     report["model_calls_this_run"] = {name: cache.misses for name, cache in caches.items()}
     write_report(output, report)

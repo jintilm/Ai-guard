@@ -268,12 +268,19 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
 
 Offline reconstruction verifies provenance, licenses, SHA-256 and group isolation.
 Explicit `--mode llm` supports paired `head` / `stratified` comparisons, call limits,
-failure reporting and resumable caches. A new [DeepSeek-V4.1-Flash pilot](reports/rag_llm_deepseek_pilot.json)
-completed on 24 development cases: both strategies detected 9/12 attacks; benign blocking
-was 3/12 for `head` and 2/12 for `stratified`. Each strategy had three HTTP 406 abstentions
-(12.5%). The sample includes 22 English cases and two Chinese cases; it does not justify
-changing defaults. Benign datasets used for rule/threshold tuning must also be treated as
-development data.
+failure reporting and resumable caches. Sampling now allocates language, label and benign-kind
+quotas before spreading parent groups, positions and lengths. The [120-case development plan](reports/rag_balanced_plan.json)
+has 60 cases per language, 60 attacks, 30 clean excerpts and 30 quotation controls across
+16 groups. Use `--plan-only` to inspect the plan, or `--sampling legacy` to reproduce old pilots.
+The [sampling measurement](reports/rag_sampling.json) records the former small-sample bias.
+See the [DeepSeek-V4.1-Flash comparison](reports/rag_llm_deepseek_balanced.json) for results,
+failure distributions and conditional subsets.
+On this stress sample, distributed windows detected eight additional attacks and blocked
+five additional benign quotation controls, with semantic failure rates of 14.17% / 15.00%.
+These trade-offs need further business-specific validation. The [HTTP 406 controls](reports/rag_gateway_diagnostic.json)
+localize a gateway rejection to a shell example in benign documentation; the exact rule
+requires gateway-side confirmation. Rejected cases remain in evaluation denominators.
+Benign datasets used for rule/threshold tuning must also be treated as development data.
 
 ## Comparison
 

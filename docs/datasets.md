@@ -73,8 +73,21 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split test
 正式比较 `head` 与 `stratified` 时显式选择 LLM 模式并给出调用上限：
 
 ```bash
-python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --max-llm-calls 48 --timeout 45 --out reports/rag_llm_current_pilot.json
+python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 120 --plan-only --out reports/rag_balanced_plan.json
+python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 120 --max-llm-calls 240 --timeout 45 --out reports/rag_llm_current_balanced.json
 ```
+
+小样本默认采用 `balanced-language-label-v1`：先给中英文分配相同配额，再平衡攻击/良性，
+最后平分良性原文/引用对照；格内优先分散母组，再分散插入位置和长度。
+120 条的构成为：每种语言 30 条攻击、15 条正常原文、15 条引用对照，覆盖 16 个开发母组。
+这是有意定义的诊断分布，不代表生产或全量语料的类别占比。
+`--sample 0` 仍表示完整切分；配额所需样本不足会明确报错。
+
+此前的小样本使用细粒度比例分层，24 条样本的余数平局按名称排序，形成 22 英文/2 中文。
+新方法以固定种子的 ID 指纹打破平局，测量证据见 [抽样对比](../reports/rag_sampling.json)：
+24 条现在为中英文各 12，120 条为各 60；输入行倒序也得到相同样本。
+旧试跑可用 `--sampling legacy` 重现；其抽样方案与新方法的数字不宜直接相减。
+离线重跑 `python -X utf8 scripts/rag_sampling_check.py` 可检查配额与来源顺序独立性，已接入 CI。
 
 模型和端点沿用 `.env`，也可用 `--provider` 和 `--model` 显式选择。
 两种策略使用相同样本、交错执行，并交替先后顺序。规则和融合使用生产实现；
@@ -89,6 +102,8 @@ python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --ma
 良性 `>= medium` 标记率、`review` 动作率、失败率和未命中缓存的耗时。
 按语言、长度、位置、场景类别与分组拆分；置信区间通过重采样 `group_id` 计算，
 不是把 1,511 条变体当作 1,511 个独立观察。
+报告还列出按语言、场景与母组的失败分布，以及“两组均拿到判决”的配对子集统计；
+后者是条件分析，不代表删除失败后就消除了偏差。
 字符预算不能换算成准确 token 费用，当前报告的 `token_usage=null`。
 
 采样覆盖统计是**原始文本上的载荷可见性**。它与模型实际判决、代理完整执行链、
@@ -116,6 +131,40 @@ python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --ma
 `model_calls_this_run` 不包含先前缓存的请求，`uncached_latency_ms` 也仅描述本次未命中缓存的调用。
 按母组配对的风险召回差为 0，95% bootstrap 区间为 [-0.15, 0.15]。
 这些证据不足以支持调整默认 `head` 策略，后续应先解决网关内容拒绝和小样本语言偏斜。
+
+### 120 条平衡开发集评测
+
+使用调用前固定的 [样本计划](../reports/rag_balanced_plan.json)，
+[纯规则基线](../reports/rag_rules_balanced.json)与
+[DeepSeek-V4.1-Flash 配对报告](../reports/rag_llm_deepseek_balanced.json)覆盖完全相同的 120 条。
+LLM 每组实际预测 120 次，均无缓存命中；语义 `always`，关闭 critical 短路，默认 policy。
+
+| 指标 | L1+L2 | +LLM `head` | +LLM `stratified` |
+|---|---:|---:|---:|
+| 风险召回（≥high） | 13/60 = 21.67% | 35/60 = 58.33% | 43/60 = 71.67% |
+| 实际阻断召回 | 12/60 = 20.00% | 35/60 = 58.33% | 43/60 = 71.67% |
+| 正常样本阻断 | 20/60 = 33.33% | 22/60 = 36.67% | 27/60 = 45.00% |
+| 原文对照阻断 | 2/30 = 6.67% | 2/30 = 6.67% | 2/30 = 6.67% |
+| 攻击引用对照阻断 | 18/30 = 60.00% | 20/30 = 66.67% | 25/30 = 83.33% |
+| 无有效语义判决 | — | 17/120 = 14.17% | 18/120 = 15.00% |
+| 平均扫描耗时 | 见规则报告 | 3.59 秒 | 4.33 秒 |
+
+分窗多检出 8 条攻击，也多阻断 5 条引用对照。按母组配对的风险召回差为 +0.1458，
+95% bootstrap 区间 [0.0573, 0.2448]；这是组宏平均，和表中按行计算的差值口径不同。
+两组都取得判决的条件子集只有 90 条（48 攻击/42 良性）：风险召回 32/48 对 37/48，
+良性阻断 15/42 对 18/42。条件子集仍显示同方向取舍，但删除失败改变了人群，不能外推。
+
+`head` 的 17 次失败为 HTTP 403 ×9、406 ×8；分窗为 403 ×9、406 ×8、其他后端失败 ×1。
+两组失败集合并不相同，报告包含按语言、场景及母组的失败分布。
+[11 次直接请求对照](../reports/rag_gateway_diagnostic.json)将已知 406 定位到正常文档中的
+85 字符 shell 示例：片段本身、包含它的正常原文与引用对照均 406，前后正文、引用段本身、
+同长度普通文本均可用；更改 JSON 模式与 Accept 头未解决。具体拒绝规则需网关端确认。
+403 的根因未由该对照确定，不与 406 混为同一种问题。
+
+即使裁判给出低于 0.5 的注入概率，仍有 `head` 10 条、分窗 7 条良性样本被融合结果阻断。
+这说明后续需要同时检查规则证据与裁判判断。尤其中文引用说明涉及的 `PV-C008` 应在开发集
+定位，而不是仅靠改变取样策略处理误报。本轮未调规则、融合阈值或默认采样方式。
+这批数据仍是单一领域、AI 辅助标注的压力场景；结果不是总体业务误报率。
 
 初次全量规则基线（L1+L2，默认 policy，关闭 critical 短路）记录在
 [rag_rules.json](../reports/rag_rules.json)。测试集的风险召回为 **48/226 = 21.24%**，
@@ -174,6 +223,23 @@ Successful judge predictions are persisted in ignored `logs/rag_eval_cache/`; fa
 are never cached. Explicit call limits are required. Retries/fallback endpoints are disabled,
 although JSON-mode fallback may use two HTTP requests per logical prediction.
 
+Small samples now use `balanced-language-label-v1`: equal language quotas, then equal
+attack/benign quotas, then equal clean/quotation controls. Within each quota, sampling
+spreads parent groups before placement and length. A 120-case pilot has 60 cases per
+language (30 attacks, 15 clean, 15 quotation controls), covering all 16 development groups.
+This defines a diagnostic population, not corpus or production prevalence. `--sample 0`
+still selects the entire split. Insufficient quota capacity raises an explicit error.
+`--plan-only` writes the exact sample before any model calls.
+
+The former fine-grained proportional sampler resolved remainder ties lexicographically,
+yielding 22 English cases and two Chinese cases in the 24-case pilot. Stable seeded ID
+hashes now resolve ties independently of input order. The [sampling measurement](../reports/rag_sampling.json)
+records 12/12 at n=24 and 60/60 at n=120, including reversed-input reconstruction.
+Use `--sampling legacy` only to reproduce old pilots. The offline measurement script
+`scripts/rag_sampling_check.py` is included in CI. Reports expose failures by language,
+kind and group, plus statistics conditional on both judges returning valid verdicts;
+that conditional subset is not an unbiased correction for missing results.
+
 Reports distinguish risk detection (`level >= high`), blocking (`action == block`), benign
 flagging (`>= medium`), review actions, failed calls and uncached latency. Confidence
 intervals resample **parent groups**, not derived rows. Character counts are not tokens;
@@ -198,6 +264,44 @@ per strategy. `model_calls_this_run` excludes earlier cached calls, and uncached
 describes only requests made during that resumed run. The paired group-macro recall
 difference is zero (95% bootstrap interval [-0.15, 0.15]). These limited, language-skewed
 observations do not justify changing the default `head` strategy.
+
+### Balanced 120-case development evaluation
+
+The [frozen sample plan](../reports/rag_balanced_plan.json),
+[rules baseline](../reports/rag_rules_balanced.json), and
+[DeepSeek comparison](../reports/rag_llm_deepseek_balanced.json) use identical cases.
+Each strategy made 120 predictions with zero cache hits, an `always` judge, no critical
+short-circuiting and the default policy.
+
+| Metric | L1/L2 | +LLM `head` | +LLM `stratified` |
+|---|---:|---:|---:|
+| Risk recall (≥high) | 13/60 = 21.67% | 35/60 = 58.33% | 43/60 = 71.67% |
+| Block recall | 12/60 = 20.00% | 35/60 = 58.33% | 43/60 = 71.67% |
+| Benign blocking | 20/60 = 33.33% | 22/60 = 36.67% | 27/60 = 45.00% |
+| Clean excerpt blocking | 2/30 | 2/30 | 2/30 |
+| Quotation control blocking | 18/30 | 20/30 | 25/30 |
+| Missing semantic verdicts | — | 17/120 = 14.17% | 18/120 = 15.00% |
+| Mean scan latency | See baseline | 3.59 s | 4.33 s |
+
+Distributed windows detected eight additional attacks and blocked five additional benign
+quotation controls. The paired group-macro risk recall difference is +0.1458 (95% bootstrap
+interval [0.0573, 0.2448]); it uses a different aggregation from the row-level table.
+Both strategies succeeded on only 90 paired cases: recall 32/48 versus 37/48, benign blocking
+15/42 versus 18/42. This conditional subset changes the population and is not an unbiased correction.
+
+Failures were nine HTTP 403 and eight HTTP 406 for `head`; the same counts plus one other
+backend failure for distributed windows. Their failed case sets differ. Eleven direct-request
+[diagnostic controls](../reports/rag_gateway_diagnostic.json) localized a known 406 to an
+85-character shell example in benign documentation. The example alone and documents containing
+it were rejected; surrounding prose, the quotation alone and equal-length neutral text worked.
+Changing JSON-mode or Accept did not resolve it. The exact gateway rule needs server-side
+confirmation; this experiment does not establish the cause of the separate 403 responses.
+
+Despite a semantic probability below 0.5, ten benign `head` cases and seven distributed-window
+cases were still blocked by the fused decision. Follow-up work should examine both rule evidence
+and judge decisions, especially `PV-C008` on Chinese quotation framing, using development data.
+Rules, fusion thresholds and the default sampling strategy were not changed. This single-domain,
+AI-assisted stress corpus does not estimate production FPR.
 
 The initial [L1/L2 baseline](../reports/rag_rules.json) measures test risk recall at
 48/226 (21.24%) and actual block recall at 20/226 (8.85%). Across both splits, clean

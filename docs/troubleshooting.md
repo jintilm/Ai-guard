@@ -154,6 +154,25 @@ python scripts/llm_check.py   # 使用已配置的模型直接请求，检查是
 `--list-models` 是可选诊断，列表请求失败不能据此判定模型不可用。
 正常检测与后端自动选择不依赖列表请求。
 
+### 直接模型请求返回 406 和 HTML
+
+先记录状态码、响应类型与输入指纹，区分网关拒绝请求与模型返回了注入判决。
+本项目的一组开发文档对照表明：正常 Kubernetes 文档中的 85 字符 shell 示例单独请求
+也会返回 406；它前后的正文、同长度普通文本与攻击引用本身均返回有效判决。
+移除 `response_format`、增加 `Accept: application/json` 都未改变原请求的 406。
+这支持“请求内容相关的网关拒绝”，具体规则仍需服务端日志确认。
+
+复现已固定的诊断（最多 11 次直接调用，无模型列表请求）：
+
+```bash
+python -X utf8 scripts/rag_gateway_check.py
+python -X utf8 scripts/rag_gateway_check.py --execute --max-calls 11
+```
+
+默认命令仅列出诊断计划。实际结果见 [网关诊断记录](../reports/rag_gateway_diagnostic.json)。
+片段仅用于诊断，不替换评测原文；被拒样本按语义弃票记录，保留在完整评测分母中。
+需要网关提供方确认该内容限制，或使用明确支持安全评测语料的接入线路。
+
 ### 连通但每条都退化成 p=0.5
 
 推理模型把 token 全烧在 `reasoning_content` 上，`content` 空 +

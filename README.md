@@ -254,10 +254,16 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
 
 构建默认离线，可核对来源、许可、SHA-256 和切分；显式 `--mode llm` 可配对比较
 `head` / `stratified`，支持失败标记、调用上限和缓存续跑。
-新网关上的 [DeepSeek-V4.1-Flash 小样本报告](reports/rag_llm_deepseek_pilot.json)
-已完成：24 条开发样本中，两种策略均检出 9/12 条攻击；正常样本阻断分别为
-`head` 3/12、`stratified` 2/12。两组各有 3 次 HTTP 406 弃票（12.5%），
-样本含英文 22 条、中文 2 条，结果不足以支持调整默认策略。
+小样本现按语言、标签和良性种类分配配额，再分散母组、位置与长度。
+[120 条开发样本计划](reports/rag_balanced_plan.json)包含中英文各 60 条、
+攻击 60 条、正常原文和攻击引用各 30 条，覆盖 16 个母组；`--plan-only` 可先查看计划。
+[抽样测量](reports/rag_sampling.json)保留旧 24 条样本偏向英文的证据，
+`--sampling legacy` 可复现旧方案。两种策略的完整结果、失败分布与条件子集见
+[DeepSeek-V4.1-Flash 平衡评测](reports/rag_llm_deepseek_balanced.json)。
+该压力集上，分窗比头部取样多检出 8 条攻击，也多阻断 5 条正常引用；
+两组语义失败率为 14.17% / 15.00%，默认策略仍需更充分的业务验证。
+[406 对照诊断](reports/rag_gateway_diagnostic.json)已定位到正常文档中的 shell 示例，
+具体拒绝规则需网关端确认；被拒样本保留在评测分母中。
 纯良性集合若参与过规则或阈值调整，也必须视为开发数据。
 
 ## Comparison

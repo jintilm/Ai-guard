@@ -121,6 +121,10 @@ jobs:
         run: python -X utf8 scripts/build_rag_bench.py --check
         # 固定的公开来源已入库；只核对完整性/切分/重建指纹，不联网、不调用模型。
 
+      - name: RAG 小样本配额与重现性
+        run: python -X utf8 scripts/rag_sampling_check.py --out logs/ci-rag-sampling.json
+        # 核对中英/标签配额、母组覆盖和输入顺序独立性；不调用模型。
+
       - name: packaging 自检（package-data 有没有真的装进去）
         run: python -m prompt_ids.cli --rules-stats
         # 这条是**闸门**而不是装饰：prompt_ids/rules/*.yaml 是 package-data，
