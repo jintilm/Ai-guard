@@ -42,6 +42,9 @@ def _hermetic_env():
         P.GENERIC_MODEL_ENV,
         P.GENERIC_PROVIDER_ENV,
         P.GENERIC_FALLBACK_ENV,
+        P.GENERIC_INPUT_STRATEGY_ENV,
+        P.GENERIC_INPUT_CHARS_ENV,
+        P.GENERIC_INPUT_WINDOWS_ENV,
         # 规则引擎也会改变行为，同样纳管
         "PROMPT_IDS_RULE_ENGINE",
     }

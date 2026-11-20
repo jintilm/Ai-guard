@@ -100,6 +100,8 @@ class ScanResult:
     rejected: str = ""
     # 因预算耗尽或短路而未执行的检测层 —— 静默跳过比报错更危险，必须可见
     skipped: tuple[str, ...] = ()
+    semantic_coverage: TextCoverage | None = None
+    semantic_ok: bool | None = None
 
     @property
     def is_blocked(self) -> bool:
@@ -132,6 +134,8 @@ class ScanResult:
             "truncated": self.truncated,
             "rejected": self.rejected,
             "skipped": list(self.skipped),
+            "semantic_coverage": self.semantic_coverage.to_dict() if self.semantic_coverage else None,
+            "semantic_ok": self.semantic_ok,
         }
 
     def summary(self) -> str:
@@ -139,6 +143,11 @@ class ScanResult:
             f"判定: {self.level.value.upper():<8} 分数: {self.score:.1f}  动作: {self.action.value}",
             f"说明: {self.explained}",
         ]
+        if self.semantic_coverage:
+            coverage = self.semantic_coverage
+            lines.append(f"所选语义输入: {coverage.sampled_chars}/{coverage.input_chars} 字符"
+                         f" · {len(coverage.ranges)} 个窗口 · {coverage.strategy}"
+                         f" · {'取得判决' if self.semantic_ok else '未取得判决'}")
         if self.findings:
             lines.append(f"命中 {len(self.findings)} 项:")
             for f in self.findings[:10]:
@@ -155,3 +164,48 @@ class ScanResult:
             total = sum(self.latency_ms.values())
         lines.append(f"耗时: {total:.2f}ms ({parts})")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class TextCoverage:
+    """Character offsets in the backend input, without any original text."""
+
+    strategy: str
+    input_chars: int
+    ranges: tuple[tuple[int, int], ...]
+
+    def __post_init__(self):
+        if self.strategy not in ("head", "stratified"):
+            raise ValueError("Unknown text sampling strategy")
+        if type(self.input_chars) is not int or self.input_chars < 0:
+            raise ValueError("input_chars must be a nonnegative integer")
+        if not isinstance(self.ranges, tuple) or len(self.ranges) > 8:
+            raise ValueError("Coverage requires at most eight immutable ranges")
+        previous = 0
+        for span in self.ranges:
+            if not isinstance(span, tuple) or len(span) != 2:
+                raise ValueError("Invalid coverage range")
+            start, end = span
+            if type(start) is not int or type(end) is not int or not previous <= start < end <= self.input_chars:
+                raise ValueError("Coverage ranges must be ordered, disjoint and inside the input")
+            previous = end
+
+    @property
+    def sampled_chars(self) -> int:
+        return sum(end - start for start, end in self.ranges)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "strategy": self.strategy,
+            "input_basis": "backend_input",
+            "input_chars": self.input_chars,
+            "sampled_chars": self.sampled_chars,
+            "coverage_ratio": round(self.sampled_chars / self.input_chars, 6) if self.input_chars else 0.0,
+            "window_count": len(self.ranges),
+            "ranges": [list(span) for span in self.ranges],
+            "truncated": self.sampled_chars < self.input_chars,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TextCoverage:
+        return cls(data["strategy"], data["input_chars"], tuple(tuple(span) for span in data["ranges"]))

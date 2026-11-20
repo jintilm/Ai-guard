@@ -34,9 +34,11 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 import time
 import urllib.error
 import urllib.request
+from dataclasses import replace
 from typing import Any, NamedTuple
 
 from prompt_ids.detectors.semantic.base import (
@@ -63,6 +65,7 @@ from prompt_ids.detectors.semantic.providers import (
     resolve_api_key,
     resolve_base_url,
     resolve_extra_body,
+    resolve_input_sampling,
     resolve_max_tokens,
     resolve_model,
     resolve_provider,
@@ -71,6 +74,7 @@ from prompt_ids.detectors.semantic.providers import (
 from prompt_ids.detectors.semantic.providers import (
     get as get_provider,
 )
+from prompt_ids.detectors.semantic.windowing import INPUT_SAMPLING_VERSION, sample_text
 
 __all__ = [
     "PROVIDERS",
@@ -172,22 +176,26 @@ class LLMBackend(SemanticBackend):
         base_url: str | None = None,
         api_key: str | None = None,
         max_retries: int = 2,
-        max_input_chars: int = 3000,
+        max_input_chars: int | None = None,
         provider: str = "auto",
         fallbacks: str | list[str] | None = None,
         allow_fallbacks: bool = True,
         max_tokens: int = 0,
         extra_body: dict | None = None,
+        input_strategy: str | None = None,
+        max_windows: int | None = None,
     ):
         self.requested_provider = provider or "auto"
         self.max_retries = max(0, max_retries)
-        self.max_input_chars = max_input_chars
+        self.input_strategy, self.max_input_chars, self.max_windows = resolve_input_sampling(
+            input_strategy, max_input_chars, max_windows)
         self.allow_fallbacks = allow_fallbacks
         # 0 表示"没指定"，此时读 PROMPT_IDS_LLM_MAX_TOKENS（仍无则用注册表默认）
         self.max_tokens = max_tokens or resolve_max_tokens()
         # 额外请求体（厂商专属开关，如关闭思考链）；显式传空 dict 表示"就是要空"
         self.extra_body = resolve_extra_body() if extra_body is None else dict(extra_body)
         #: 最近一次 predict 是否真的拿到了可解析的判决（给诊断脚本用）
+        self._tls = threading.local()
         self.last_parsed = False
 
         explicit_base = (base_url or "").strip()
@@ -215,6 +223,23 @@ class LLMBackend(SemanticBackend):
             self._api_key = explicit_key
 
         self.endpoints: tuple[Endpoint, ...] = self._build_endpoints(fallbacks)
+
+    @property
+    def last_parsed(self) -> bool:
+        return getattr(self._tls, "last_parsed", False)
+
+    @last_parsed.setter
+    def last_parsed(self, value: bool) -> None:
+        self._tls.last_parsed = value
+
+    @property
+    def input_sampling(self) -> dict[str, Any]:
+        return {"strategy": self.input_strategy, "max_input_chars": self.max_input_chars,
+                "max_windows": self.max_windows, "version": INPUT_SAMPLING_VERSION}
+
+    def _select_input(self, text: str):
+        return sample_text(text, budget=self.max_input_chars, strategy=self.input_strategy,
+                           max_windows=self.max_windows)
 
     # ------------------------------------------------------------ 端点组装
     def _make_endpoint(self, provider: str, model: str = "") -> Endpoint:
@@ -316,7 +341,7 @@ class LLMBackend(SemanticBackend):
             "max_tokens": self.max_tokens,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": JUDGE_PROMPT.format(text=text[: self.max_input_chars])},
+                {"role": "user", "content": JUDGE_PROMPT.format(text=self._select_input(text).text)},
             ],
         }
         if use_json:
@@ -334,7 +359,7 @@ class LLMBackend(SemanticBackend):
             "temperature": 0,
             "system": _SYSTEM_PROMPT,
             "messages": [
-                {"role": "user", "content": JUDGE_PROMPT.format(text=text[: self.max_input_chars])},
+                {"role": "user", "content": JUDGE_PROMPT.format(text=self._select_input(text).text)},
             ],
         }
         payload.update(self.extra_body)
@@ -453,17 +478,22 @@ class LLMBackend(SemanticBackend):
             return Prediction(0.0, self.unavailable_reason(), self.name, ok=False)
 
         started = time.perf_counter()
+        selection = self._select_input(text)
+        # extra_body may replace the entire request. In that case selection is not
+        # a reliable account of what reached the model, so do not claim coverage.
+        coverage = None if "messages" in self.extra_body or "system" in self.extra_body else selection.coverage
         # 调度器的预算包括排队；SDK 直接调用时使用后端默认总预算。
         deadline = current_deadline()
         if deadline is None and self.default_timeout_s > 0:
             deadline = time.monotonic() + self.default_timeout_s
         try:
             with prediction_deadline(deadline):
-                return self._predict_with_budget(text, started)
+                result = self._predict_with_budget(selection.text, started)
+                return replace(result, coverage=coverage)
         except PredictionTimeout:
             self.last_parsed = False
             return Prediction(0.0, "LLM 裁判调用失败：总时间预算已耗尽", self.name,
-                              (time.perf_counter() - started) * 1000, ok=False)
+                              (time.perf_counter() - started) * 1000, ok=False, coverage=coverage)
 
     def _predict_with_budget(self, text: str, started: float) -> Prediction:
         problems: list[str] = []
@@ -505,6 +535,7 @@ class LLMBackend(SemanticBackend):
             "providers": list(provider_names()),
             "max_tokens": self.max_tokens,
             "extra_body": dict(self.extra_body),
+            "input_sampling": self.input_sampling,
         })
         if not self.is_available():
             data["reason"] = self.unavailable_reason()

@@ -84,7 +84,8 @@ def build_backend(spec: str | SemanticBackend | None = "auto", **kwargs) -> Sema
         return NullBackend()
     if lowered == "local":
         return LocalModelBackend(
-            model_name=kwargs.get("model_name", DEFAULT_MODEL), **_strip(kwargs, "model_name")
+            model_name=kwargs.get("model_name", DEFAULT_MODEL),
+            **_strip(kwargs, "model_name", "max_input_chars", "input_strategy", "max_windows")
         )
     if lowered == "lightweight":
         return LightweightBackend(model_path=kwargs.get("model_path"))
@@ -102,7 +103,8 @@ def build_backend(spec: str | SemanticBackend | None = "auto", **kwargs) -> Sema
 
 
 def _llm_backend(provider: str, model_name: str, kwargs: dict[str, Any]) -> LLMBackend:
-    picked = _pick(kwargs, "base_url", "api_key", "max_retries", "fallbacks", "allow_fallbacks")
+    picked = _pick(kwargs, "base_url", "api_key", "max_retries", "fallbacks", "allow_fallbacks",
+                   "max_input_chars", "input_strategy", "max_windows")
     return LLMBackend(provider=provider, model_name=model_name, **picked)
 
 

@@ -67,6 +67,9 @@ All five entry points share the same `Pipeline`; only the integration surface di
   with only OpenAI/Anthropic wire protocols.
 - **Evidence-based fusion**: evidence layers are additive while semantic discriminators adjust
   multiplicatively, avoiding weak signals diluting strong evidence.
+- **Configurable long-text input**: LLM judges can select head-only or distributed windows
+  within the same character budget and return selection ranges. Distributed sampling is
+  opt-in; see [configuration and coverage measurements](docs/operations.md#llm-长文本分窗取样) (Chinese).
 - **Fingerprint-only audit**: original text and fingerprint algorithm are never persisted.
 - **Reproducible numbers**: every metric in this README can be regenerated from `scripts/`.
 

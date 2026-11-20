@@ -266,6 +266,69 @@ python -X utf8 scripts/semantic_load_check.py --out reports/semantic_load_after.
 超时后额外启动的后端调用从 12 次降到 0 次；60ms 的模拟 LLM 重试预算从
 约 3125ms 收敛到约 60ms。此测量使用本地替身，不代表真实厂商延迟或攻击检出率。
 
+### LLM 长文本分窗取样
+
+LLM 裁判默认仍使用 `head`（前 3000 字符）。在 `.env` 中显式配置以下选项可切换为
+分层取样；启动服务或 CLI 时生效，仅适用于 LLM 裁判后端，本地 DeBERTa 的 token 截断行为不变。
+
+```dotenv
+PROMPT_IDS_LLM_INPUT_STRATEGY=stratified
+PROMPT_IDS_LLM_INPUT_CHARS=3000
+PROMPT_IDS_LLM_INPUT_WINDOWS=3
+```
+
+```bash
+python -m prompt_ids.cli --semantic --semantic-backend llm --semantic-mode always --file document.txt --json
+```
+
+SDK 可显式构造后端，显式参数优先于环境变量：
+
+```python
+from prompt_ids import PipelineConfig, create_pipeline
+from prompt_ids.detectors.semantic.detector import SemanticDetector
+from prompt_ids.detectors.semantic.llm import LLMBackend
+
+backend = LLMBackend(input_strategy="stratified", max_input_chars=3000, max_windows=3)
+pipeline = create_pipeline(
+    config=PipelineConfig(semantic_enabled=True, semantic_mode="always"),
+    semantic=SemanticDetector(enabled=True, backend=backend, mode="always"),
+)
+try:
+    result = pipeline.scan("your document")
+    print(result.to_dict()["semantic_coverage"])
+finally:
+    pipeline.close()
+```
+
+短于预算的文本保持完整。长文本分配头部、中间和尾部窗口（窗口数可设 1–8）；
+窗口之间插入 `[... content omitted ...]`，避免把不相邻的文字拼成原文里不存在的指令。
+**所有窗口合成一次裁判输入**，3000 字符预算包含断点标记，但不包含固定裁判提示。
+重试和备用端点仍可能产生多次 HTTP 请求，沿用同一个时间预算。
+
+结果增加两个字段：
+
+- `semantic_ok`：是否取得有效语义判决；`null` 表示本次没有取得执行结果，例如 L3 被跳过。
+- `semantic_coverage`：所选输入的 `input_chars`、`sampled_chars`、`coverage_ratio`、
+  `window_count`、`strategy`、`truncated` 和 `[start, end)` 区间；没有可靠信息时为 `null`。
+
+**覆盖是输入选择的记录，不是“判定成功”的证明。** 应同时看 `semantic_ok`。
+区间以归一化后的后端输入为基准，不能直接当作原始文档位置；代理可能已经先做了分段或抽样，
+应结合 `trajectory.coverage` 阅读。审计、SSE、代理每段轨迹只记录区间和计数，不记录片段原文。
+取样配置进入缓存键；更换策略、窗口数或字符预算不会复用旧判定。
+
+[覆盖测量](../reports/semantic_windows.json) 只使用 `deepset_train` 的攻击原文，
+将它们放入合成长文档的头部、中段、尾部，未调用真实模型，也未使用留出集。
+12,000 字符文档、3000 字符预算下，三窗完整保留中段或尾部载荷 200/203 条，
+头部截取为 0/203；头部载荷则从 202/203 降到 200/203。三窗实际选择 2942 字符，
+覆盖约 24.5%；30,000 字符时仅约 9.8%。
+
+该结果量的是载荷可见性，**不能引用为检测召回**。取样仍有空洞，长载荷可能被切断，
+真实误报率、延迟和 token 成本需要用所选模型另行评测，因此此策略保持显式开启。
+
+```bash
+python -X utf8 scripts/semantic_window_check.py --out reports/semantic_windows.json
+```
+
 ## 六、审计日志
 
 ```jsonl

@@ -37,7 +37,7 @@ from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
 from prompt_ids.auth import authorized
-from prompt_ids.core.types import ScanResult
+from prompt_ids.core.types import ScanResult, TextCoverage
 from prompt_ids.net import send_security_headers, warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -132,6 +132,9 @@ class PlaygroundState:
 
     def publish_scan(self, result: dict[str, Any], *, chars: int) -> None:
         """从已完成的 API 结果发布白名单摘要，不重复检测或写审计。"""
+        coverage = result.get("semantic_coverage")
+        if coverage is not None:
+            coverage = TextCoverage.from_dict(coverage).to_dict()
         self.publish({
             "ts": time.time(),
             "level": result["level"],
@@ -143,6 +146,8 @@ class PlaygroundState:
             "detect_ms": round(float(result["latency_ms"].get("total", 0.0)), 2),
             "cached": bool(result["cached"]),
             "skipped": list(result["skipped"]),
+            "semantic_coverage": coverage,
+            "semantic_ok": result.get("semantic_ok"),
             "source": "playground",
         })
 

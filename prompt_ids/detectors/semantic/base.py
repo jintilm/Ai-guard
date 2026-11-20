@@ -9,9 +9,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import monotonic
 from typing import Any
+
+from prompt_ids.core.types import TextCoverage
 
 _DEADLINE: ContextVar[float | None] = ContextVar("semantic_deadline", default=None)
 
@@ -59,12 +61,13 @@ class Prediction:
     #: 判别层的 contribution() 见到 ok=False 必须弃票，否则一次网络抖动
     #: 会把规则层证据打 75 折（p=0 → 乘性因子 0.75），凭空制造漏报。
     ok: bool = True
+    coverage: TextCoverage | None = None
 
     def clamp(self) -> Prediction:
         p = min(1.0, max(0.0, self.probability))
         if p == self.probability:
             return self
-        return Prediction(p, self.rationale, self.backend, self.latency_ms, self.ok)
+        return replace(self, probability=p)
 
 
 class SemanticBackend(ABC):

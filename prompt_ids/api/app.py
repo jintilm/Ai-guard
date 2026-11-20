@@ -736,6 +736,22 @@ _SCAN_RESULT_SCHEMA = {
         "fingerprint": {"type": "string"},
         "latency_ms": {"type": "object"},
         "skipped": {"type": "array"},
+        "semantic_ok": {"type": "boolean", "nullable": True},
+        "semantic_coverage": {
+            "type": "object", "nullable": True,
+            "description": "Selected LLM input; offsets refer to normalized backend input, not the original document. Null means unavailable or not applicable.",
+            "properties": {
+                "strategy": {"type": "string", "enum": ["head", "stratified"]},
+                "input_basis": {"type": "string", "enum": ["backend_input"]},
+                "input_chars": {"type": "integer", "minimum": 0},
+                "sampled_chars": {"type": "integer", "minimum": 0},
+                "coverage_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+                "window_count": {"type": "integer", "minimum": 0, "maximum": 8},
+                "ranges": {"type": "array", "items": {"type": "array", "minItems": 2,
+                           "maxItems": 2, "items": {"type": "integer"}}},
+                "truncated": {"type": "boolean"},
+            },
+        },
     },
 }
 

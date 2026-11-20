@@ -8,6 +8,7 @@ from __future__ import annotations
 import threading
 import time
 from concurrent.futures import CancelledError, ThreadPoolExecutor
+from dataclasses import replace
 from typing import Any
 
 from prompt_ids.core.types import DETECTOR_SEMANTIC, Finding
@@ -200,13 +201,7 @@ class SemanticDetector(Detector):
 
         prediction = prediction.clamp()
         if prediction.latency_ms <= 0:
-            prediction = Prediction(
-                prediction.probability,
-                prediction.rationale,
-                prediction.backend,
-                (time.perf_counter() - started) * 1000,
-                prediction.ok,
-            )
+            prediction = replace(prediction, latency_ms=(time.perf_counter() - started) * 1000)
         # 弃权计数：ok=False 意味着这一层从融合里退出（不贡献分数），
         # 连续大量弃权 = L3 实际上没在工作，必须能被 metrics 看见。
         with self._work_lock:
@@ -290,6 +285,7 @@ class SemanticDetector(Detector):
 
     # ---------- Detector 接口 ----------
     def detect(self, ctx: DetectorContext) -> list[Finding]:
+        self.last_prediction = None
         if not self.enabled:
             return []
         text = (ctx.canonical or ctx.raw or "").strip()
@@ -354,6 +350,7 @@ class SemanticDetector(Detector):
             "mode": self.mode,
             "available": self.backend.is_available(),
             "timeout_s": self.timeout_s,
+            "input_sampling": getattr(self.backend, "input_sampling", None),
             # 弃权计数。**后端自己返回 ok=False 时 timeouts/errors 都是 0** ——
             # 而「网关 401/503」「推理模型 content 为空」这些恰恰走这条路。
             # 缺了它，一次死网关就是 L3 彻底静默失效：每次调用都弃票，

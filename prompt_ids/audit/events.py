@@ -11,6 +11,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from prompt_ids.core.types import TextCoverage
+
 # 事件类型：检测 / Canary 泄漏 / Canary 签发 / 记忆写入 / API 请求 / 代理转发 /
 # 人工复核 / 自定义
 KIND_SCAN = "scan"
@@ -156,6 +158,10 @@ def event_from_scan(result, *, text: str = "", user: str = "",
     top = ""
     if findings:
         top = max(findings, key=lambda f: f.weight * f.confidence).pattern_id
+    coverage = getattr(result, "semantic_coverage", None)
+    if isinstance(coverage, TextCoverage):
+        extra["semantic_coverage"] = coverage.to_dict()
+        extra["semantic_ok"] = bool(getattr(result, "semantic_ok", False))
     return AuditEvent(
         ts=time.time(),
         kind=KIND_SCAN,
@@ -306,6 +312,10 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
             # 也不会把「要不要落盘」变成一个必须记得开的开关。
             # 由 `proxy.trajectory` 构造；`None` 表示这条路径没有分段信息。
             "trajectory": dict(trajectory) if trajectory else None,
+            "semantic_coverage": (result.semantic_coverage.to_dict()
+                                  if isinstance(getattr(result, "semantic_coverage", None), TextCoverage)
+                                  else None),
+            "semantic_ok": getattr(result, "semantic_ok", None),
             # 出站密钥扫描命中的类别与计数：**只落类别，不落原文**。
             # 密钥的脱敏形态（首尾几个字符）只出现在给客户端的告警体里，不进审计文件。
             "secret_kinds": dict(secret_kinds or {}),

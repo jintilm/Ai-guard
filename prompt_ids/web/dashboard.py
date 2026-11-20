@@ -320,11 +320,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 button.primary:hover:not(:disabled){background:var(--btn-primary-hover);color:#fff}
 .pg-result{margin-top:16px}
-.verdict{display:flex;align-items:baseline;gap:14px;padding:16px 18px;border-radius:14px;
+.verdict{display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:16px 18px;border-radius:14px;
   background:var(--bg);border:1px solid var(--line)}
 .verdict .lv{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .verdict .sc{font-family:var(--mono);font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
 .verdict .ac{font-size:12px;color:var(--ink-3);margin-left:auto;font-family:var(--mono)}
+.verdict .lv,.verdict .sc,.verdict .badge{flex-shrink:0;white-space:nowrap}
+.verdict .ac{flex:1 1 240px;overflow-wrap:anywhere}
+.semantic-coverage{margin-top:8px;line-height:1.6;overflow-wrap:anywhere;color:var(--ink-2)}
+.pg-result th,.pg-result td{padding-right:12px}
+@media(max-width:600px){.verdict .ac{flex-basis:100%;margin-left:0}}
 .lv-safe{color:var(--ok)}.lv-low{color:var(--ok)}
 .lv-medium{color:var(--warn)}
 /* 复核台账里的「嫌疑规则」行：不用新颜色，直接复用 --warn-soft 体系 */
@@ -582,7 +587,7 @@ I18N_JS = """
       "hint.output":"请求侧检测管「用户说了什么」，出站检测管「模型吐了什么」",
       "hint.proxy":"来自审计日志（只记录指纹，不落原文）",
       "hint.limits":"答辩前需要主动说明的部分",
-      "hint.playground":"粘一段文本，看四级流水线当场怎么判 —— 数据不出本机，走本地服务",
+      "hint.playground":"输入文本，查看风险判定与所选语义输入范围",
       "hint.live":"来自本地服务 <code>/v1/metrics</code> 与 <code>/v1/events</code>（只含指纹，不含原文），随每次检测自动滚动。静态打开时本卡片不显示。",
       "bestConfig":"最优配置：",
       "f1":"F1 ",
@@ -635,6 +640,12 @@ I18N_JS = """
       "avgDetectMs":"平均检测耗时",
       "cachedHit":"缓存命中 · ",
       "skippedLayers":"未执行层：",
+      "coverage.selected":"所选语义输入",
+      "coverage.windows":"个窗口",
+      "coverage.basis":"按归一化后的后端输入计数",
+      "coverage.partial":"部分覆盖",
+      "coverage.verdict":"取得判决",
+      "coverage.abstained":"未取得语义判决",
       "truncatedText":"输入过长，已截断后检测",
       "rejectedByGuard":"已被护栏拒绝：",
       "findingsPrefix":"命中 ",
@@ -771,7 +782,7 @@ I18N_JS = """
       "hint.output":"Input scanning handles what users say; output scanning handles what models emit",
       "hint.proxy":"From the audit log (fingerprints only, no original text)",
       "hint.limits":"Limitations to state explicitly before review",
-      "hint.playground":"Paste text and see the four-stage pipeline decide - data stays local",
+      "hint.playground":"Scan text to view its risk verdict and selected semantic input",
       "hint.live":"From local <code>/v1/metrics</code> and <code>/v1/events</code> (fingerprints only). Scrolls with each scan. Hidden in static mode.",
       "bestConfig":"Best configuration: ",
       "f1":"F1 ",
@@ -824,6 +835,12 @@ I18N_JS = """
       "avgDetectMs":"Average detection latency",
       "cachedHit":"Cached · ",
       "skippedLayers":"Skipped layers: ",
+      "coverage.selected":"Selected semantic input",
+      "coverage.windows":"windows",
+      "coverage.basis":"Offsets refer to normalized backend input",
+      "coverage.partial":"Partial coverage",
+      "coverage.verdict":"Verdict received",
+      "coverage.abstained":"No semantic verdict received",
       "truncatedText":"Input too long; truncated before scanning",
       "rejectedByGuard":"Rejected by guard: ",
       "findingsPrefix":"Hit ",
@@ -1199,6 +1216,22 @@ PG_JS = """
     status.innerHTML = html;
   }
 
+  function coverageHtml(d){
+    function label(key){
+      return '<span data-i18n="' + key + '">' + window.__T__(key) + '</span>';
+    }
+    var c = d.semantic_coverage;
+    if(!c) return d.semantic_ok === false
+      ? '<p class="hint">' + label('coverage.abstained') + '</p>' : '';
+    return '<p class="hint semantic-coverage">' + label('coverage.selected') + ': ' +
+      esc(c.sampled_chars) + ' / ' + esc(c.input_chars) + ' (' +
+      (Number(c.coverage_ratio) * 100).toFixed(1) + '%) · ' + esc(c.window_count) + ' ' +
+      label('coverage.windows') + ' · ' + esc(c.strategy) +
+      (c.truncated ? ' · ' + label('coverage.partial') : '') +
+      ' · ' + label(d.semantic_ok ? 'coverage.verdict' : 'coverage.abstained') +
+      '<br>' + label('coverage.basis') + '</p>';
+  }
+
   function renderResult(d){
     var lv = (d.level || 'safe');
     var findings = d.findings || [];
@@ -1216,6 +1249,7 @@ PG_JS = """
     if(d.explained){
       html += '<p class="hint" style="margin:12px 0 0">' + esc(d.explained) + '</p>';
     }
+    html += coverageHtml(d);
     if(d.skipped && d.skipped.length){
       html += '<p class="hint" style="margin-top:6px;color:var(--warn)">' +
         window.__T__('skippedLayers') + esc(d.skipped.join('、')) + '</p>';
@@ -1377,7 +1411,7 @@ PG_JS = """
     var rows = rs.map(function(r, i){
       var f = r.findings || [];
       return '<tr><td class="n">' + (i + 1) + '</td>' +
-        '<td style="max-width:360px">' + esc(preview(texts[i], 70)) + '</td>' +
+        '<td style="max-width:360px">' + esc(preview(texts[i], 70)) + coverageHtml(r) + '</td>' +
         '<td>' + lvl(r.level) + '</td>' +
         '<td class="n">' + (r.score || 0).toFixed(1) + '</td>' +
         '<td>' + esc(window.__T__('action.' + (r.action || '')) || r.action || '') + '</td>' +
@@ -1449,7 +1483,7 @@ PG_JS = """
       lvl(r.level) + '<span class="delta">' + (r.score || 0).toFixed(1) + '</span>' +
       '<span class="badge">' + esc(window.__T__('action.' + (r.action || '')) || r.action || '') + '</span></div>' +
       '<div style="font-size:12.5px;color:var(--ink-2);margin:6px 0 10px">' +
-      esc(preview(text, 160)) + '</div>' + inner + '</div>';
+      esc(preview(text, 160)) + '</div>' + coverageHtml(r) + inner + '</div>';
   }
   function renderCompare(a, b, ta, tb){
     var d = (b.score || 0) - (a.score || 0);
@@ -1522,7 +1556,7 @@ PG_JS = """
       '<div class="note"><strong>' + esc(head) + '</strong> ' + lvl(lv) +
       ' ' + window.__T__('th.score') + ' ' + (typeof d.score === 'number' ? d.score.toFixed(1) : '—') +
       ' ' + window.__T__('th.action') + ' ' + esc((window.__T__('action.' + (d.action || '')) || d.action || '')) +
-      ' · ' + window.__T__('th.fingerprint') + ' ' + esc(String(d.fingerprint || '').slice(0, 12)) + '</div>' +
+      ' · ' + window.__T__('th.fingerprint') + ' ' + esc(String(d.fingerprint || '').slice(0, 12)) + '</div>' + coverageHtml(d) +
       /* 记忆层那一行只在**复核响应**里才有字段；/v1/scan 不返回 memory_reason，
          无条件渲染会把「只是看了一眼判定」显示成「记忆层被拒」—— 界面在撒谎。 */
       (d.memory_reason ? '<div class="note" style="margin-top:10px">记忆层：' +
@@ -2087,7 +2121,7 @@ def render_html(data: dict) -> str:
 
 <section class="card rise" id="playground" style="margin-bottom:20px">
   <h2 data-i18n="h.playground">在线检测台</h2>
-  <p class="hint" data-i18n="hint.playground">粘一段文本，看四级流水线当场怎么判 —— 数据不出本机，走本地服务</p>
+  <p class="hint" data-i18n="hint.playground">输入文本，查看风险判定与所选语义输入范围</p>
 
   <div id="pg-status" class="hint" style="margin-bottom:14px">正在连接本地检测服务…</div>
 

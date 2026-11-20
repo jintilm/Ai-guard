@@ -43,7 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
-from prompt_ids.core.types import Action
+from prompt_ids.core.types import Action, TextCoverage
 from prompt_ids.core.verdict import FusionConfig
 from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
@@ -138,6 +138,7 @@ class CachedSemanticBackend(SemanticBackend):
                 str(hit.get("r", "")),
                 str(hit.get("b", self.name)),
                 float(hit.get("t", 0.0)),
+                coverage=TextCoverage.from_dict(hit["coverage"]) if hit.get("coverage") else None,
             )
         prediction = self._inner.predict(text)
         self.misses += 1
@@ -152,6 +153,7 @@ class CachedSemanticBackend(SemanticBackend):
             "b": prediction.backend,
             # 保留原始延迟，让命中缓存时不把统计拉成 0
             "t": round(prediction.latency_ms, 3),
+            "coverage": prediction.coverage.to_dict() if prediction.coverage else None,
         }
         self._dirty += 1
         if self._dirty >= self._flush_every:
@@ -160,6 +162,10 @@ class CachedSemanticBackend(SemanticBackend):
 
     def is_available(self) -> bool:
         return self._inner.is_available()
+
+    @property
+    def input_sampling(self):
+        return getattr(self._inner, "input_sampling", None)
 
     def warmup(self) -> None:
         self._inner.warmup()
@@ -188,11 +194,11 @@ def _backend_fingerprint(inner: SemanticBackend) -> str:
         info = {}
     relevant = {
         key: info.get(key)
-        for key in ("backend", "provider", "model", "base_url", "max_tokens", "extra_body")
+        for key in ("backend", "provider", "model", "base_url", "max_tokens", "extra_body", "input_sampling")
         if key in info
     }
     # 旧版本可能把不可解析的 LLM 回复当作成功缓存；升级后必须重新取判决。
-    relevant["prediction_contract"] = 2
+    relevant["prediction_contract"] = 3
     blob = json.dumps(relevant, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 

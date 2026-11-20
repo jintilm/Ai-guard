@@ -45,6 +45,9 @@ GENERIC_DEPLOYMENT_ENVS = ("PROMPT_IDS_LLM_DEPLOYMENT",)
 GENERIC_USER_AGENT_ENV = "PROMPT_IDS_LLM_USER_AGENT"
 GENERIC_MAX_TOKENS_ENV = "PROMPT_IDS_LLM_MAX_TOKENS"
 GENERIC_EXTRA_BODY_ENV = "PROMPT_IDS_LLM_EXTRA_BODY"
+GENERIC_INPUT_STRATEGY_ENV = "PROMPT_IDS_LLM_INPUT_STRATEGY"
+GENERIC_INPUT_CHARS_ENV = "PROMPT_IDS_LLM_INPUT_CHARS"
+GENERIC_INPUT_WINDOWS_ENV = "PROMPT_IDS_LLM_INPUT_WINDOWS"
 
 #: 裁判回复的默认 token 上限。
 #: **别调回 120**：推理模型（glm-4.5、deepseek-v4 等）会先把 token 花在
@@ -456,6 +459,18 @@ def resolve_extra_body() -> dict:
     except json.JSONDecodeError:
         return {}
     return obj if isinstance(obj, dict) else {}
+
+
+def resolve_input_sampling(strategy: str | None, chars: int | None,
+                           windows: int | None) -> tuple[str, int, int]:
+    """Explicit settings override environment values; invalid budgets fail loudly."""
+    from prompt_ids.detectors.semantic.windowing import sample_text
+
+    chosen = strategy if strategy is not None else (_env(GENERIC_INPUT_STRATEGY_ENV) or "head")
+    budget = chars if chars is not None else int(_env(GENERIC_INPUT_CHARS_ENV) or "3000")
+    count = windows if windows is not None else int(_env(GENERIC_INPUT_WINDOWS_ENV) or "3")
+    sample_text("", budget=budget, strategy=chosen, max_windows=count)
+    return chosen, budget, count
 
 
 def resolve_deployment(provider: str, model: str = "") -> str:

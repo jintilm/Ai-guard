@@ -1,6 +1,7 @@
 """流水线编排：层串联、短路、超时、缓存。"""
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 
@@ -234,6 +235,10 @@ class Pipeline:
             parts.append(f"sem={self.config.semantic_mode}")
         # system/developer 的规则结果不能冒充 user/tool 的完整检测结果。
         parts.append("l3=off" if semantic is False else "l3=config")
+        if semantic is not False:
+            sampling = getattr(getattr(self.semantic_detector, "backend", None), "input_sampling", None)
+            if sampling:
+                parts.append("input=" + json.dumps(sampling, sort_keys=True))
         mem = self.memory_detector
         if mem is not None and mem.enabled:
             # 版本号在每次成功写入后递增，记忆一变缓存即失效
@@ -340,6 +345,9 @@ class Pipeline:
             layer_findings, used = detector.timed_detect(ctx)
             if isinstance(detector, SemanticDetector):
                 prediction = detector.last_prediction
+                if prediction is not None:
+                    result.semantic_coverage = prediction.coverage
+                    result.semantic_ok = prediction.ok
                 if prediction is not None and not prediction.ok:
                     # 后端过载/超时是临时状态，不能让缓存把降级判定固化。
                     cacheable = False

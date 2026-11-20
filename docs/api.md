@@ -50,6 +50,13 @@
 
 ## 核心检测
 
+单条和批量扫描结果中的 `semantic_ok` 表示是否获得有效语义判决；
+`semantic_coverage` 记录 LLM 裁判所选输入的字符数、比例和 `[start, end)` 区间。
+其 `input_basis="backend_input"` 表示坐标对应归一化后的后端输入，
+不对应原始文档，也不包含固定裁判提示。`null` 表示没有可靠覆盖信息，不能解读为全文扫描。
+覆盖信息也出现在审计事件的 `extra` 与代理分段轨迹中，不含原文。
+配置见 [长文本取样](operations.md#llm-长文本分窗取样)。
+
 ### `POST /v1/scan`
 
 请求：

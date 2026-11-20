@@ -28,6 +28,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from prompt_ids.core.types import TextCoverage
+
 #: 单条轨迹最多记多少步。消息数由 `max_tool_segments` 与 body 上限共同限制，
 #: 但代理可能被喂 32 段工具结果 —— 审计文件不该被一条请求写爆。
 MAX_STEPS = 64
@@ -48,6 +50,8 @@ class SegmentStep:
     truncated: bool = False
     sampled: bool = False
     rules_only: bool = False
+    semantic_coverage: TextCoverage | None = None
+    semantic_ok: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -62,6 +66,8 @@ class SegmentStep:
             "truncated": self.truncated,
             "sampled": self.sampled,
             "rules_only": self.rules_only,
+            "semantic_coverage": self.semantic_coverage.to_dict() if self.semantic_coverage else None,
+            "semantic_ok": self.semantic_ok,
         }
 
     @property
@@ -97,6 +103,8 @@ def build_steps(plan: list[tuple[Any, str, bool]],
             truncated=bool(getattr(segment, "truncated", False)) or bool(sampled and False),
             sampled=bool(sampled),
             rules_only=bool(getattr(segment, "rules_only", False)),
+            semantic_coverage=getattr(result, "semantic_coverage", None),
+            semantic_ok=getattr(result, "semantic_ok", None),
         ))
     return tuple(steps[:MAX_STEPS])
 
