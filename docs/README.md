@@ -7,6 +7,7 @@
 | [快速上手](getting-started.md) | 第一次用：装、跑通第一条、四个入口怎么选 |
 | [部署与运维](operations.md) | 要上线：接入方式、配置项、监控、部署姿势 |
 | [API 参考](api.md) | 要接进自己的系统：19 条 REST 路由 + SDK |
+| [Responses API 代理](responses.md) | 接入 OpenAI Responses 文本与函数工具、完整历史和流式告警 |
 | [故障排查](troubleshooting.md) | 数字不对 / 没生效 / 服务起不来 |
 | [数据集与评测](datasets.md) | 中英文 RAG 长文本、分组切分、来源许可与采样策略对比 |
 

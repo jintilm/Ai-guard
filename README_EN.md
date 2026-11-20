@@ -200,6 +200,11 @@ client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="dummy")
 The proxy adds indirect-injection scanning, outbound secret redaction, canary tokens, and
 role-aware policy.
 
+`client.responses.create(...)` is supported for text and explicit function-tool results,
+including secret/Canary warnings before the terminal streaming event. Replay the full history;
+hidden conversation references, multimodal input and hosted tools are not yet supported.
+See [Responses integration and scope](docs/responses.md#english).
+
 ### CLI
 
 ```bash

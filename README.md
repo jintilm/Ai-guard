@@ -186,6 +186,10 @@ client = OpenAI(base_url="http://127.0.0.1:8787/v1", api_key="dummy")
 
 代理额外覆盖间接注入、响应侧密钥脱敏、Canary 令牌和分角色策略。
 
+支持 `client.responses.create(...)`：文本与显式函数工具结果进入同一检测流程，
+流式密钥/Canary 命中会在 Responses 终止事件前告警。需完整重放历史；会话引用、
+多模态与托管工具暂不支持。见 [Responses 接入与边界](docs/responses.md)。
+
 ### CLI
 
 ```bash

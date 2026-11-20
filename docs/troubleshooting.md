@@ -195,6 +195,10 @@ python scripts/llm_check.py        # 判据是 backend.last_parsed，不是连�
 **代理不是全透传。** 未知路径 404，已知但未接入的 501 —— 这是刻意的
 （防止「不在扫描列表里就悄悄放行」）。挂代理前先确认你的应用只用支持的路径。
 
+Responses 文本请求已接入。若收到 `responses_scan_unsupported`，检查错误的 `param` 字段：
+服务器端会话/提示引用、多模态、托管工具、后台请求和资源读取暂不支持。
+应用需在 `input` 中重放完整文本历史与函数工具结果，详见 [接入边界](responses.md#首版支持边界)。
+
 ⚠ 历史上 `/v1/messages`（Anthropic）曾**静默透传**，等于 Anthropic 客户端
 完全不过检测。现在已改成扫描。
 

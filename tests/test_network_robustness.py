@@ -486,12 +486,12 @@ def test_known_passthrough_path_still_works(weird_upstream, tmp_path):
 
 
 def test_generation_path_without_extractor_says_so_loudly(weird_upstream, tmp_path):
-    """`/v1/responses` 是真实存在的生成端点，但载荷结构还没接入分段提取。
+    """`/v1/complete` 尚未接入；Responses 已有单独的受限文本适配器。
     静默透传 = 用户以为有防护；明确 501 才是诚实的。"""
     httpd, _config, _audit = _proxy(weird_upstream, tmp_path)
     try:
         status, _headers, body = _proxy_post(
-            httpd.server_address[1], {"input": "x"}, path="/v1/responses")
+            httpd.server_address[1], {"prompt": "x"}, path="/v1/complete")
         assert status == 501
         assert b"scan_unsupported" in body
         assert _WeirdUpstream.last_path == ""

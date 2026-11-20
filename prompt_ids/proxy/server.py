@@ -40,6 +40,16 @@ from prompt_ids.output import MAX_HITS, redact_bytes, scan_text, summary
 from prompt_ids.preprocess.guard import RateLimiter, fingerprint
 from prompt_ids.proxy import trajectory
 from prompt_ids.proxy.forward import UpstreamError, forward_headers, post_json, post_stream
+from prompt_ids.proxy.responses import (
+    RESPONSE_PATHS,
+    ResponseFrameTooLarge,
+    ResponsesInputError,
+    ResponsesOutput,
+    extract_responses,
+    is_response_resource,
+    iter_frames,
+    output_text,
+)
 
 DEFAULT_PORT = 8787
 # 请求体上限。不设的话攻击者可以用超大 Content-Length 吃满内存与 CPU：
@@ -52,6 +62,7 @@ SCANNED_PATHS = (
     "/v1/chat/completions", "/v1/completions",
     "/chat/completions", "/completions",
     "/v1/messages",
+    *RESPONSE_PATHS,
 )
 #: 明确**不检测**、直接透传的路径。逐个列出来，而不是「不在扫描列表里就透传」——
 #: 后者的含义是「将来新增的生成端点会自动被跳过检测」，而这正是静默漏检的来源。
@@ -63,7 +74,6 @@ PASSTHROUGH_PATHS = (
 #: 已知但**尚未支持检测**的生成端点。明确报 501 而不是透传：
 #: 调用方能立刻知道「这里没有防护」，而不是以为检测过了。
 UNSUPPORTED_SCAN_PATHS = {
-    "/v1/responses": "OpenAI Responses API 的载荷结构（input / instructions）尚未接入分段提取",
     "/v1/complete": "legacy completions 需要 prompt 而非 messages，尚未接入",
 }
 #: 代理支持的 HTTP 方法。其余返回 JSON 405，而不是 BaseHTTPRequestHandler 的 HTML 501
@@ -612,6 +622,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 "message": "缺少或错误的客户端 Key（X-API-Key）",
                 "type": "unauthorized", "code": "unauthorized"}})
             return
+        path = self._upstream_path()
+        if is_response_resource(path):
+            # Stored responses and their streamed replays must not bypass the
+            # outbound checks performed on POST /responses.
+            self.config.audit.log(AuditEvent(
+                ts=time.time(), kind=KIND_PROXY, source="proxy", user=self.client_address[0],
+                note="Responses 资源读取尚未接入出站检测", extra={"path": "/v1/responses/{id}",
+                    "status": 501, "decision": "rejected", "scanned": False,
+                    "error_code": "responses_scan_unsupported"}))
+            self._send_json(501, {"error": {"code": "responses_scan_unsupported",
+                "message": "Responses 资源读取暂不支持；请使用携带完整文本历史的 POST /v1/responses"}})
+            return
         self._passthrough("GET", b"")
 
     # 其余方法统一走 JSON 405，而不是 BaseHTTPRequestHandler 的 HTML 501
@@ -773,15 +795,32 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         try:
             payload = json.loads(body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
             self._send_json(400, {"error": "请求体不是合法 JSON"})
             return
         if not isinstance(payload, dict):
             self._send_json(400, {"error": "请求体必须是 JSON 对象"})
             return
 
-        segments = extract_segments(payload, self.config)
-        if not segments:
+        response_input = None
+        if path in RESPONSE_PATHS:
+            try:
+                response_input = extract_responses(payload, self.config)
+            except ResponsesInputError as exc:
+                # Format failures are not injection verdicts. Record only the
+                # fixed field path and error code, never supplied values.
+                self.config.audit.log(AuditEvent(
+                    ts=time.time(), kind=KIND_PROXY, source="proxy", user=self.client_address[0],
+                    note=str(exc), extra={"path": path, "status": exc.status,
+                        "decision": "rejected", "scanned": False, "input_protocol": "responses",
+                        "error_code": exc.code, "field": exc.field}))
+                self._send_json(exc.status, {"error": {"message": str(exc), "type": exc.code,
+                                                      "code": exc.code, "param": exc.field}})
+                return
+            segments = response_input.segments
+        else:
+            segments = extract_segments(payload, self.config)
+        if not segments and response_input is None:
             self._passthrough("POST", body)
             return
 
@@ -790,21 +829,23 @@ class ProxyHandler(BaseHTTPRequestHandler):
         scan = scan_segments(pipeline, segments,
                              budget_chars=self.config.max_total_scan_chars)
         detect_ms = (time.perf_counter() - started) * 1000
-        result, trigger = scan.result, scan.trigger
+        result, trigger = scan.result or ScanResult(), scan.trigger
         decision, status, note = decide(result, self.config, trigger)
         # 指纹覆盖所有**实际扫过**的文本：谁被拦下，指纹就该对得上被扫的那部分
         text = "\n".join(seg.text for seg in segments)
-        coverage = dict(segments=len(segments), trigger=trigger.tag if trigger else "",
-                        truncated=scan.truncated, dropped=scan.dropped,
+        omitted = response_input.omitted_tools if response_input else 0
+        input_coverage = response_input.account() if response_input else {}
+        coverage = dict(segments=len(segments) + omitted, trigger=trigger.tag if trigger else "",
+                        truncated=scan.truncated, dropped=scan.dropped + omitted,
                         scanned_chars=scan.scanned_chars)
         # 轨迹**单独传**，不混进 coverage：coverage 是 splat 进 event_from_proxy 的
         # 关键字参数集合，而轨迹要先在 proxy 侧转成 dict（audit 层不能反向 import
         # proxy —— proxy 已经依赖 audit 了）。
         traj = trajectory.to_dict(
             scan.steps,
-            coverage={"segments": len(segments), "budget_chars": self.config.max_total_scan_chars,
+            coverage={"segments": coverage["segments"], "budget_chars": self.config.max_total_scan_chars,
                       "scanned_chars": scan.scanned_chars,
-                      "truncated": scan.truncated, "dropped": scan.dropped})
+                      "truncated": scan.truncated, "dropped": coverage["dropped"], **input_coverage})
 
         if status == 403:
             self.config.audit.log(
@@ -833,19 +874,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                         # 纯索引轨迹：告诉调用方「注入从哪一条进来」。
                         # ⚠ 只给 role#index 与命中规则，**不回显内容** ——
                         #   调用方看得到自己发的请求，能自己对回那一条。
-                        "trajectory": trajectory.to_dict(
-                            scan.steps,
-                            coverage={"segments": len(segments),
-                                      "truncated": scan.truncated,
-                                      "dropped": scan.dropped,
-                                      "scanned_chars": scan.scanned_chars}),
+                        "trajectory": traj,
                     },
                 },
             )
             return
 
         self._forward(path, body, payload, result, decision, detect_ms, text,
-                        steps=scan.steps, **coverage)
+                        steps=scan.steps, input_coverage=input_coverage, **coverage)
 
     # ---------- 转发 ----------
     def _build_headers(self) -> dict[str, str]:
@@ -948,6 +984,56 @@ class ProxyHandler(BaseHTTPRequestHandler):
         out = OUTBOUND_WARNED if (leak is not None or secrets_found) else OUTBOUND_NONE
         return out, detail, summary(secrets_found), secret_sampled or capped, secret_chars
 
+    def _stream_responses(self, chunks):
+        """Inspect decoded text per output field and warn before completion.
+
+        Responses uses response.completed/failed/incomplete instead of [DONE].
+        Inspecting only at EOF places warnings too late when a terminal event is
+        followed by keepalives. The outgoing stream remains unchanged except for
+        explicit prompt_ids.warning events; already emitted text is irreversible.
+        """
+        scanner = ResponsesOutput(self.config.max_response_scan_chars)
+        outcome, detail, kinds = OUTBOUND_NONE, "", {}
+        warned = False
+
+        def warn():
+            nonlocal outcome, detail, kinds, warned
+            if warned:
+                return
+            warned = True
+            text = scanner.text
+            leak = self.config.leak_check(text)
+            hits, sampled, _chars = self.config.secret_check(text)
+            scanner.capped = scanner.capped or sampled
+            notices = []
+            if leak:
+                notices.append({"warning": "canary_leak", "leak": leak.as_dict(public=True)})
+            if hits:
+                kinds = summary(hits)
+                notices.append({"warning": "secret_scan", "secrets": [h.as_dict() for h in hits[:MAX_HITS]]})
+            if notices:
+                outcome = OUTBOUND_WARNED
+                detail = "Responses 出站命中（流式，内容已发出，无法撤回，只能事后告警）"
+                for notice in notices:
+                    self.wfile.write(_responses_warning(notice))
+                self.wfile.flush()
+
+        try:
+            for frame in iter_frames(chunks, self.config.max_response_bytes):
+                if scanner.feed(frame):
+                    warn()
+                self.wfile.write(frame)
+                self.wfile.flush()
+            warn()
+        except ResponseFrameTooLarge:
+            scanner.capped = True
+            warn()
+            outcome = OUTBOUND_WARNED
+            detail = "Responses 流帧超出响应体上限，连接已终止；已发出的内容无法撤回"
+            self.wfile.write(_responses_warning({"warning": "response_frame_too_large"}))
+            self.wfile.flush()
+        return outcome, detail, kinds, scanner.capped, scanner.chars if self.config.scan_secrets else 0
+
     def _forward(
         self,
         path: str,
@@ -963,6 +1049,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         dropped: int = 0,
         scanned_chars: int = 0,
         steps: tuple = (),
+        input_coverage: dict | None = None,
     ) -> None:
         url = self._upstream_url(path)
         headers = self._build_headers()
@@ -996,11 +1083,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
                                  outbound=outbound if out is None else out,
                                  outbound_detail=outbound_detail if detail is None else detail,
                                  trajectory=trajectory.to_dict(steps, coverage={
-                                     "segments": len(steps),
+                                     "segments": segments,
                                      "budget_chars": self.config.max_total_scan_chars,
                                      "scanned_chars": scanned_chars,
                                      "truncated": truncated,
                                      "dropped": dropped,
+                                     **(input_coverage or {}),
                                  }))
             )
 
@@ -1008,12 +1096,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
             if stream:
                 status, resp_headers, chunks, _, close_upstream = post_stream(
                     url, body, headers, self.config.timeout_s)
-                self._relay_response(status, resp_headers)
                 try:
-                    outbound, outbound_detail, secret_kinds, secret_sampled, secret_chars = \
-                        self._stream_body(chunks, path, result, status, detect_ms, text,
-                                          segments, trigger, truncated, dropped,
-                                          scanned_chars, started)
+                    encoding = {k.lower(): v for k, v in resp_headers.items()}.get("content-encoding", "identity")
+                    if path in RESPONSE_PATHS and encoding not in ("", "identity"):
+                        audit_one(502, "Responses 流使用不支持的内容编码，已拒收", upstream_ms=0,
+                                  out=OUTBOUND_REJECTED, detail="unsupported_content_encoding")
+                        self._send_json(502, {"error": {"code": "unsupported_content_encoding"}})
+                        return
+                    self._relay_response(status, resp_headers, body_modified=path in RESPONSE_PATHS)
+                    if path in RESPONSE_PATHS:
+                        outbound, outbound_detail, secret_kinds, secret_sampled, secret_chars = \
+                            self._stream_responses(chunks)
+                    else:
+                        outbound, outbound_detail, secret_kinds, secret_sampled, secret_chars = \
+                            self._stream_body(chunks, path, result, status, detect_ms, text,
+                                              segments, trigger, truncated, dropped,
+                                              scanned_chars, started)
                 finally:
                     # 任何退出路径都关上游连接（生成器未被启动时它的 finally 不会跑）
                     close_upstream()
@@ -1527,6 +1625,8 @@ def _collect_output(obj: Any, parts: list[tuple[str, str]]) -> None:
     拼接时**不能加任何分隔符**（加了就把跨帧的凭据拆断了）；
     ``line`` 表示另一段独立文本，用换行隔开即可。
     """
+    if isinstance(obj, dict) and isinstance(obj.get("output"), list):
+        parts.append(("line", output_text(obj)))
     for choice in (obj.get("choices") or []) if isinstance(obj, dict) else []:
         if not isinstance(choice, dict):
             continue
@@ -1628,6 +1728,12 @@ def _secret_event(hits) -> bytes:
         "note": "响应中含有凭据，已记审计；内容已发出，无法撤回",
         "secrets": [h.as_dict() for h in hits],
     }, ensure_ascii=False).encode("utf-8") + b"\n\n"
+
+
+def _responses_warning(notice: dict) -> bytes:
+    payload = {"type": "prompt_ids.warning", "note": "内容已发出，无法撤回", **notice}
+    return b"event: prompt_ids.warning\ndata: " + json.dumps(
+        payload, ensure_ascii=False).encode("utf-8") + b"\n\n"
 
 
 def _leak_event(leak) -> bytes:
