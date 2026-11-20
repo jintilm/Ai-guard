@@ -88,25 +88,50 @@ therefore routes `system` messages through rules only by default.
 
 ## Benchmarks
 
-817 public samples (351 attacks / 466 benign), local DeBERTa, 0% semantic abstention:
+Rerun on 2026-11-20: [full report](reports/ablation.json). **817 unique texts**
+(351 attacks / 466 benign): 546 deepset training samples, 116 deepset test samples,
+70 garak samples, and 85 built-in seeds. This is a mixed dataset containing training
+and synthetic samples; use the separate holdout results below to assess generalization.
+The run uses local DeBERTa and the `default` policy, with detection caching and rule
+short-circuiting disabled for layer comparison. Semantic abstention is 0%.
 
-| Configuration | Precision | Recall | F1 | False-positive rate | Latency/sample |
-|---|---:|---:|---:|---:|---:|
-| L1 rules only | 1.000 | 0.352 | 0.520 | **0.0000** | 1.3ms |
-| L1+L2 rules + heuristics | 1.000 | 0.357 | 0.526 | **0.0000** | 1.3ms |
-| +L3 semantic (fallback gate) | 0.964 | 0.594 | 0.735 | 0.0180 | 67.2ms |
-| +L3 semantic (always) | 0.935 | 0.609 | **0.737** | 0.0339 | 100.2ms |
+**Risk detection: `level >= high`**, the report's `confusion` field:
 
-The rule layer has zero false positives and 1.3ms latency, at the cost of 0.352 recall. The
-semantic layer raises recall to 0.609, at the cost of 3.4% false positives and 100ms latency.
-That tradeoff is intentional.
+| Configuration | Precision | Recall | F1 | False-positive rate |
+|---|---:|---:|---:|---:|
+| L1 rules only | 1.0000 | 0.2934 | 0.4537 | 0.0000 |
+| L1+L2 rules + heuristics | 1.0000 | 0.2963 | 0.4571 | 0.0000 |
+| +L3 semantic (fallback gate) | 0.9604 | 0.5527 | 0.7016 | 0.0172 |
+| +L3 semantic (always) | 0.9423 | 0.5584 | 0.7013 | 0.0258 |
 
-On the over-refusal side, 1,533 purely benign public samples (OR-Bench hard-1k + XSTest safe):
+**Actual blocking: `action == "block"`**, the `blocking` field; excludes `sandbox`:
+
+| Configuration | Precision | Recall | F1 | False-positive rate |
+|---|---:|---:|---:|---:|
+| L1 rules only | 1.0000 | 0.2336 | 0.3788 | 0.0000 |
+| L1+L2 rules + heuristics | 1.0000 | 0.2365 | 0.3825 | 0.0000 |
+| +L3 semantic (fallback gate) | 0.9630 | 0.5185 | 0.6741 | 0.0150 |
+| +L3 semantic (always) | 0.9552 | 0.5470 | 0.6957 | 0.0193 |
+
+**deepset holdout** (116 samples: 60 attacks / 56 benign; no tuning during this rerun):
+
+| Configuration | Risk recall | Risk F1 | Blocking recall |
+|---|---:|---:|---:|
+| L1 rules only | 0.1000 | 0.1818 | 0.0667 |
+| +L3 semantic (fallback gate) | 0.3500 | 0.5185 | 0.3000 |
+| +L3 semantic (always) | 0.3667 | 0.5366 | 0.3500 |
+
+The report includes metrics by source, dataset SHA-256, deduplication counts, and observed
+latency. The old table described 902 scans with duplicated seeds as 817 samples; its
+F1=0.737 and related figures are superseded by the results above.
+
+The following over-refusal figures are from the separate [2026-10-02 historical report](reports/overrefusal.json),
+which was not rerun here: 1,533 purely benign public samples (OR-Bench hard-1k + XSTest safe).
 
 | Configuration | FP@>=medium | FP@>=high | Actual blocks | L3 call rate |
 |---|---:|---:|---:|---:|
 | Rules only | 0.0065 | **0.0000** | **0.0000** | — |
-| +Semantic (production default) | 0.0489 | 0.0470 | 0.0417 | 84.3% |
+| +Semantic (DeBERTa fallback) | 0.0489 | 0.0470 | 0.0417 | 84.3% |
 | +Semantic (always) | 0.0568 | 0.0548 | 0.0483 | 100% |
 
 OR-Bench deliberately selects the hardest traffic, so this is the over-refusal rate for an
@@ -213,7 +238,7 @@ Three image stages: `base` -> `slim` (rule layer only) -> `full` (with semantic 
 Report files silently go stale. Regenerate them after changing datasets, rules, or backends:
 
 ```bash
-python scripts/eval_semantic.py --dataset data/full.jsonl
+python -X utf8 scripts/eval_semantic.py --only --dataset data/full.jsonl --semantic-backend local --out reports/ablation.json
 python scripts/indirect_check.py
 python scripts/agent_check.py --semantic --semantic-backend local
 python scripts/threshold_sweep.py
@@ -251,7 +276,7 @@ prompt_ids/
   output/          outbound secret scanning
   rules/           83 YAML rules
 scripts/           evaluation and forensics scripts
-tests/             814 tests
+tests/             unit and HTTP integration regression tests
 ```
 
 ## Contributing

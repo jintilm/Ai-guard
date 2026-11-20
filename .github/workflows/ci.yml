@@ -3,9 +3,7 @@
 #
 # ⚠⚠ 关于「两条腿都绿」这件事，先说清楚，别让这个文件制造错觉：
 #
-#   * windows-latest —— **验证过**。814 项单测在本机 Windows / Python 3.11 全绿。
-#   * ubuntu-latest  —— **未验证**。这条腿是新增的，本项目至今没在任何 Linux
-#     机器上跑过单测。首次跑通之前，请不要把它当成「跨平台已验证」的证据。
+#   两个平台的验证状态以本次运行结果为准；本机全绿不能替代远端结果。
 #
 #   本 workflow 的作用是把「验证过」变成「每次提交自动验证」，
 #   而不是替一个未验证的平台背书。两个平台的差异（路径分隔符、代码页、
@@ -41,14 +39,17 @@ jobs:
     # 两边都要看到结果：一边失败就取消另一边，会把「哪个平台坏了」这个
     # 关键信息藏掉 —— 而跨平台差异正是这个 workflow 存在的理由。
     timeout-minutes: 30
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            note: "已验证：本机 Windows / Python 3.11 上 814 项单测全绿。"
+            note: "Windows / Python 3.11；另有强制 cp1252/cp936 的 CLI 回归用例。"
           - os: ubuntu-latest
-            note: "未验证：本项目至今未在任何 Linux 机器上跑过单测，首次跑通前不要引用为跨平台结论。"
+            note: "Ubuntu / Python 3.11；结果以本次运行的各步骤状态为准。"
 
     steps:
       # ⚠ 必须用 v5/v6：v4/v5 跑在 Node.js 20 上，而 GitHub 已于 2025-09
@@ -112,24 +113,9 @@ jobs:
         # 只查 prompt_ids scripts tests，不查 data/：data/raw/ 是下载来的第三方语料，
         # 对它跑 lint 只会产出与本项目无关的噪声。
 
-      # ⚠ 诊断步骤（2026-10 加，**非闸门**）：有一条子进程用例
-      #   `test_cli_output_scan_is_a_separate_mode_from_input_scanning`
-      #   在本机全绿、只有 Windows CI 报 `assert 1 == 0`（退出码 1 = 未捕获异常）。
-      #
-      #   已排除：缺 transformers/torch（真 venv 复现不出）· 本机 .env
-      #   （清掉后仍复现不出）· 中文参数的编码路径 · 调用顺序 · 工作目录。
-      #   ⇒ 只能靠 CI 上**真实的 traceback**定位。而原版 `_run_cli`
-      #   只返回 returncode，把 stderr 丢进黑洞 —— 于是连查三轮都只能猜。
-      #
-      #   这一步把那条用例单独跑一遍并打印 stderr：它失败时 CI 日志里
-      #   会直接出现异常内容，不必再等「单测」那步的 `assert 1 == 0`。
-      #   定位后**删掉这一步**（它是临时诊断，不是常设检查）。
-      - name: 诊断（子进程 CLI 用例）
-        continue-on-error: true
-        run: |
-          python -m pytest tests/test_output_secrets.py -k separate_mode -x --tb=long
-          python -c "import subprocess,sys; r=subprocess.run([sys.executable,'-m','prompt_ids.cli','文档里的示例密钥 AKIAIOSFODNN7EXAMPLE 是公开的样例'],capture_output=True,text=True,encoding='utf-8',errors='replace'); print('rc=',r.returncode); print('STDERR>>>'); print(r.stderr); print('<<<STDERR')"
-        # ⚠ 上面那句中文命令行是**故意**的：它复刻失败用例的参数原样。
+      # 子进程主动覆盖上面的 UTF-8 环境，验证实际 CLI 在旧代码页下也不崩。
+      - name: CLI 代码页回归
+        run: python -m pytest tests/test_cli_encoding.py --tb=short
 
       - name: packaging 自检（package-data 有没有真的装进去）
         run: python -m prompt_ids.cli --rules-stats
@@ -178,15 +164,14 @@ jobs:
             - 装的是 `.[dev,speed]`，**不含** `semantic`/`memory`
               （torch + transformers 约 2GB；且没装它们时 `LocalModelBackend.is_available()`
               返回 False，正好让单测覆盖到「后端不可用 → 弃票」那条路径）
-            - 闸门：`pytest`、`scripts/smoke.py`、`--rules-stats`
-            - 非闸门：`ruff check`（基线债务 85 条，见 workflow 注释）、
-              `scripts/check_dashboard.py`（需 node 且依赖未入库的 `reports/*.json`）、
+            - 闸门：`ruff check`、`pytest`、CLI 代码页回归、`scripts/smoke.py`、`--rules-stats`
+            - 非闸门：`scripts/check_dashboard.py`（需 node 和报告文件）、
               `scripts/redos_check.py`（计时，阈值与机器性能相关）
             - 刻意不跑：任何需要 API Key 或联网下载数据集的脚本
               （`build_overrefusal.py` / `build_pint_shape.py` / `eval_semantic.py` /
               `agent_check.py` …）—— 不可复现，且不该在 PR 上花这个钱。
 
-            ⚠ 首次跑通前，本文件**不构成**「跨平台已验证」的结论。
+            跨平台验证以本次 Windows 和 Ubuntu 两个 job 的实际结果为准。
         run: >-
           python -c "import os, pathlib;
           pathlib.Path(os.environ['GITHUB_STEP_SUMMARY']).write_text(os.environ['SUMMARY'],

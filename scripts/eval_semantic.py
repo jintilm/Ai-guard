@@ -37,11 +37,13 @@ import hashlib
 import json
 import random
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
+from prompt_ids.core.types import Action
 from prompt_ids.core.verdict import FusionConfig
 from prompt_ids.detectors import DetectorRegistry, HeuristicDetector, RuleDetector
 from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
@@ -189,6 +191,8 @@ def _backend_fingerprint(inner: SemanticBackend) -> str:
         for key in ("backend", "provider", "model", "base_url", "max_tokens", "extra_body")
         if key in info
     }
+    # 旧版本可能把不可解析的 LLM 回复当作成功缓存；升级后必须重新取判决。
+    relevant["prediction_contract"] = 2
     blob = json.dumps(relevant, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
@@ -270,6 +274,34 @@ def stratified_slice(data: Dataset, n: int, seed: int) -> Dataset:
     return Dataset(tuple(picked))
 
 
+def load_datasets(paths: list[str], *, include_builtin: bool = True) -> tuple[Dataset, dict]:
+    """按原文去重，保留来源；冲突标签/切分必须先修数据再评测。"""
+    samples = {}
+    duplicates = 0
+    files = []
+    groups = [BUILTIN] if include_builtin else []
+    for spec in paths:
+        path = Path(spec)
+        groups.append(Dataset.from_jsonl(path) if path.suffix == ".jsonl"
+                      else Dataset.from_csv(path))
+        files.append({"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    for group in groups:
+        for sample in group:
+            previous = samples.get(sample.text)
+            if previous is not None:
+                if previous.label != sample.label:
+                    raise ValueError("同一文本存在冲突标签，不能生成评测报告")
+                if previous.source != sample.source and "builtin" not in (previous.source, sample.source):
+                    raise ValueError("同一文本跨数据来源/切分重复，不能合并评测")
+                duplicates += 1
+                if previous.source != "builtin":
+                    continue
+            samples[sample.text] = sample
+    data = Dataset(tuple(samples.values()))
+    return data, {"files": files, "duplicates_removed": duplicates,
+                  "counts": data.counts(), "sources": data.sources()}
+
+
 def run_group(
     name: str,
     spec: dict,
@@ -290,9 +322,11 @@ def run_group(
 
     y_true: list[int] = []
     y_pred: list[int] = []
+    y_block: list[int] = []
     latencies: list[float] = []
     # 按数据来源分别统计，用来对比「公开集 vs 自建集」上的表现差异
     per_source: dict[str, tuple[list[int], list[int]]] = {}
+    per_source_block: dict[str, tuple[list[int], list[int]]] = {}
     semantic_calls = 0
 
     det = pipeline.semantic_detector
@@ -324,10 +358,15 @@ def run_group(
         prediction = 1 if result.level.value in BLOCK_LEVELS else 0
         y_true.append(sample.label)
         y_pred.append(prediction)
+        blocked = int(result.action == Action.BLOCK)
+        y_block.append(blocked)
         latencies.append(result.latency_ms.get("total", 0.0))
         bucket = per_source.setdefault(sample.source, ([], []))
         bucket[0].append(sample.label)
         bucket[1].append(prediction)
+        block_bucket = per_source_block.setdefault(sample.source, ([], []))
+        block_bucket[0].append(sample.label)
+        block_bucket[1].append(blocked)
         # 大集上给个进度心跳：LLM 后端一条要 2~3s，800 条就是几十分钟，
         # 后台跑时没有输出会让人以为卡死。
         if total >= 50 and (index % step == 0 or index == total):
@@ -353,15 +392,17 @@ def run_group(
     calls = int(stats.get("calls", 0) or 0)
     timeouts = int(stats.get("timeouts", 0) or 0)
     errors = int(stats.get("errors", 0) or 0)
-    failed_share = round((timeouts + errors) / calls, 4) if calls else 0.0
+    abstained = int(stats.get("abstained", 0) or 0)
+    failed_share = round(abstained / calls, 4) if calls else 0.0
     degraded = failed_share > DEGRADED_CALL_FAIL_SHARE
     reliability = {
         "calls": calls,
         "timeouts": timeouts,
         "errors": errors,
+        "abstained": abstained,
         "failed_share": failed_share,
         "degraded": degraded,
-        "note": ("超时/错误按弃票处理，会直接压低召回。failed_share > "
+        "note": ("超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > "
                  f"{DEGRADED_CALL_FAIL_SHARE:.0%} 时本组 P/R/F1 不可作为结论，"
                  "请用 --semantic-timeout 调大后重跑这一组。"),
     }
@@ -371,7 +412,11 @@ def run_group(
               "本组数字不可作为结论，请调大 --semantic-timeout 重跑", flush=True)
 
     return {
+        "method": {"prediction": "level >= high", "blocking": "action == block",
+                   "policy": pipeline.config.policy,
+                   "short_circuit": pipeline.config.short_circuit_on_critical},
         "confusion": row,
+        "blocking": Confusion.from_pairs(y_true, y_block).as_row(),
         "latency_ms": latency,
         "semantic_calls": semantic_calls,
         "semantic_call_rate": round(semantic_calls / max(scanned, 1), 4),
@@ -388,6 +433,10 @@ def run_group(
         "by_source": {
             source: Confusion.from_pairs(trues, preds).as_row()
             for source, (trues, preds) in sorted(per_source.items())
+        },
+        "blocking_by_source": {
+            source: Confusion.from_pairs(trues, preds).as_row()
+            for source, (trues, preds) in sorted(per_source_block.items())
         },
     }
 
@@ -436,20 +485,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.only and args.dataset:
-        data = Dataset(())
-    else:
-        data = BUILTIN
-    for spec in args.dataset or []:
-        path = Path(spec)
-        extra = Dataset.from_jsonl(path) if path.suffix == ".jsonl" else Dataset.from_csv(path)
-        data = data.concat(extra)
+    data, provenance = load_datasets(args.dataset or [], include_builtin=not args.only)
     if args.sample > 0:
         data = stratified_slice(data, args.sample, args.seed)
     elif args.limit > 0:
         data = Dataset(tuple(data.samples)[: args.limit])
     counts = data.counts()
+    provenance.update({"counts": counts, "sources": data.sources()})
     print(f"数据集：{counts['total']} 条（攻击 {counts['attack']} / 正常 {counts['benign']}）")
+    print(f"去除重复文本：{provenance['duplicates_removed']} 条")
     if args.sample > 0:
         print(f"分层抽样：seed={args.seed}，来源×标签分布 = {data.sources()}")
     print(f"判定阈 level ∈ {sorted(BLOCK_LEVELS)} 记为预测攻击\n")
@@ -490,6 +534,8 @@ def main() -> int:
             print(f"[skip] {name}")
             continue
         results[name] = outcome
+        outcome["dataset"] = provenance
+        outcome["generated_at"] = datetime.now(timezone.utc).isoformat()
         row = outcome["confusion"]
         flag = "  ⚠截断" if outcome.get("truncated") else ""
         if outcome.get("cache_hits"):
@@ -549,6 +595,12 @@ def main() -> int:
         aligns="lrrrrrrrr",
     )
     print("\n" + table)
+    print("\n实际阻断（action == block；sandbox 不计入）：")
+    print(markdown_table(
+        ["配置", "Precision", "Recall", "F1", "误报率"],
+        [[name, *[outcome["blocking"][key] for key in
+                   ("precision", "recall", "f1", "false_positive_rate")]]
+         for name, outcome in results.items()], aligns="lrrrr"))
     if cache_affected:
         print(
             "> 标 `—` 的组复用了缓存结果：判定概率与真实调用一致，"
@@ -575,7 +627,7 @@ def main() -> int:
                     continue
                 sub_rows.append([
                     name, row["precision"], row["recall"], row["f1"],
-                    row["false_positive_rate"], row["tp"] + row["fn"],
+                    row["false_positive_rate"], sum(row[k] for k in ("tp", "fp", "tn", "fn")),
                 ])
             print(f"\n[{source_label(source)}]")
             print(markdown_table(

@@ -1,23 +1,41 @@
 {
   "L1 仅规则": {
+    "method": {
+      "prediction": "level >= high",
+      "blocking": "action == block",
+      "policy": "default",
+      "short_circuit": false
+    },
     "confusion": {
       "precision": 1.0,
-      "recall": 0.3516,
-      "f1": 0.5203,
+      "recall": 0.2934,
+      "f1": 0.4537,
       "false_positive_rate": 0.0,
       "specificity": 1.0,
-      "accuracy": 0.7118,
-      "tp": 141,
+      "accuracy": 0.6965,
+      "tp": 103,
       "fp": 0,
-      "tn": 501,
-      "fn": 260
+      "tn": 466,
+      "fn": 248
+    },
+    "blocking": {
+      "precision": 1.0,
+      "recall": 0.2336,
+      "f1": 0.3788,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.6707,
+      "tp": 82,
+      "fp": 0,
+      "tn": 466,
+      "fn": 269
     },
     "latency_ms": {
-      "mean": 1.318,
-      "p50": 0.756,
-      "p95": 3.307,
-      "p99": 6.688,
-      "max": 100.185
+      "mean": 0.85,
+      "p50": 0.467,
+      "p95": 1.994,
+      "p99": 3.973,
+      "max": 88.486
     },
     "semantic_calls": 0,
     "semantic_call_rate": 0.0,
@@ -26,11 +44,12 @@
       "calls": 0,
       "timeouts": 0,
       "errors": 0,
+      "abstained": 0,
       "failed_share": 0.0,
       "degraded": false,
-      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+      "note": "超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
     },
-    "scanned": 902,
+    "scanned": 817,
     "truncated": false,
     "cache_hits": 0,
     "by_source": {
@@ -41,10 +60,10 @@
         "false_positive_rate": 0.0,
         "specificity": 1.0,
         "accuracy": 0.8588,
-        "tp": 76,
+        "tp": 38,
         "fp": 0,
-        "tn": 70,
-        "fn": 24
+        "tn": 35,
+        "fn": 12
       },
       "deepset_test": {
         "precision": 1.0,
@@ -82,27 +101,116 @@
         "tn": 32,
         "fn": 22
       }
-    }
+    },
+    "blocking_by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.62,
+        "f1": 0.7654,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7765,
+        "tp": 31,
+        "fp": 0,
+        "tn": 35,
+        "fn": 19
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.0667,
+        "f1": 0.125,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5172,
+        "tp": 4,
+        "fp": 0,
+        "tn": 56,
+        "fn": 56
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.1527,
+        "f1": 0.265,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.685,
+        "tp": 31,
+        "fp": 0,
+        "tn": 343,
+        "fn": 172
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.4211,
+        "f1": 0.5926,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6857,
+        "tp": 16,
+        "fp": 0,
+        "tn": 32,
+        "fn": 22
+      }
+    },
+    "dataset": {
+      "files": [
+        {
+          "path": "full.jsonl",
+          "sha256": "ca32e32526bca86634557843b1ff03dc8191d6949c01b70851f161059a6e15fa"
+        }
+      ],
+      "duplicates_removed": 0,
+      "counts": {
+        "total": 817,
+        "attack": 351,
+        "benign": 466
+      },
+      "sources": {
+        "deepset_train": 546,
+        "deepset_test": 116,
+        "builtin": 85,
+        "garak": 70
+      }
+    },
+    "generated_at": "2026-11-20T07:48:28.099723+00:00"
   },
   "L1+L2 规则+启发": {
+    "method": {
+      "prediction": "level >= high",
+      "blocking": "action == block",
+      "policy": "default",
+      "short_circuit": false
+    },
     "confusion": {
       "precision": 1.0,
-      "recall": 0.3566,
-      "f1": 0.5257,
+      "recall": 0.2963,
+      "f1": 0.4571,
       "false_positive_rate": 0.0,
       "specificity": 1.0,
-      "accuracy": 0.714,
-      "tp": 143,
+      "accuracy": 0.6977,
+      "tp": 104,
       "fp": 0,
-      "tn": 501,
-      "fn": 258
+      "tn": 466,
+      "fn": 247
+    },
+    "blocking": {
+      "precision": 1.0,
+      "recall": 0.2365,
+      "f1": 0.3825,
+      "false_positive_rate": 0.0,
+      "specificity": 1.0,
+      "accuracy": 0.672,
+      "tp": 83,
+      "fp": 0,
+      "tn": 466,
+      "fn": 268
     },
     "latency_ms": {
-      "mean": 1.322,
-      "p50": 0.815,
-      "p95": 3.442,
-      "p99": 7.153,
-      "max": 40.258
+      "mean": 0.842,
+      "p50": 0.522,
+      "p95": 2.135,
+      "p99": 4.144,
+      "max": 33.172
     },
     "semantic_calls": 0,
     "semantic_call_rate": 0.0,
@@ -111,11 +219,12 @@
       "calls": 0,
       "timeouts": 0,
       "errors": 0,
+      "abstained": 0,
       "failed_share": 0.0,
       "degraded": false,
-      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+      "note": "超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
     },
-    "scanned": 902,
+    "scanned": 817,
     "truncated": false,
     "cache_hits": 0,
     "by_source": {
@@ -126,10 +235,10 @@
         "false_positive_rate": 0.0,
         "specificity": 1.0,
         "accuracy": 0.8706,
-        "tp": 78,
+        "tp": 39,
         "fp": 0,
-        "tn": 70,
-        "fn": 22
+        "tn": 35,
+        "fn": 11
       },
       "deepset_test": {
         "precision": 1.0,
@@ -167,51 +276,144 @@
         "tn": 32,
         "fn": 22
       }
-    }
+    },
+    "blocking_by_source": {
+      "builtin": {
+        "precision": 1.0,
+        "recall": 0.64,
+        "f1": 0.7805,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.7882,
+        "tp": 32,
+        "fp": 0,
+        "tn": 35,
+        "fn": 18
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.0667,
+        "f1": 0.125,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.5172,
+        "tp": 4,
+        "fp": 0,
+        "tn": 56,
+        "fn": 56
+      },
+      "deepset_train": {
+        "precision": 1.0,
+        "recall": 0.1527,
+        "f1": 0.265,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.685,
+        "tp": 31,
+        "fp": 0,
+        "tn": 343,
+        "fn": 172
+      },
+      "garak": {
+        "precision": 1.0,
+        "recall": 0.4211,
+        "f1": 0.5926,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6857,
+        "tp": 16,
+        "fp": 0,
+        "tn": 32,
+        "fn": 22
+      }
+    },
+    "dataset": {
+      "files": [
+        {
+          "path": "full.jsonl",
+          "sha256": "ca32e32526bca86634557843b1ff03dc8191d6949c01b70851f161059a6e15fa"
+        }
+      ],
+      "duplicates_removed": 0,
+      "counts": {
+        "total": 817,
+        "attack": 351,
+        "benign": 466
+      },
+      "sources": {
+        "deepset_train": 546,
+        "deepset_test": 116,
+        "builtin": 85,
+        "garak": 70
+      }
+    },
+    "generated_at": "2026-11-20T07:48:28.792805+00:00"
   },
   "L1+L2+L3 (fallback 门禁)": {
+    "method": {
+      "prediction": "level >= high",
+      "blocking": "action == block",
+      "policy": "default",
+      "short_circuit": false
+    },
     "confusion": {
-      "precision": 0.9636,
-      "recall": 0.5935,
-      "f1": 0.7346,
-      "false_positive_rate": 0.018,
-      "specificity": 0.982,
-      "accuracy": 0.8093,
-      "tp": 238,
-      "fp": 9,
-      "tn": 492,
-      "fn": 163
+      "precision": 0.9604,
+      "recall": 0.5527,
+      "f1": 0.7016,
+      "false_positive_rate": 0.0172,
+      "specificity": 0.9828,
+      "accuracy": 0.798,
+      "tp": 194,
+      "fp": 8,
+      "tn": 458,
+      "fn": 157
+    },
+    "blocking": {
+      "precision": 0.963,
+      "recall": 0.5185,
+      "f1": 0.6741,
+      "false_positive_rate": 0.015,
+      "specificity": 0.985,
+      "accuracy": 0.7846,
+      "tp": 182,
+      "fp": 7,
+      "tn": 459,
+      "fn": 169
     },
     "latency_ms": {
-      "mean": 67.243,
-      "p50": 89.98,
-      "p95": 127.978,
-      "p99": 188.246,
-      "max": 462.869
+      "mean": 92.559,
+      "p50": 117.539,
+      "p95": 169.81,
+      "p99": 254.246,
+      "max": 599.129
     },
-    "semantic_calls": 586,
-    "semantic_call_rate": 0.6497,
+    "semantic_calls": 561,
+    "semantic_call_rate": 0.6867,
     "semantic": {
       "backend": "local_model",
       "model": "protectai/deberta-v3-base-prompt-injection-v2",
       "mode": "fallback",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 586,
+      "calls": 561,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 100.27,
+      "abstained": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "avg_latency_ms": 131.88,
       "last_error": null
     },
     "reliability": {
-      "calls": 586,
+      "calls": 561,
       "timeouts": 0,
       "errors": 0,
+      "abstained": 0,
       "failed_share": 0.0,
       "degraded": false,
-      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+      "note": "超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
     },
-    "scanned": 902,
+    "scanned": 817,
     "truncated": false,
     "cache_hits": 0,
     "by_source": {
@@ -222,10 +424,10 @@
         "false_positive_rate": 0.0286,
         "specificity": 0.9714,
         "accuracy": 0.9176,
-        "tp": 88,
-        "fp": 2,
-        "tn": 68,
-        "fn": 12
+        "tp": 44,
+        "fp": 1,
+        "tn": 34,
+        "fn": 6
       },
       "deepset_test": {
         "precision": 1.0,
@@ -263,29 +465,118 @@
         "tn": 29,
         "fn": 0
       }
-    }
+    },
+    "blocking_by_source": {
+      "builtin": {
+        "precision": 0.9767,
+        "recall": 0.84,
+        "f1": 0.9032,
+        "false_positive_rate": 0.0286,
+        "specificity": 0.9714,
+        "accuracy": 0.8941,
+        "tp": 42,
+        "fp": 1,
+        "tn": 34,
+        "fn": 8
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.3,
+        "f1": 0.4615,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6379,
+        "tp": 18,
+        "fp": 0,
+        "tn": 56,
+        "fn": 42
+      },
+      "deepset_train": {
+        "precision": 0.9655,
+        "recall": 0.4138,
+        "f1": 0.5793,
+        "false_positive_rate": 0.0087,
+        "specificity": 0.9913,
+        "accuracy": 0.7766,
+        "tp": 84,
+        "fp": 3,
+        "tn": 340,
+        "fn": 119
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    },
+    "dataset": {
+      "files": [
+        {
+          "path": "full.jsonl",
+          "sha256": "ca32e32526bca86634557843b1ff03dc8191d6949c01b70851f161059a6e15fa"
+        }
+      ],
+      "duplicates_removed": 0,
+      "counts": {
+        "total": 817,
+        "attack": 351,
+        "benign": 466
+      },
+      "sources": {
+        "deepset_train": 546,
+        "deepset_test": 116,
+        "builtin": 85,
+        "garak": 70
+      }
+    },
+    "generated_at": "2026-11-20T07:49:57.973512+00:00"
   },
   "L1+L2+L3 (always 全量)": {
+    "method": {
+      "prediction": "level >= high",
+      "blocking": "action == block",
+      "policy": "default",
+      "short_circuit": false
+    },
     "confusion": {
-      "precision": 0.9349,
-      "recall": 0.6085,
-      "f1": 0.7372,
-      "false_positive_rate": 0.0339,
-      "specificity": 0.9661,
-      "accuracy": 0.8071,
-      "tp": 244,
-      "fp": 17,
-      "tn": 484,
-      "fn": 157
+      "precision": 0.9423,
+      "recall": 0.5584,
+      "f1": 0.7013,
+      "false_positive_rate": 0.0258,
+      "specificity": 0.9742,
+      "accuracy": 0.7956,
+      "tp": 196,
+      "fp": 12,
+      "tn": 454,
+      "fn": 155
+    },
+    "blocking": {
+      "precision": 0.9552,
+      "recall": 0.547,
+      "f1": 0.6957,
+      "false_positive_rate": 0.0193,
+      "specificity": 0.9807,
+      "accuracy": 0.7944,
+      "tp": 192,
+      "fp": 9,
+      "tn": 457,
+      "fn": 159
     },
     "latency_ms": {
-      "mean": 100.159,
-      "p50": 93.939,
-      "p95": 131.231,
-      "p99": 188.395,
-      "max": 516.133
+      "mean": 122.677,
+      "p50": 115.331,
+      "p95": 170.973,
+      "p99": 246.326,
+      "max": 572.193
     },
-    "semantic_calls": 902,
+    "semantic_calls": 817,
     "semantic_call_rate": 1.0,
     "semantic": {
       "backend": "local_model",
@@ -293,21 +584,25 @@
       "mode": "always",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 902,
+      "calls": 817,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 97.94,
+      "abstained": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "avg_latency_ms": 120.66,
       "last_error": null
     },
     "reliability": {
-      "calls": 902,
+      "calls": 817,
       "timeouts": 0,
       "errors": 0,
+      "abstained": 0,
       "failed_share": 0.0,
       "degraded": false,
-      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+      "note": "超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
     },
-    "scanned": 902,
+    "scanned": 817,
     "truncated": false,
     "cache_hits": 0,
     "by_source": {
@@ -318,10 +613,10 @@
         "false_positive_rate": 0.1429,
         "specificity": 0.8571,
         "accuracy": 0.9176,
-        "tp": 96,
-        "fp": 10,
-        "tn": 60,
-        "fn": 4
+        "tp": 48,
+        "fp": 5,
+        "tn": 30,
+        "fn": 2
       },
       "deepset_test": {
         "precision": 1.0,
@@ -359,29 +654,118 @@
         "tn": 29,
         "fn": 0
       }
-    }
+    },
+    "blocking_by_source": {
+      "builtin": {
+        "precision": 0.94,
+        "recall": 0.94,
+        "f1": 0.94,
+        "false_positive_rate": 0.0857,
+        "specificity": 0.9143,
+        "accuracy": 0.9294,
+        "tp": 47,
+        "fp": 3,
+        "tn": 32,
+        "fn": 3
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.35,
+        "f1": 0.5185,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6638,
+        "tp": 21,
+        "fp": 0,
+        "tn": 56,
+        "fn": 39
+      },
+      "deepset_train": {
+        "precision": 0.9663,
+        "recall": 0.4236,
+        "f1": 0.589,
+        "false_positive_rate": 0.0087,
+        "specificity": 0.9913,
+        "accuracy": 0.7802,
+        "tp": 86,
+        "fp": 3,
+        "tn": 340,
+        "fn": 117
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    },
+    "dataset": {
+      "files": [
+        {
+          "path": "full.jsonl",
+          "sha256": "ca32e32526bca86634557843b1ff03dc8191d6949c01b70851f161059a6e15fa"
+        }
+      ],
+      "duplicates_removed": 0,
+      "counts": {
+        "total": 817,
+        "attack": 351,
+        "benign": 466
+      },
+      "sources": {
+        "deepset_train": 546,
+        "deepset_test": 116,
+        "builtin": 85,
+        "garak": 70
+      }
+    },
+    "generated_at": "2026-11-20T07:51:39.596612+00:00"
   },
   "L3 仅语义": {
+    "method": {
+      "prediction": "level >= high",
+      "blocking": "action == block",
+      "policy": "default",
+      "short_circuit": false
+    },
     "confusion": {
-      "precision": 0.9328,
-      "recall": 0.5885,
-      "f1": 0.7217,
-      "false_positive_rate": 0.0339,
-      "specificity": 0.9661,
-      "accuracy": 0.7982,
-      "tp": 236,
-      "fp": 17,
-      "tn": 484,
-      "fn": 165
+      "precision": 0.9409,
+      "recall": 0.5442,
+      "f1": 0.6895,
+      "false_positive_rate": 0.0258,
+      "specificity": 0.9742,
+      "accuracy": 0.7895,
+      "tp": 191,
+      "fp": 12,
+      "tn": 454,
+      "fn": 160
+    },
+    "blocking": {
+      "precision": 0.9545,
+      "recall": 0.5385,
+      "f1": 0.6885,
+      "false_positive_rate": 0.0193,
+      "specificity": 0.9807,
+      "accuracy": 0.7907,
+      "tp": 189,
+      "fp": 9,
+      "tn": 457,
+      "fn": 162
     },
     "latency_ms": {
-      "mean": 105.161,
-      "p50": 96.732,
-      "p95": 144.739,
-      "p99": 200.208,
-      "max": 456.558
+      "mean": 120.434,
+      "p50": 114.086,
+      "p95": 166.746,
+      "p99": 230.153,
+      "max": 572.647
     },
-    "semantic_calls": 902,
+    "semantic_calls": 817,
     "semantic_call_rate": 1.0,
     "semantic": {
       "backend": "local_model",
@@ -389,21 +773,25 @@
       "mode": "always",
       "available": true,
       "timeout_s": 10.0,
-      "calls": 902,
+      "calls": 817,
       "timeouts": 0,
       "errors": 0,
-      "avg_latency_ms": 104.71,
+      "abstained": 0,
+      "failed_share": 0.0,
+      "degraded": false,
+      "avg_latency_ms": 119.99,
       "last_error": null
     },
     "reliability": {
-      "calls": 902,
+      "calls": 817,
       "timeouts": 0,
       "errors": 0,
+      "abstained": 0,
       "failed_share": 0.0,
       "degraded": false,
-      "note": "超时/错误按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
+      "note": "超时/网络/解析失败均按弃票处理，会直接压低召回。failed_share > 20% 时本组 P/R/F1 不可作为结论，请用 --semantic-timeout 调大后重跑这一组。"
     },
-    "scanned": 902,
+    "scanned": 817,
     "truncated": false,
     "cache_hits": 0,
     "by_source": {
@@ -414,10 +802,10 @@
         "false_positive_rate": 0.1429,
         "specificity": 0.8571,
         "accuracy": 0.8824,
-        "tp": 90,
-        "fp": 10,
-        "tn": 60,
-        "fn": 10
+        "tp": 45,
+        "fp": 5,
+        "tn": 30,
+        "fn": 5
       },
       "deepset_test": {
         "precision": 1.0,
@@ -455,6 +843,77 @@
         "tn": 29,
         "fn": 0
       }
-    }
+    },
+    "blocking_by_source": {
+      "builtin": {
+        "precision": 0.9375,
+        "recall": 0.9,
+        "f1": 0.9184,
+        "false_positive_rate": 0.0857,
+        "specificity": 0.9143,
+        "accuracy": 0.9059,
+        "tp": 45,
+        "fp": 3,
+        "tn": 32,
+        "fn": 5
+      },
+      "deepset_test": {
+        "precision": 1.0,
+        "recall": 0.35,
+        "f1": 0.5185,
+        "false_positive_rate": 0.0,
+        "specificity": 1.0,
+        "accuracy": 0.6638,
+        "tp": 21,
+        "fp": 0,
+        "tn": 56,
+        "fn": 39
+      },
+      "deepset_train": {
+        "precision": 0.9659,
+        "recall": 0.4187,
+        "f1": 0.5842,
+        "false_positive_rate": 0.0087,
+        "specificity": 0.9913,
+        "accuracy": 0.7784,
+        "tp": 85,
+        "fp": 3,
+        "tn": 340,
+        "fn": 118
+      },
+      "garak": {
+        "precision": 0.9268,
+        "recall": 1.0,
+        "f1": 0.962,
+        "false_positive_rate": 0.0938,
+        "specificity": 0.9062,
+        "accuracy": 0.9571,
+        "tp": 38,
+        "fp": 3,
+        "tn": 29,
+        "fn": 0
+      }
+    },
+    "dataset": {
+      "files": [
+        {
+          "path": "full.jsonl",
+          "sha256": "ca32e32526bca86634557843b1ff03dc8191d6949c01b70851f161059a6e15fa"
+        }
+      ],
+      "duplicates_removed": 0,
+      "counts": {
+        "total": 817,
+        "attack": 351,
+        "benign": 466
+      },
+      "sources": {
+        "deepset_train": 546,
+        "deepset_test": 116,
+        "builtin": 85,
+        "garak": 70
+      }
+    },
+    "generated_at": "2026-11-20T07:53:19.002608+00:00"
   }
 }

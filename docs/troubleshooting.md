@@ -303,6 +303,29 @@ Windows 上 `text=True` 却不钉 `encoding`，解码跟随本机代码页 cp936
 子进程 env 要钉 `PYTHONIOENCODING=utf-8`，父进程读的时候
 `encoding="utf-8", errors="replace"`。
 
+### Windows CI 报 `UnicodeEncodeError: charmap`
+
+这是 CLI 子进程写出中文时使用了 `cp1252` 等旧代码页，检测可能已完成，
+但 `print(item.summary())` 抛错，把业务退出码覆盖成了 1。
+当前 CLI 在入口处把 stdout/stderr 统一为 UTF-8；管道调用方也应按 UTF-8 解码。
+`tests/test_cli_encoding.py` 会强制用 cp1252、cp936 和 UTF-8 启动子进程，
+验证文本、JSON、出站扫描和参数错误的输出及退出码。
+
+### 消融报告样本数比数据文件多 85 条
+
+旧版评测入口默认追加内置种子；`data/full.jsonl` 已含这 85 条，曾导致
+902 次扫描被描述为 817 条样本。当前入口按原文去重并记录
+`dataset.duplicates_removed`、来源数量及数据文件 SHA-256；标签或外部切分冲突会报错。
+
+复跑本地基线：
+
+```bash
+python -X utf8 scripts/eval_semantic.py --only --dataset data/full.jsonl --semantic-backend local --out reports/ablation.json
+```
+
+`confusion` / `by_source` 统计 `level >= high`；`blocking` / `blocking_by_source`
+统计 `action == block`。后者才是默认策略下的实际阻断，`sandbox` 不计入。
+
 ### 改仓库文件后中文全变成问号
 
 ⚠ **绝不拿 PowerShell 的文本管道改仓库里的 UTF-8 文件**：

@@ -217,7 +217,8 @@ class Pipeline:
         }
 
     # ---------- 主流程 ----------
-    def cache_key(self, fp: str, policy_name: str | None = None) -> str:
+    def cache_key(self, fp: str, policy_name: str | None = None,
+                  *, semantic: bool | None = None) -> str:
         """缓存键必须包含一切会影响判定结果的维度。
 
         只拿文本指纹当键会导致两种静默错误：
@@ -231,6 +232,8 @@ class Pipeline:
             parts.append("tiers=" + ",".join(str(t) for t in tiers))
         if self.config.semantic_enabled:
             parts.append(f"sem={self.config.semantic_mode}")
+        # system/developer 的规则结果不能冒充 user/tool 的完整检测结果。
+        parts.append("l3=off" if semantic is False else "l3=config")
         mem = self.memory_detector
         if mem is not None and mem.enabled:
             # 版本号在每次成功写入后递增，记忆一变缓存即失效
@@ -285,7 +288,8 @@ class Pipeline:
 
         # 键必须在整次扫描中固定：若在结尾重新计算，自进化刚写入的记忆
         # 会把版本号抬高，导致 put 与 get 用不同的键，缓存失效机制被架空
-        cache_key = self.cache_key(fp, policy_name) if self.config.enable_cache else ""
+        cache_key = (self.cache_key(fp, policy_name, semantic=semantic)
+                     if self.config.enable_cache else "")
         if self.config.enable_cache:
             cached = self.guard.cache.get(cache_key)
             if cached is not None:

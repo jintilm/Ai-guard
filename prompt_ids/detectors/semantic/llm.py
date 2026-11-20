@@ -33,6 +33,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 import urllib.error
 import urllib.request
@@ -417,9 +418,13 @@ class LLMBackend(SemanticBackend):
                     f"或用 PROMPT_IDS_LLM_EXTRA_BODY 关闭思考链）"
                 ), False
             return 0.5, f"裁判返回非 JSON：{content[:80]}", False
-        verdict = bool(obj.get("injection", False))
-        confidence = float(obj.get("confidence", 0.5) or 0.5)
-        confidence = min(1.0, max(0.0, confidence))
+        verdict = obj.get("injection")
+        confidence = obj.get("confidence")
+        if not isinstance(verdict, bool):
+            return 0.5, "裁判 injection 字段必须是 JSON 布尔值", False
+        if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
+                or not 0.0 <= confidence <= 1.0 or not math.isfinite(confidence)):
+            return 0.5, "裁判 confidence 字段必须是 0 到 1 的有限数值", False
         reason = str(obj.get("reason", ""))[:120]
         # 判「不是注入」时取 1-confidence：0.8 确信不是注入 → 注入概率 0.2
         probability = confidence if verdict else 1.0 - confidence
@@ -430,6 +435,7 @@ class LLMBackend(SemanticBackend):
         return probability, reason
 
     def predict(self, text: str) -> Prediction:
+        self.last_parsed = False
         if not text.strip():
             return Prediction(0.0, "空文本", self.name, ok=False)
         if not self.is_available():
@@ -444,7 +450,10 @@ class LLMBackend(SemanticBackend):
                 problems.append(f"{ep.label}: {error}")
                 continue
             probability, rationale, parsed = self._parse_verdict(content, finish)
-            self.last_parsed = parsed
+            if not parsed:
+                problems.append(f"{ep.label}: {rationale}")
+                continue
+            self.last_parsed = True
             prefix = "" if index == 0 else f"[回退 {ep.label}] "
             return Prediction(probability, f"{prefix}{ep.model}: {rationale}", self.name, elapsed)
 

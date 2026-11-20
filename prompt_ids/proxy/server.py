@@ -18,7 +18,7 @@ import posixpath
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -206,14 +206,22 @@ class ProxyConfig:
         """出站检测：模型输出里是否出现了第三方凭据（与 Canary 语义不同，见 output.secrets）。
 
         返回 (命中列表, 是否取样, 实际扫描字符数)：
-        - 超预算走**分层取样**（复用请求侧的 `clip_segment`，不另写一套），
+        - 超预算复用请求侧的取样窗口，命中位置始终对应原文，
         - 取样必须回报，否则「只看了开头」与「完整看过」在日志里长得一样。
         """
         if not self.scan_secrets or not text:
             return [], False, 0
-        sampled, truncated = clip_segment(text, self.max_response_scan_chars)
-        result = scan_text(sampled)
-        return list(result.hits), truncated, len(sampled)
+        windows = _sample_ranges(len(text), self.max_response_scan_chars)
+        hits = []
+        scanned = 0
+        incomplete = len(text) > self.max_response_scan_chars
+        for start, end in windows:
+            result = scan_text(text[start:end])
+            hits.extend(replace(hit, start=start + hit.start, end=start + hit.end)
+                        for hit in result.hits)
+            scanned += end - start
+            incomplete = incomplete or result.capped
+        return hits, incomplete, scanned
 
     @property
     def pipeline_instance(self) -> Pipeline:
@@ -275,6 +283,25 @@ def _message_text(item: dict[str, Any]) -> str:
 _GAP = "\n[…跳过若干字符…]\n"
 
 
+def _sample_ranges(length: int, limit: int) -> list[tuple[int, int]]:
+    """分层取样的原文区间；输入检测与出站脱敏共用窗口分配。"""
+    if length <= limit:
+        return [(0, length)]
+    keep = limit - (len(_GAP) + 1) * 5
+    if keep < 400:
+        head = limit // 2
+        return [(0, head), (length - (limit - head), length)]
+    edge = int(keep * 0.3)
+    window = (keep - 2 * edge) // 4
+    span = length - 2 * edge
+    ranges = [(0, edge)]
+    for i in range(4):
+        start = edge + int(span * i / 4)
+        ranges.append((start, start + window))
+    ranges.append((length - edge, length))
+    return ranges
+
+
 def clip_segment(text: str, limit: int) -> tuple[str, bool]:
     """超长文本做**分层取样**，返回 (文本, 是否截断)。
 
@@ -289,22 +316,8 @@ def clip_segment(text: str, limit: int) -> tuple[str, bool]:
 
     截断必须回报给调用方 —— 静默截断就是静默漏检。
     """
-    if len(text) <= limit:
-        return text, False
-    keep = limit - (len(_GAP) + 1) * 5
-    if keep < 400:  # limit 极小，退化成纯头尾
-        head = limit // 2
-        return f"{text[:head]}{_GAP}{text[-(limit - head):]}", True
-    edge = int(keep * 0.3)
-    window = (keep - 2 * edge) // 4
-    middle = text[edge: len(text) - edge]
-    span = len(middle)
-    parts = [text[:edge]]
-    for i in range(4):
-        start = int(span * i / 4)
-        parts.append(middle[start:start + window])
-    parts.append(text[len(text) - edge:])
-    return _GAP.join(parts), True
+    ranges = _sample_ranges(len(text), limit)
+    return _GAP.join(text[start:end] for start, end in ranges), len(text) > limit
 
 
 
@@ -793,7 +806,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                       "scanned_chars": scan.scanned_chars,
                       "truncated": scan.truncated, "dropped": scan.dropped})
 
-        if decision == "block":
+        if status == 403:
             self.config.audit.log(
                 event_from_proxy(
                     result, path=path, client=self.client_address[0], stream=False,
@@ -1198,7 +1211,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         detect_ms = (time.perf_counter() - started) * 1000
         decision, status, why = decide(scan.result, self.config, scan.trigger)
 
-        if decision == "block":
+        if status == 403:
             self._audit_passthrough(
                 path, scan, note, status=status, scanned=True, detect_ms=detect_ms,
                 decision=decision, reason=why, segments=len(segments),

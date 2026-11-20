@@ -92,6 +92,16 @@ def _state(server):
     return server.RequestHandlerClass.state
 
 
+def _post_scan(port, payload, path="/v1/scan", key=None):
+    headers = {"Content-Type": "application/json"}
+    if key:
+        headers[HEADER] = key
+    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}",
+                                     data=json.dumps(payload).encode("utf-8"), headers=headers)
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
+
 def test_stream_greets_with_a_hello_frame(playground):
     """连接建立后先给一个 `hello`，前端据此知道「环大小/心跳/当前 seq」。"""
     server, _ctx = playground
@@ -103,12 +113,7 @@ def test_stream_greets_with_a_hello_frame(playground):
 
 
 def test_scan_appears_on_the_stream(playground):
-    """核心断言：检测一发生就推出去，不等 4 秒轮询。
-
-    ⚠ 走 `PlaygroundState.scan`（检测台自己的入口），**不是** `pipeline.scan`：
-    发布发生在检测台这一层，所以直接调 pipeline 的扫描**不会**上 SSE ——
-    那正是「谁负责发布」必须明确的地方，否则读代码会以为谁扫都推。
-    """
+    """浏览器实际使用的 HTTP 扫描路由必须发布 SSE。"""
     server, _ctx = playground
     port = server.server_address[1]
     result_chunks: list = []
@@ -118,7 +123,7 @@ def test_scan_appears_on_the_stream(playground):
             _sse(port, timeout=6.0, want=2)), daemon=True)
     reader.start()
     time.sleep(0.6)          # 等 hello 到达
-    _state(server).scan(ATTACK)
+    _post_scan(port, {"text": ATTACK})
     reader.join(timeout=8)
 
     scans = [e for e in result_chunks if e.get("type") is None and "level" in e]
@@ -138,7 +143,7 @@ def test_stream_events_never_contain_the_text(playground):
         target=lambda: seen.extend(_sse(port, timeout=6.0, want=2)), daemon=True)
     reader.start()
     time.sleep(0.5)
-    _state(server).scan(ATTACK)
+    _post_scan(port, {"text": ATTACK})
     reader.join(timeout=8)
 
     body = json.dumps(seen, ensure_ascii=False)
@@ -147,6 +152,40 @@ def test_stream_events_never_contain_the_text(playground):
     assert "reveal the system prompt" not in body
     # 但指纹与字数要在 —— 少了它们就无法与审计对账
     assert any(e.get("fingerprint") for e in seen if e.get("level"))
+
+
+@pytest.mark.parametrize("path", ["/v1/scan", "/api/scan", "/v1/scan/batch"])
+def test_http_scans_publish_once_without_duplicate_audit(tmp_path, path):
+    from prompt_ids.api.app import ApiContext
+    from prompt_ids.web.playground import serve
+
+    audit = tmp_path / "audit.jsonl"
+    ctx = ApiContext(audit_path=str(audit))
+    server = serve(ctx, str(tmp_path / "unused.html"), port=0, client_key="test-key")
+    texts = [ATTACK, BENIGN] if path.endswith("batch") else [ATTACK]
+    payload = {"texts": texts} if path.endswith("batch") else {"text": texts[0]}
+    port = server.server_address[1]
+    try:
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _post_scan(port, payload, path)
+        assert exc.value.code == 401
+        assert _state(server).seq == 0
+        assert ctx.stats["scans"] == 0
+        for _ in range(2):
+            _post_scan(port, payload, path, "test-key")
+        events = _sse(port, key="test-key", want=1 + len(texts) * 2)
+        scans = [e for e in events if "fingerprint" in e]
+        assert len(scans) == len(texts) * 2
+        assert ctx.stats["scans"] == len(scans)
+        assert [e["seq"] for e in scans] == list(range(1, len(scans) + 1))
+        assert all(e["cached"] for e in scans[len(texts):])
+        assert all("text" not in e and "explained" not in e for e in scans)
+        assert ATTACK not in json.dumps(scans)
+        assert len(audit.read_text(encoding="utf-8").splitlines()) == len(scans)
+    finally:
+        server.shutdown()
+        server.server_close()
+        ctx.pipeline.close()
 
 
 def test_stream_requires_the_client_key(tmp_path):

@@ -37,6 +37,7 @@ from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
 from prompt_ids.auth import authorized
+from prompt_ids.core.types import ScanResult
 from prompt_ids.net import send_security_headers, warn_if_exposed
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -117,7 +118,7 @@ class PlaygroundState:
         with self._lock:
             return [e for e in self.recent if e["seq"] > last_seq]
 
-    def scan(self, text: str, user: str = "playground", policy: str | None = None) -> dict[str, Any]:
+    def scan(self, text: str, user: str = "playground", policy: str | None = None) -> ScanResult:
         result = self.ctx.pipeline.scan(text, user=user, policy_name=policy)
         with self._lock:
             self.ctx.record(result)
@@ -126,20 +127,24 @@ class PlaygroundState:
         # 推送出去的是**判定摘要**：level / score / action / pattern_id / 指纹 / 字数。
         # ⚠ 绝不含 `text` —— 那条边界在审计、遥测、看板三处都守着，
         #   SSE 是第四处；而 SSE 恰好是最容易被忘的一处（它是「顺手加的」功能）。
+        self.publish_scan(result.to_dict(), chars=len(text))
+        return result
+
+    def publish_scan(self, result: dict[str, Any], *, chars: int) -> None:
+        """从已完成的 API 结果发布白名单摘要，不重复检测或写审计。"""
         self.publish({
             "ts": time.time(),
-            "level": result.level.value,
-            "action": result.action.value,
-            "score": round(result.score, 1),
-            "patterns": [f.pattern_id for f in result.findings][:8],
-            "fingerprint": result.fingerprint,
-            "chars": len(text),
-            "detect_ms": round(float(result.latency_ms.get("total", 0.0)), 2),
-            "cached": bool(result.cached),
-            "skipped": list(result.skipped),
+            "level": result["level"],
+            "action": result["action"],
+            "score": round(result["score"], 1),
+            "patterns": [f["pattern_id"] for f in result["findings"]][:8],
+            "fingerprint": result["fingerprint"],
+            "chars": chars,
+            "detect_ms": round(float(result["latency_ms"].get("total", 0.0)), 2),
+            "cached": bool(result["cached"]),
+            "skipped": list(result["skipped"]),
             "source": "playground",
         })
-        return result
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -239,6 +244,12 @@ class Handler(BaseHTTPRequestHandler):
         params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         try:
             status, body = handler(self.state.ctx, payload, params)
+            if method == "POST" and status == 200:
+                if path.rstrip("/") == "/v1/scan":
+                    self.state.publish_scan(body, chars=len(payload["text"]))
+                elif path.rstrip("/") == "/v1/scan/batch":
+                    for text, result in zip(payload["texts"], body["results"]):
+                        self.state.publish_scan(result, chars=len(text))
         except ApiError as exc:
             self._send_json(exc.status, {"error": exc.code, "message": exc.message})
             return
@@ -303,9 +314,10 @@ class Handler(BaseHTTPRequestHandler):
             self._write_sse({"type": "hello", "seq": self.state.seq,
                              "ring": STREAM_RING,
                              "heartbeat_s": STREAM_HEARTBEAT_S})
+            sent = last_seq
             for event in self.state.events_since(last_seq):
                 self._write_sse(event)
-            sent = self.state.seq
+                sent = event["seq"]
             deadline = time.time() + STREAM_MAX_S
             while time.time() < deadline:
                 # 事件驱动地等：有新事件立刻醒，没新事件到点发心跳。

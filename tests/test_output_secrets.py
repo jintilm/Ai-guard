@@ -405,6 +405,7 @@ def _run_cli(*args: str) -> tuple[int, str]:
     教训与项目里其它几处一致：**报错要指到真正的原因**，
     而「只报退出码」是最常见的断链点。
     """
+    import os
     import subprocess
     import sys
     from pathlib import Path
@@ -413,6 +414,7 @@ def _run_cli(*args: str) -> tuple[int, str]:
         [sys.executable, "-m", "prompt_ids.cli", *args],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
         cwd=str(Path(__file__).resolve().parent.parent),
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
     if proc.returncode not in (0, 2, 3):
         raise AssertionError(
@@ -437,6 +439,40 @@ def test_cli_output_scan_is_a_separate_mode_from_input_scanning():
     assert code_out == 3
     code_in, _ = _run_cli(text)
     assert code_in == 0
+
+
+def test_sampled_response_redacts_original_positions_over_http(leaky_upstream, tmp_path_factory):
+    httpd, audit_path = _proxy_for(leaky_upstream, tmp_path_factory, "sampled")
+    content = "ordinary text " * 18000 + f" key={AWS}"
+    try:
+        status, body = _post(httpd.server_address[1], {
+            "messages": [{"role": "user", "content": content}]})
+        assert status == 200
+        answer = json.loads(body)["choices"][0]["message"]["content"]
+        assert AWS not in answer
+        assert answer == content.replace(AWS, "[REDACTED:aws_access_key]")
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    events = _events(audit_path)
+    assert len(events) == 1
+    assert events[0]["extra"]["outbound"] == "redacted"
+    assert events[0]["extra"]["secret_sampled"] is True
+    assert events[0]["extra"]["secret_scanned_chars"] <= 200_000
+
+
+def test_sampled_secret_hits_keep_offsets_in_each_window():
+    from prompt_ids.proxy.server import _sample_ranges
+
+    content = " " * 250_000
+    starts = [start + 10 for start, _end in _sample_ranges(len(content), 200_000)]
+    for start in starts:
+        content = content[:start] + AWS + content[start + len(AWS):]
+    hits, sampled, scanned = ProxyConfig(api_key="").secret_check(content)
+    assert sampled and scanned <= 200_000
+    assert [hit.start for hit in hits] == starts
+    assert all(content[hit.start:hit.end] == hit.raw for hit in hits)
+    assert AWS not in redact(content, hits)
 
 
 def test_stream_can_only_be_warned_after_the_fact(leaky_upstream, tmp_path_factory):

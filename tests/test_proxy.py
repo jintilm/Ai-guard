@@ -162,6 +162,39 @@ def test_benign_request_is_forwarded(proxy, upstream):
     assert len(MockUpstream.calls) == before + 1
 
 
+@pytest.mark.parametrize("path,payload", [
+    ("/v1/chat/completions", {"messages": [{"role": "user", "content": "sample"}]}),
+    ("/v1/embeddings", {"input": "sample"}),
+])
+@pytest.mark.parametrize("allow_sandbox", [False, True])
+def test_sandbox_policy_is_enforced_before_forwarding(upstream, tmp_path, path, payload,
+                                                      allow_sandbox):
+    from prompt_ids.core.types import Action, Level, ScanResult
+
+    class HighRiskPipeline:
+        def scan(self, text, **kwargs):
+            return ScanResult(score=70, level=Level.HIGH, action=Action.SANDBOX)
+
+    audit = tmp_path / "sandbox.jsonl"
+    config = ProxyConfig(upstream=f"http://127.0.0.1:{upstream.server_address[1]}/v1",
+                         api_key="", port=0, pipeline=HighRiskPipeline(),
+                         audit_path=str(audit), allow_sandbox=allow_sandbox)
+    server = create_server(config)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    before = len(MockUpstream.calls)
+    try:
+        status, body = _post(server.server_address[1], payload, path)
+        assert status == (200 if allow_sandbox else 403), body
+        assert len(MockUpstream.calls) - before == int(allow_sandbox)
+    finally:
+        server.shutdown()
+        server.server_close()
+    events = [json.loads(line) for line in audit.read_text(encoding="utf-8").splitlines()]
+    assert len(events) == 1
+    assert events[0]["extra"]["decision"] == "sandbox"
+    assert events[0]["extra"]["status"] == status
+
+
 def test_stream_response_is_passthrough(proxy):
     server, _, _ = proxy
     port = server.server_address[1]

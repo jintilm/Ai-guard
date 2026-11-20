@@ -158,6 +158,7 @@ class SemanticDetector(Detector):
         # 连续大量弃权 = L3 实际上没在工作，必须能被 metrics 看见。
         if not prediction.ok:
             self.abstained += 1
+            self.last_error = prediction.rationale[:200]
         self.total_latency_ms += prediction.latency_ms
         self.last_prediction = prediction
         return prediction

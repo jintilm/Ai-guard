@@ -291,6 +291,11 @@ def _print_models(provider: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # CLI 输出统一为 UTF-8，管道/重定向不能随 Windows 的 cp1252 编码崩溃。
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
     args = build_argparser().parse_args(argv)
 
     if args.rules_stats:
