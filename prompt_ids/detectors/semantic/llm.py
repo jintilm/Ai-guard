@@ -415,8 +415,14 @@ class LLMBackend(SemanticBackend):
         for attempt in range(self.max_retries + 1):
             for use_json in self._json_attempts(ep):
                 remaining = remaining_timeout()
-                budget_limited = remaining is not None and remaining <= self.default_timeout_s
-                timeout_s = remaining if budget_limited else self.default_timeout_s
+                deadline = current_deadline()
+                # Compare absolute deadlines. Subtracting large clock values can
+                # round a .1s budget up to .10000000000002274: on a coarse clock
+                # that used to misclassify a full-budget timeout as retryable.
+                budget_limited = (deadline is not None
+                                  and deadline <= time.monotonic() + self.default_timeout_s)
+                timeout_s = (min(remaining, self.default_timeout_s)
+                             if remaining is not None else self.default_timeout_s)
                 try:
                     content, finish = self._request(ep, text, timeout_s, use_json)
                     remaining_timeout()

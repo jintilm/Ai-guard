@@ -165,6 +165,8 @@ LLM 每组实际预测 120 次，均无缓存命中；语义 `always`，关闭 c
 这说明后续需要同时检查规则证据与裁判判断。尤其中文引用说明涉及的 `PV-C008` 应在开发集
 定位，而不是仅靠改变取样策略处理误报。本轮未调规则、融合阈值或默认采样方式。
 这批数据仍是单一领域、AI 辅助标注的压力场景；结果不是总体业务误报率。
+报告保留测量时的代码指纹。后续 Windows CI 暴露了 0.1 秒 socket 预算的浮点边界，
+已改为绝对截止时间比较并补回归；本轮评测使用 45 秒预算、未重跑，其指纹对应修复前版本。
 
 初次全量规则基线（L1+L2，默认 policy，关闭 critical 短路）记录在
 [rag_rules.json](../reports/rag_rules.json)。测试集的风险召回为 **48/226 = 21.24%**，
@@ -302,6 +304,10 @@ cases were still blocked by the fused decision. Follow-up work should examine bo
 and judge decisions, especially `PV-C008` on Chinese quotation framing, using development data.
 Rules, fusion thresholds and the default sampling strategy were not changed. This single-domain,
 AI-assisted stress corpus does not estimate production FPR.
+Reports retain the code fingerprints used during measurement. A subsequent Windows CI
+failure exposed floating-point rounding at a 0.1-second socket budget; absolute-deadline
+comparison and regression coverage fix that boundary. This 45-second-budget evaluation
+was not rerun, and its fingerprint identifies the version before that fix.
 
 The initial [L1/L2 baseline](../reports/rag_rules.json) measures test risk recall at
 48/226 (21.24%) and actual block recall at 20/226 (8.85%). Across both splits, clean

@@ -204,9 +204,12 @@ def test_retry_and_backoff_share_one_deadline(clock, monkeypatch):
 
 
 @pytest.mark.parametrize("wrapped", [False, True])
-def test_budget_limited_socket_timeout_stops_even_before_clock_advances(clock, monkeypatch, wrapped):
+@pytest.mark.parametrize("clock_offset,budget", [(0.0, 1.0), (1000.0, 0.1), (1_000_000.0, 0.01)])
+def test_budget_limited_socket_timeout_stops_even_before_clock_advances(
+        clock, monkeypatch, wrapped, clock_offset, budget):
+    clock.now = clock_offset
     backend = judge(fallbacks="ollama", max_retries=2)
-    backend.default_timeout_s = 1
+    backend.default_timeout_s = budget
     calls = []
 
     def timeout(endpoint, text, timeout_s, use_json):
@@ -218,7 +221,7 @@ def test_budget_limited_socket_timeout_stops_even_before_clock_advances(clock, m
     result = backend.predict("sample")
     assert not result.ok
     assert calls == ["custom"]
-    assert clock.now == 0
+    assert clock.now == clock_offset
 
 
 def test_per_operation_timeout_can_retry_with_a_larger_shared_budget(clock, monkeypatch):
