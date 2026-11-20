@@ -39,7 +39,7 @@ def failure_kind(pipeline) -> str | None:
     if prediction.ok:
         return None
     reason = prediction.rationale.casefold()
-    codes = re.findall(r"\b(?:400|401|403|404|422|429|500|502|503|504)\b", reason)
+    codes = re.findall(r"\bhttp\s+([45][0-9]{2})\b", reason)
     if codes:
         return "http_" + codes[0]
     if any(word in reason for word in ("timeout", "timed out", "超时")):
@@ -235,6 +235,8 @@ def main() -> int:
             semantic = {"enabled": True, "mode": "always", "backend": cache,
                         "timeout_s": args.timeout}
             backend_info[name] = {"provider": backend.provider, "model": backend.model_name,
+                                  "max_tokens": backend.max_tokens,
+                                  "backend_fingerprint": cache._fingerprint,
                                   "input_sampling": backend.input_sampling,
                                   "judge_prompt_sha256": prompt_hash}
         pipelines[name] = build_pipeline(semantic=semantic, short_circuit=False, enable_cache=False)

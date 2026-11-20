@@ -254,7 +254,10 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
 
 构建默认离线，可核对来源、许可、SHA-256 和切分；显式 `--mode llm` 可配对比较
 `head` / `stratified`，支持失败标记、调用上限和缓存续跑。
-首次 LLM 试跑遇到网关 HTTP 404，暂不提供两种策略的准确率结论。
+新网关上的 [DeepSeek-V4.1-Flash 小样本报告](reports/rag_llm_deepseek_pilot.json)
+已完成：24 条开发样本中，两种策略均检出 9/12 条攻击；正常样本阻断分别为
+`head` 3/12、`stratified` 2/12。两组各有 3 次 HTTP 406 弃票（12.5%），
+样本含英文 22 条、中文 2 条，结果不足以支持调整默认策略。
 纯良性集合若参与过规则或阈值调整，也必须视为开发数据。
 
 ## Comparison

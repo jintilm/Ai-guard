@@ -268,9 +268,12 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split dev
 
 Offline reconstruction verifies provenance, licenses, SHA-256 and group isolation.
 Explicit `--mode llm` supports paired `head` / `stratified` comparisons, call limits,
-failure reporting and resumable caches. The initial LLM pilot received HTTP 404 responses,
-so no accuracy comparison is claimed. Benign datasets used for rule/threshold tuning must
-also be treated as development data.
+failure reporting and resumable caches. A new [DeepSeek-V4.1-Flash pilot](reports/rag_llm_deepseek_pilot.json)
+completed on 24 development cases: both strategies detected 9/12 attacks; benign blocking
+was 3/12 for `head` and 2/12 for `stratified`. Each strategy had three HTTP 406 abstentions
+(12.5%). The sample includes 22 English cases and two Chinese cases; it does not justify
+changing defaults. Benign datasets used for rule/threshold tuning must also be treated as
+development data.
 
 ## Comparison
 

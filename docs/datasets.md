@@ -73,7 +73,7 @@ python -X utf8 scripts/eval_rag_bench.py --mode rules --split test
 正式比较 `head` 与 `stratified` 时显式选择 LLM 模式并给出调用上限：
 
 ```bash
-python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --max-llm-calls 48 --timeout 45 --out reports/rag_llm_pilot.json
+python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --max-llm-calls 48 --timeout 45 --out reports/rag_llm_current_pilot.json
 ```
 
 模型和端点沿用 `.env`，也可用 `--provider` 和 `--model` 显式选择。
@@ -93,8 +93,27 @@ python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 24 --ma
 
 采样覆盖统计是**原始文本上的载荷可见性**。它与模型实际判决、代理完整执行链、
 攻击成功率是不同指标；规则基线不能证明两种 LLM 采样策略谁更准确。
-本轮 LLM 小样本试跑中网关返回 HTTP 404，报告保留失败记录并标记不可比较；
-默认 `head` 策略因此没有调整。
+旧网关的 [首次试跑](../reports/rag_llm_pilot.json) 返回 HTTP 404，保留为不可比较的历史记录。
+新网关上的 [DeepSeek-V4.1-Flash 试跑](../reports/rag_llm_deepseek_pilot.json) 已完成：
+
+| 指标 | `head` | `stratified` |
+|---|---:|---:|
+| 风险检出 / 实际阻断召回 | 9/12 = 75% | 9/12 = 75% |
+| 正常样本阻断（包含降级路径） | 3/12 = 25% | 2/12 = 16.67% |
+| 未取得裁判判决 | 3/24 = 12.5% | 3/24 = 12.5% |
+| 成功判决的正常样本阻断 | 3/9 = 33.33% | 2/9 = 22.22% |
+
+这是 24 条开发样本、14 个母组的配对试跑，其中英文 22 条、中文仅 2 条，
+不能据此评价中文效果。样本中 12 条攻击、10 条攻击引用对照、2 条原始正常文档。
+两组失败均来自同一篇文档的三个良性引用变体，网关返回 **HTTP 406 + HTML**，
+因此失败并非随机缺失；生产管线在这些样本上按语义弃票处理。
+对成功判决的子集单独统计也会改变人群，不能把它当成无偏修正。
+模型列表接口返回 HTTP 502，但裁判接口的正常请求能返回合法 JSON。
+
+最终报告复用了每组 21 条成功预测，只补跑每组 3 条失败样本；
+`model_calls_this_run` 不包含先前缓存的请求，`uncached_latency_ms` 也仅描述本次未命中缓存的调用。
+按母组配对的风险召回差为 0，95% bootstrap 区间为 [-0.15, 0.15]。
+这些证据不足以支持调整默认 `head` 策略，后续应先解决网关内容拒绝和小样本语言偏斜。
 
 初次全量规则基线（L1+L2，默认 policy，关闭 critical 短路）记录在
 [rag_rules.json](../reports/rag_rules.json)。测试集的风险召回为 **48/226 = 21.24%**，
@@ -158,8 +177,22 @@ flagging (`>= medium`), review actions, failed calls and uncached latency. Confi
 intervals resample **parent groups**, not derived rows. Character counts are not tokens;
 provider token usage is not collected. Incomplete runs or failure rates above 20% invalidate
 strategy comparison. Three consecutive pairs without any valid verdict stop the run.
-The initial LLM pilot received HTTP 404 responses and is marked unusable; the default
-sampling strategy remains `head`.
+The [original pilot](../reports/rag_llm_pilot.json) received HTTP 404 responses and remains
+an unusable historical record. The new [DeepSeek-V4.1-Flash pilot](../reports/rag_llm_deepseek_pilot.json)
+completed on 24 development cases from 14 parent groups (22 English, two Chinese;
+12 attacks, ten quotation controls, two clean excerpts). Both strategies detected and
+blocked 9/12 attacks. Benign blocking, including semantic-abstention paths, was 3/12 for
+`head` and 2/12 for `stratified`.
+
+Each strategy failed on the same three benign quotation variants with **HTTP 406 and HTML**,
+a 12.5% abstention rate. Among successful verdicts, benign blocking was 3/9 and 2/9;
+this subset changes the population and is not an unbiased correction. The model-list
+endpoint returned HTTP 502 while ordinary classification requests produced valid JSON.
+The final report reused 21 successful predictions per strategy and retried three failures
+per strategy. `model_calls_this_run` excludes earlier cached calls, and uncached latency
+describes only requests made during that resumed run. The paired group-macro recall
+difference is zero (95% bootstrap interval [-0.15, 0.15]). These limited, language-skewed
+observations do not justify changing the default `head` strategy.
 
 The initial [L1/L2 baseline](../reports/rag_rules.json) measures test risk recall at
 48/226 (21.24%) and actual block recall at 20/226 (8.85%). Across both splits, clean
