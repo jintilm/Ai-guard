@@ -45,6 +45,10 @@ def failure_kind(pipeline) -> str | None:
         return "not_invoked" if detector else None
     if prediction.ok:
         return None
+    code = getattr(prediction, "failure_code", "")
+    if code:
+        http_status = getattr(prediction, "http_status", None)
+        return f"http_{http_status}" if code == "http_error" and http_status else code
     reason = prediction.rationale.casefold()
     codes = re.findall(r"\bhttp\s+([45][0-9]{2})\b", reason)
     if codes:
@@ -347,6 +351,8 @@ def main() -> int:
                                "flagged": int(result.level.value in ("medium", "high", "critical")),
                                "action": result.action.value, "score": result.score,
                                "semantic_ok": result.semantic_ok,
+                               "semantic_execution": result.semantic_execution.to_dict()
+                               if result.semantic_execution else None,
                                "semantic_context_used": result.semantic_context_used,
                                "context_fingerprint": result.context_fingerprint,
                                "semantic_probability": prediction.probability

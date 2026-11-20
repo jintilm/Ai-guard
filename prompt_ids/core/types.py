@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from prompt_ids.core.execution import SemanticExecution
+
 DETECTOR_RULE = "rule"
 DETECTOR_HEURISTIC = "heuristic"
 DETECTOR_SEMANTIC = "semantic"
@@ -104,6 +106,7 @@ class ScanResult:
     semantic_ok: bool | None = None
     context_fingerprint: str = ""
     semantic_context_used: bool = False
+    semantic_execution: SemanticExecution | None = None
 
     @property
     def is_blocked(self) -> bool:
@@ -140,6 +143,7 @@ class ScanResult:
             "semantic_ok": self.semantic_ok,
             "context_fingerprint": self.context_fingerprint,
             "semantic_context_used": self.semantic_context_used,
+            "semantic_execution": self.semantic_execution.to_dict() if self.semantic_execution else None,
         }
 
     def summary(self) -> str:
@@ -147,6 +151,10 @@ class ScanResult:
             f"判定: {self.level.value.upper():<8} 分数: {self.score:.1f}  动作: {self.action.value}",
             f"说明: {self.explained}",
         ]
+        if self.semantic_execution:
+            lines.append("语义执行: " + self.semantic_execution.summary())
+        if self.context_fingerprint:
+            lines.append("任务上下文: " + ("已用于有效判决" if self.semantic_context_used else "未用于有效判决"))
         if self.semantic_coverage:
             coverage = self.semantic_coverage
             lines.append(f"所选语义输入: {coverage.sampled_chars}/{coverage.input_chars} 字符"

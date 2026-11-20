@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 
 from prompt_ids.api.app import ApiContext
 from prompt_ids.api.server import DEFAULT_PORT, ApiServerConfig, serve
@@ -30,6 +31,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--canary-issue-window", type=float, default=60.0)
     parser.add_argument("--semantic", action="store_true", help="启用 L3 语义层")
     parser.add_argument("--semantic-mode", default="fallback")
+    parser.add_argument("--semantic-backend", default="auto", help="auto/local/lightweight/null 或 LLM 提供商")
+    parser.add_argument("--semantic-model", default="", help="显式指定裁判模型")
+    parser.add_argument("--semantic-timeout", type=float, default=None, help="语义调用总预算秒数")
+    parser.add_argument("--no-short-circuit", action="store_true", help="关闭高危规则短路，仍保留高危下限分")
     parser.add_argument("--allow-context", action="store_true",
                         help="允许可信应用提交任务上下文；不得把此入口直接开放给不可信客户端")
     parser.add_argument("--memory", action="store_true", help="启用 L4 向量记忆库（自进化）")
@@ -41,11 +46,17 @@ def main(argv: list[str] | None = None) -> int:
                         help="复核语料路径（JSONL，**含原文**）。不配就不写。"
                              "用于把人工结论喂回规则迭代；会自动加进 .gitignore")
     args = parser.parse_args(argv)
+    if args.semantic_timeout is not None and (not math.isfinite(args.semantic_timeout) or args.semantic_timeout <= 0):
+        parser.error("--semantic-timeout 必须是正的有限秒数")
 
     ctx = ApiContext(
         canary=CanaryRegistry() if args.canary else None,
         semantic=args.semantic,
         semantic_mode=args.semantic_mode,
+        semantic_backend=args.semantic_backend,
+        semantic_model=args.semantic_model,
+        semantic_timeout_s=args.semantic_timeout,
+        short_circuit_on_critical=not args.no_short_circuit,
         memory=args.memory,
         memory_encoder=args.memory_encoder,
         memory_threshold=args.memory_threshold,

@@ -64,6 +64,8 @@ class Prediction:
     ok: bool = True
     coverage: TextCoverage | None = None
     context_used: bool = False
+    failure_code: str = ""
+    http_status: int | None = None
 
     def clamp(self) -> Prediction:
         p = min(1.0, max(0.0, self.probability))
@@ -84,7 +86,8 @@ class SemanticBackend(ABC):
 
     def predict_context(self, text: str, context: ScanContext) -> Prediction:
         """Abstain explicitly when the selected backend cannot use task context."""
-        return Prediction(0.0, "语义后端不支持任务上下文，已弃票", self.name, ok=False)
+        return Prediction(0.0, "语义后端不支持任务上下文，已弃票", self.name, ok=False,
+                          failure_code="unsupported_context")
 
     def is_available(self) -> bool:
         """依赖是否齐备。不等于模型已经下载。"""
@@ -114,7 +117,8 @@ class NullBackend(SemanticBackend):
     name = "null"
 
     def predict(self, text: str) -> Prediction:
-        return Prediction(0.0, "语义后端不可用，已跳过", self.name, ok=False)
+        return Prediction(0.0, "语义后端不可用，已跳过", self.name, ok=False,
+                          failure_code="backend_unavailable")
 
     def is_available(self) -> bool:
         return False

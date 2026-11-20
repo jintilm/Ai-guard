@@ -182,13 +182,16 @@ class SemanticDetector(Detector):
             prediction = _coerce(raw, self.backend.name)
         except SemanticOverloaded:
             failure = "overloaded"
-            prediction = Prediction(0.0, "语义层过载，已弃票", self.backend.name, ok=False)
+            prediction = Prediction(0.0, "语义层过载，已弃票", self.backend.name, ok=False,
+                                    failure_code="overloaded")
         except CancelledError:
-            prediction = Prediction(0.0, "语义任务已取消，已弃票", self.backend.name, ok=False)
+            prediction = Prediction(0.0, "语义任务已取消，已弃票", self.backend.name, ok=False,
+                                    failure_code="cancelled")
         except TimeoutError:
             failure = "timeout"
             prediction = Prediction(
-                0.0, f"语义后端超时（>{self.timeout_s}s）", self.backend.name, ok=False
+                0.0, f"语义后端超时（>{self.timeout_s}s）", self.backend.name, ok=False,
+                failure_code="timeout"
             )
         # 说明（抑制见下一行行尾的 noqa）：21 家提供商 + 自定义端点抛的异常类型各不相同
         # （urllib / HTTPError / JSONDecodeError / KeyError…），
@@ -198,7 +201,8 @@ class SemanticDetector(Detector):
         except Exception as exc:  # noqa: BLE001
             failure = "error"
             prediction = Prediction(
-                0.0, f"语义后端异常：{str(exc)[:200]}", self.backend.name, ok=False
+                0.0, f"语义后端异常：{str(exc)[:200]}", self.backend.name, ok=False,
+                failure_code="backend_error"
             )
 
         prediction = prediction.clamp()

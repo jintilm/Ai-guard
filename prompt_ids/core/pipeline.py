@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.core.context import ScanContext
+from prompt_ids.core.execution import SemanticExecution
 from prompt_ids.core.policy import PolicyEngine
 from prompt_ids.core.types import Action, Finding, Level, ScanResult
 from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
@@ -168,7 +169,7 @@ class Pipeline:
                 continue
 
     def review(self, text: str, *, is_attack: bool, reviewer: str = "",
-               note: str = "") -> dict:
+               note: str = "", context: ScanContext | None = None) -> dict:
         """人工复核：给一条检测定性，并把结论喂回记忆层。
 
         这是「检测 → 复核 → 学习」闭环的落点。三个设计点：
@@ -179,14 +180,16 @@ class Pipeline:
           双向记忆是同一条通路，不为复核另造一套写入逻辑。
         - **这里能拿到原文，是因为调用方手里就有**（REST 请求体 / 控制台输入）。
           审计侧仍然只记指纹 —— 见 `audit.event_from_review` 的说明。
+        - 带任务上下文的结论不能写入没有任务维度的通用记忆；返回
+          `memory_reason="context_not_stored"`，由应用保存上下文对应的人工结论。
         """
-        text = (text or "").strip()
-        if not text:
+        text = text or ""
+        if not text.strip():
             raise ValueError("复核需要非空文本")
-        result = self.scan(text, user=reviewer or "reviewer")
+        result = self.scan(text, user=reviewer or "reviewer", context=context)
         detector = self.memory_detector
-        absorbed, reason = False, "memory_disabled"
-        if detector is not None and getattr(detector, "enabled", False):
+        absorbed, reason = False, "context_not_stored" if context is not None else "memory_disabled"
+        if context is None and detector is not None and getattr(detector, "enabled", False):
             # 记下计数器增量再调用：learn() 返回 False 有多种原因（指纹重复、
             # 容量满、编码器不可用…），混成一句「rejected」会让运维无法判断
             # 是「这条已经在库里」还是「库满了」，这两种要采取的动作完全不同。
@@ -216,6 +219,11 @@ class Pipeline:
             "top_pattern": _top_pattern(result),
             "memory_absorbed": absorbed,
             "memory_reason": reason,
+            "context_fingerprint": result.context_fingerprint,
+            "semantic_context_used": result.semantic_context_used,
+            "semantic_ok": result.semantic_ok,
+            "semantic_execution": result.semantic_execution.to_dict() if result.semantic_execution else None,
+            "semantic_coverage": result.semantic_coverage.to_dict() if result.semantic_coverage else None,
         }
 
     # ---------- 主流程 ----------
@@ -262,10 +270,22 @@ class Pipeline:
 
         result = ScanResult()
         result.context_fingerprint = context.fingerprint() if context else ""
+        sem_detector = self.semantic_detector
+        if isinstance(sem_detector, SemanticDetector):
+            result.semantic_execution = (SemanticExecution("skipped", "not_reached")
+                                         if sem_detector.enabled else SemanticExecution("disabled", "not_enabled"))
+        if semantic is False and sem_detector is not None and sem_detector.enabled:
+            result.semantic_execution = SemanticExecution("skipped", "caller_disabled")
+
+        def skipped_semantic(reason: str) -> None:
+            if result.semantic_execution == SemanticExecution("skipped", "not_reached"):
+                result.semantic_execution = SemanticExecution("skipped", reason)
+
         # 限流（默认关闭：GuardConfig.rate_limit=0）。开着时按 user 分桶，
         # 超限**不阻断**而是转人工 —— 限流的语义是「别让一个人吃掉全部算力」，
         # 不是「判定为攻击」，所以动作是 review + 说明里写明原因。
         if not self.guard.check_rate(user):
+            skipped_semantic("rate_limited")
             result.level = Level.MEDIUM
             result.action = Action.REVIEW
             result.explained = (f"超过限流（{self.guard.config.rate_limit} 次/"
@@ -285,6 +305,7 @@ class Pipeline:
                 result.truncated = True
                 oversized_note = f"（输入 {original_len} 字符，超过上限 {limit}，已截断检测）"
             else:
+                skipped_semantic("input_rejected")
                 result.rejected = exc.reason
                 result.level = Level.CRITICAL
                 result.action = Action.BLOCK
@@ -349,11 +370,20 @@ class Pipeline:
                 continue
             if isinstance(detector, SemanticDetector) and detector.layer == 3:
                 preliminary = fuse(subscores, self.config.fusion)
+                if not detector.backend.is_available():
+                    skipped.append(detector.name)
+                    skipped_semantic("backend_unavailable")
+                    # Availability may recover; do not freeze a rules-only result.
+                    cacheable = False
+                    continue
                 if not detector.should_invoke(preliminary, grade(preliminary, self.config.fusion).value):
                     skipped.append(detector.name)
+                    skipped_semantic("gate")
                     continue
                 if elapsed_total > self.config.budget_ms:
                     skipped.append(detector.name)
+                    skipped_semantic("budget_exhausted")
+                    cacheable = False
                     continue
             cold = detector.name not in self._warm
             layer_findings, used = detector.timed_detect(ctx)
@@ -363,6 +393,9 @@ class Pipeline:
                     result.semantic_coverage = prediction.coverage
                     result.semantic_ok = prediction.ok
                     result.semantic_context_used = prediction.context_used
+                    result.semantic_execution = SemanticExecution.from_prediction(prediction)
+                else:
+                    skipped_semantic("empty_input")
                 if prediction is not None and not prediction.ok:
                     # 后端过载/超时是临时状态，不能让缓存把降级判定固化。
                     cacheable = False
@@ -400,11 +433,14 @@ class Pipeline:
                 )
             ):
                 skipped.extend(d.name for d in detectors[index + 1:])
+                skipped_semantic("short_circuit")
                 break
             if elapsed_total > self.config.budget_ms:
                 # 预算耗尽：把没跑的层记下来。静默丢弃会让"已开启的模块"
                 # 看起来在工作、实际一次没执行，是最难排查的一类故障。
                 skipped.extend(d.name for d in detectors[index + 1:])
+                skipped_semantic("budget_exhausted")
+                cacheable = False
                 break
 
         result.skipped = tuple(dict.fromkeys(skipped))
@@ -421,7 +457,7 @@ class Pipeline:
         if oversized_note:
             result.explained += oversized_note
         if result.skipped:
-            result.explained += f"；因预算/短路未执行：{', '.join(result.skipped)}"
+            result.explained += f"；未执行层：{', '.join(result.skipped)}"
         if cold_notes:
             result.explained += "；含冷启动开销（不计入预算）：" + ", ".join(cold_notes)
         if fell_back:

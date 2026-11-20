@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from prompt_ids import __version__, get_pipeline
+from prompt_ids.core.context import ScanContext
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.policy import Policy, PolicyEngine
 from prompt_ids.core.types import Level
@@ -46,6 +47,7 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--budget-ms", type=float, default=500.0, help="检测总耗时预算")
     p.add_argument("--rules-stats", action="store_true", help="打印规则库统计后退出")
     p.add_argument("--rules-dir", help="自定义规则目录")
+    p.add_argument("--context-file", help="可信应用任务 JSON 文件（user_task/source_role），与待检正文分开")
     sem = p.add_argument_group("语义层 L3")
     sem.add_argument("--semantic", action="store_true", help="启用语义层（自动挑可用后端）")
     sem.add_argument("--semantic-backend", default="auto",
@@ -142,6 +144,23 @@ def _split(text: str, by_lines: bool) -> list[str]:
     if not by_lines:
         return [text]
     return [line for line in text.splitlines() if line.strip()]
+
+
+def _read_context(path: str | None) -> ScanContext | None:
+    if not path:
+        return None
+    try:
+        with Path(path).open("rb") as handle:
+            raw = handle.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("上下文文件超过 64 KiB")
+        data = json.loads(raw.decode("utf-8-sig"))
+        if not isinstance(data, dict) or set(data) - {"user_task", "source_role"}:
+            raise ValueError("上下文只接受 user_task 和 source_role")
+        return ScanContext(data.get("user_task"), data.get("source_role", "document"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        # Do not echo file contents, tasks or arbitrary decoder error excerpts.
+        raise SystemExit(f"上下文文件无效（{type(exc).__name__}），请检查 UTF-8 JSON、字段与长度") from None
 
 
 def _make_pipeline(args: argparse.Namespace) -> Pipeline:
@@ -327,15 +346,19 @@ def main(argv: list[str] | None = None) -> int:
         return _print_models(args.list_models or "")
 
     if args.scan_output:
+        if args.context_file:
+            raise SystemExit("--context-file 仅用于输入检测，不能与 --scan-output 同用")
         return _run_output_scan(args)
 
+    context = _read_context(args.context_file)
     pipeline = _make_pipeline(args)
     if args.semantic:
         _announce_semantic_backend(
             pipeline, machine_output=bool(args.json or args.jsonl), quiet=bool(args.quiet))
         pipeline.warmup()
     texts = _split(_read_input(args), args.lines)
-    results = pipeline.scan_batch(texts, user=args.user)
+    kwargs = {"context": context} if context is not None else {}
+    results = pipeline.scan_batch(texts, user=args.user, **kwargs)
     if pipeline.audit is not None:
         pipeline.audit.flush()
 

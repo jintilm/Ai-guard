@@ -15,6 +15,7 @@ from typing import Any
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
 from prompt_ids.core.context import MAX_TASK_CHARS, SOURCE_ROLES, ScanContext
+from prompt_ids.core.execution import REASONS, SemanticExecution
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
 from prompt_ids.output import MAX_HITS, redact, scan_text
 
@@ -50,12 +51,20 @@ class ApiContext:
         canary_issue_limit: int = 0,
         canary_issue_window_s: float = 60.0,
         allow_scan_context: bool = False,
+        semantic_backend: str = "auto",
+        semantic_model: str = "",
+        semantic_timeout_s: float | None = None,
+        short_circuit_on_critical: bool = True,
     ):
         self.allow_scan_context = allow_scan_context
         self.pipeline = pipeline or create_pipeline(
             config=PipelineConfig(
                 semantic_enabled=semantic,
                 semantic_mode=semantic_mode,
+                semantic_backend=semantic_backend,
+                semantic_model=semantic_model,
+                semantic_timeout_s=semantic_timeout_s,
+                short_circuit_on_critical=short_circuit_on_critical,
                 memory_enabled=memory,
                 memory_encoder=memory_encoder,
                 memory_threshold=memory_threshold,
@@ -500,9 +509,11 @@ def handle_review(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
     is_attack = _require_bool(payload, "is_attack", True)
     reviewer = _require_str(payload, "reviewer", "api")
     note = _require_str(payload, "note", "")
+    context = _scan_context(ctx, payload)
 
     try:
-        outcome = ctx.pipeline.review(text, is_attack=is_attack, reviewer=reviewer, note=note)
+        kwargs = {"context": context} if context is not None else {}
+        outcome = ctx.pipeline.review(text, is_attack=is_attack, reviewer=reviewer, note=note, **kwargs)
     except ValueError as exc:
         raise ApiError(400, "bad_request", str(exc)) from exc
 
@@ -514,12 +525,16 @@ def handle_review(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
             top_pattern=outcome.get("top_pattern", ""),
             note=note or outcome["verdict"], memory_absorbed=outcome["memory_absorbed"],
             source="api",
+            context_fingerprint=outcome.get("context_fingerprint", ""),
+            semantic_context_used=outcome.get("semantic_context_used", False),
+            semantic_execution=(SemanticExecution.from_dict(outcome["semantic_execution"])
+                                if outcome.get("semantic_execution") else None),
         )
     # 复核语料（含原文，刻意与审计层分开的第二个数据面）。
     # 显式配置了才写；写了要能看见写没写成 —— 静默失败会让「反哺」看起来是通的。
     corpus_written = None
     corpus_error = ""
-    if ctx.review_corpus is not None:
+    if ctx.review_corpus is not None and context is None:
         corpus_written = ctx.review_corpus.add(
             text=text, is_attack=is_attack, fp=outcome["fingerprint"],
             patterns=tuple(outcome.get("patterns") or ()),
@@ -539,6 +554,8 @@ def handle_review(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dic
         "written": corpus_written,
         "error": corpus_error,
     }
+    if context is not None:
+        body["corpus"]["skip_reason"] = "context_not_stored"
     return 200, body
 
 
@@ -621,6 +638,7 @@ def handle_review_queue(ctx: ApiContext, payload: Any, params: dict) -> tuple[in
                 "findings": e.findings,
                 "top_pattern": e.top_pattern,
                 "source": e.source,
+                "context_fingerprint": (e.extra or {}).get("context_fingerprint", ""),
             }
             for e in pending
         ],
@@ -658,6 +676,13 @@ def handle_metrics(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, di
         "semantic": {
             "enabled": bool(ctx.pipeline.semantic_detector and ctx.pipeline.semantic_detector.enabled),
             "info": ctx.pipeline.semantic_detector.stats() if ctx.pipeline.semantic_detector else {},
+        },
+        "context": {
+            "accepted": ctx.allow_scan_context,
+            "backend_supported": bool(getattr(getattr(ctx.pipeline.semantic_detector, "backend", None),
+                                                "supports_context", False)),
+            "max_task_chars": MAX_TASK_CHARS,
+            "source_roles": list(SOURCE_ROLES),
         },
         "canary": ctx.canary.stats() if ctx.canary else None,
         # 遥测出口：kind=off 时也给，让用户知道「有这条路、现在没开」。
@@ -760,6 +785,15 @@ _SCAN_RESULT_SCHEMA = {
         "semantic_ok": {"type": "boolean", "nullable": True},
         "context_fingerprint": {"type": "string", "description": "SHA-256 of supplied task context; empty if absent."},
         "semantic_context_used": {"type": "boolean", "description": "A valid verdict used the supplied context."},
+        "semantic_execution": {
+            "type": "object", "nullable": True,
+            "description": "Content-free execution status; null for legacy/custom results without execution metadata.",
+            "properties": {
+                "status": {"type": "string", "enum": list(REASONS)},
+                "reason": {"type": "string", "enum": sorted({r for values in REASONS.values() for r in values})},
+                "http_status": {"type": "integer", "minimum": 400, "maximum": 599, "nullable": True},
+            },
+        },
         "semantic_coverage": {
             "type": "object", "nullable": True,
             "description": "Selected LLM input; offsets refer to normalized backend input, not the original document. Null means unavailable or not applicable.",
@@ -851,6 +885,7 @@ _REQUEST_BODIES: dict[str, dict[str, Any]] = {
         "required": ["text", "is_attack"],
         "properties": {
             "text": {"type": "string"},
+            "context": _CONTEXT_SCHEMA,
             "is_attack": {"type": "boolean"},
             "reviewer": {"type": "string"},
             "note": {"type": "string"},

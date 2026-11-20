@@ -37,6 +37,7 @@ from urllib.parse import parse_qs, urlparse
 
 from prompt_ids.api.app import ApiContext, ApiError, resolve
 from prompt_ids.auth import authorized
+from prompt_ids.core.execution import SemanticExecution
 from prompt_ids.core.types import ScanResult, TextCoverage
 from prompt_ids.net import send_security_headers, warn_if_exposed
 
@@ -135,6 +136,9 @@ class PlaygroundState:
         coverage = result.get("semantic_coverage")
         if coverage is not None:
             coverage = TextCoverage.from_dict(coverage).to_dict()
+        execution = result.get("semantic_execution")
+        if execution is not None:
+            execution = SemanticExecution.from_dict(execution).to_dict()
         self.publish({
             "ts": time.time(),
             "level": result["level"],
@@ -148,6 +152,9 @@ class PlaygroundState:
             "skipped": list(result["skipped"]),
             "semantic_coverage": coverage,
             "semantic_ok": result.get("semantic_ok"),
+            "semantic_execution": execution,
+            "context_fingerprint": result.get("context_fingerprint", ""),
+            "semantic_context_used": bool(result.get("semantic_context_used", False)),
             "source": "playground",
         })
 

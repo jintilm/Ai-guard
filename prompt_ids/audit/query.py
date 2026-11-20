@@ -88,7 +88,7 @@ def rule_ledger(events: Iterable[AuditEvent]) -> dict[str, dict[str, int]]:
       而这个榜是要拿去指导改规则的，不能让人为刷分。
     """
     ledger: dict[str, dict[str, int]] = {}
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str]] = set()
     for event in events:
         verdict = review_verdict(event)
         if not verdict:
@@ -99,7 +99,7 @@ def rule_ledger(events: Iterable[AuditEvent]) -> dict[str, dict[str, int]]:
             names = [event.top_pattern]
         key_base = event.fp or f"ts:{event.ts:.3f}"
         for name in names:
-            marker = (name, key_base)
+            marker = (name, key_base, str((event.extra or {}).get("context_fingerprint", "")))
             if marker in seen:
                 continue
             seen.add(marker)
@@ -146,12 +146,15 @@ def pending_reviews(events: Sequence[AuditEvent], limit: int = 20) -> list[Audit
     只给指纹与元信息 —— 审计层不存原文，所以队列**不是**内容列表，
     而是一份「这些指纹需要人拿原文去 `/v1/review` 定性」的工单列表。
     """
-    reviewed = {e.fp for e in events if e.kind == "review" and e.fp}
+    def key(event):
+        return event.fp, str((event.extra or {}).get("context_fingerprint", ""))
+
+    reviewed = {key(e) for e in events if e.kind == "review" and e.fp}
     out: list[AuditEvent] = []
     for event in reversed(events):
         if event.kind != "scan" or event.level not in REVIEW_LEVELS:
             continue
-        if not event.fp or event.fp in reviewed:
+        if not event.fp or key(event) in reviewed:
             continue
         out.append(event)
         if len(out) >= limit:

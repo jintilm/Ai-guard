@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from prompt_ids.core.execution import SemanticExecution
 from prompt_ids.core.types import TextCoverage
 
 # 事件类型：检测 / Canary 泄漏 / Canary 签发 / 记忆写入 / API 请求 / 代理转发 /
@@ -165,13 +166,18 @@ def event_from_scan(result, *, text: str = "", user: str = "",
     if getattr(result, "context_fingerprint", ""):
         extra["context_fingerprint"] = result.context_fingerprint
         extra["semantic_context_used"] = bool(result.semantic_context_used)
+    execution = getattr(result, "semantic_execution", None)
+    if isinstance(execution, SemanticExecution):
+        extra["semantic_execution"] = execution.to_dict()
     return AuditEvent(
         ts=time.time(),
         kind=KIND_SCAN,
         level=result.level.value,
         action=result.action.value,
         score=result.score,
-        fp=fingerprint(text) if text else "",
+        # Scan/review responses use the normalized fingerprint. Rehashing the
+        # raw text here leaves Unicode/whitespace variants stuck in the queue.
+        fp=getattr(result, "fingerprint", "") or (fingerprint(text) if text else ""),
         findings=len(findings),
         patterns=tuple(f.pattern_id for f in findings[:MAX_PATTERNS]),
         top_pattern=top,
@@ -187,7 +193,9 @@ def event_from_review(*, fp: str, is_attack: bool, reviewer: str = "",
                       level: str = "", score: float = 0.0, top_pattern: str = "",
                       patterns: tuple[str, ...] = (),
                       note: str = "", memory_absorbed: bool = False,
-                      source: str = "review") -> AuditEvent:
+                      source: str = "review", context_fingerprint: str = "",
+                      semantic_context_used: bool = False,
+                      semantic_execution: SemanticExecution | None = None) -> AuditEvent:
     """人工复核结论 -> 统一 AuditEvent。
 
     为什么复核记录里**也没有原文**：审计层一旦存了原文，它就变成业务数据的副本，
@@ -219,6 +227,10 @@ def event_from_review(*, fp: str, is_attack: bool, reviewer: str = "",
             "memory_absorbed": bool(memory_absorbed),
             "linked_level": level,
             "top_pattern": top_pattern,
+            "context_fingerprint": context_fingerprint,
+            "semantic_context_used": bool(semantic_context_used),
+            "semantic_execution": (semantic_execution.to_dict()
+                                   if isinstance(semantic_execution, SemanticExecution) else None),
         },
     )
 
@@ -319,6 +331,9 @@ def event_from_proxy(result, *, decision: str = "allow", path: str = "",
                                   if isinstance(getattr(result, "semantic_coverage", None), TextCoverage)
                                   else None),
             "semantic_ok": getattr(result, "semantic_ok", None),
+            "semantic_execution": (result.semantic_execution.to_dict()
+                                   if isinstance(getattr(result, "semantic_execution", None), SemanticExecution)
+                                   else None),
             # 出站密钥扫描命中的类别与计数：**只落类别，不落原文**。
             # 密钥的脱敏形态（首尾几个字符）只出现在给客户端的告警体里，不进审计文件。
             "secret_kinds": dict(secret_kinds or {}),

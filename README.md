@@ -165,6 +165,10 @@ python -m prompt_ids.api --port 8790 --api-key "$PROMPT_IDS_API_KEY"
 主要路由：`/v1/scan`、`/v1/scan/batch`、`/v1/scan/output`、`/v1/rules`、
 `/v1/canary/*`、`/v1/memory/*`、`/v1/review*`、`/v1/metrics`、`/v1/events`。
 
+需要结合 RAG 任务检测时，由可信应用显式传入 `ScanContext`；REST 须开启 `--allow-context`。
+检测与人工复核共用任务指纹，特定任务下的复核结论不会写入通用记忆。
+上下文能力仍为可选，现有评测尚未证明整体检测收益，接入方法见 [任务上下文](docs/operations.md#为-rag-文档提供可信任务上下文)。
+
 ### Transparent Proxy
 
 ```bash
@@ -190,12 +194,18 @@ python -m prompt_ids.cli --semantic --semantic-backend local --semantic-mode alw
 python -m prompt_ids.cli --policy strict "..."
 ```
 
+支持 `--context-file task.json` 单独读取可信任务（`user_task` / `source_role`），与文档正文分开。
+JSON 结果的 `semantic_execution` 会解释语义层为何跳过或弃票；`semantic_context_used` 表明任务是否用于有效判决。
+
 ### Dashboard / Playground
 
 ```bash
 python -m prompt_ids.web              # 生成 reports/dashboard.html
 python -m prompt_ids.web --serve      # 起检测台，默认 8765
 ```
+
+检测台可切换中英文，显示语义执行状态、具体失败原因、HTTP 状态和任务使用情况。
+复核队列展示文本与任务指纹；含任务的记录需经 API 携带原上下文复核。
 
 ## Security Design
 

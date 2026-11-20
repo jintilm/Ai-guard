@@ -88,11 +88,11 @@ class Guard:
     def scan(self, text: str, user: str = "default", *, context: ScanContext | None = None) -> ScanResult:
         return self.pipeline.scan(text, user=user, context=context)
 
-    def score(self, text: str) -> float:
-        return self.pipeline.scan(text).score
+    def score(self, text: str, *, context: ScanContext | None = None) -> float:
+        return self.pipeline.scan(text, context=context).score
 
-    def is_safe(self, text: str) -> bool:
-        return not self.pipeline.scan(text).is_blocked
+    def is_safe(self, text: str, *, context: ScanContext | None = None) -> bool:
+        return not self.pipeline.scan(text, context=context).is_blocked
 
     def reload_rules(self) -> bool:
         return self.pipeline.reload_rules()

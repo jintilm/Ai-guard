@@ -58,6 +58,25 @@
 覆盖信息也出现在审计事件的 `extra` 与代理分段轨迹中，不含原文。
 配置见 [长文本取样](operations.md#llm-长文本分窗取样)。
 
+`semantic_execution` 解释语义层本次为何执行或未执行。例如网关拒绝请求时返回：
+
+```json
+{"status": "abstained", "reason": "http_error", "http_status": 406}
+```
+
+| `status` | 含义 | 常见 `reason` |
+|---|---|---|
+| `disabled` | 配置未启用 | `not_enabled` |
+| `skipped` | 本次没有取得后端预测 | `caller_disabled`、`short_circuit`、`gate`、`budget_exhausted`、`backend_unavailable`、`rate_limited`、`input_rejected`、`empty_input` |
+| `succeeded` | 取得有效语义判决 | `verdict` |
+| `abstained` | 尝试预测但没有有效判决，融合层弃票 | `timeout`、`http_error`、`invalid_response`、`overloaded`、`cancelled`、`unsupported_context`、`request_override`、`backend_error` |
+
+完整枚举见 `/v1/openapi.json`。HTTP 状态之外不附带网关响应正文或错误原文。
+`semantic_execution=null` 表示旧结果或自定义检测器没有此元数据；不能推断成功。
+最终结果缓存命中时，状态描述缓存中判决的生成过程，本次没有重新调用后端，需结合 `cached` 阅读。
+调用失败、后端不可用或预算耗尽的降级结果不进入最终缓存，恢复后同一文本会重新检测。
+状态同步出现在 CLI、检测台、审计、SSE 和代理分段轨迹中；它不改变最终 `action` 的含义。
+
 ### `POST /v1/scan`
 
 请求：
@@ -148,8 +167,13 @@
 服务默认拒绝 `context` 字段（`400 context_disabled`）。仅供可信应用接入时开启：
 
 ```bash
-python -m prompt_ids.api --semantic --semantic-mode always --allow-context --api-key "$API_KEY"
+python -m prompt_ids.api --semantic --semantic-backend llm --semantic-mode always --semantic-timeout 45 --no-short-circuit --allow-context --api-key "$API_KEY"
 ```
+
+该示例使用已配置的 LLM 裁判，显式关闭规则短路以便逐条尝试语义判决，会增加耗时和模型调用。
+高危规则的下限分继续保留。默认预筛、短路与上下文开关均未改变。
+`/v1/metrics.context` 可查看 `accepted`（接口允许上下文）、`backend_supported`（后端协议支持）、
+最大任务长度和来源角色；是否实际用于这条检测仍以结果为准。
 
 请求示例（格式示例，响应取决于后端）：
 
@@ -171,7 +195,8 @@ python -m prompt_ids.api --semantic --semantic-mode always --allow-context --api
 结果新增 `context_fingerprint` 和 `semantic_context_used`。后者为 true 才表示取得了使用上下文的
 有效判决；语义关闭、后端不支持、短路或调用失败均不能视作已使用上下文。
 规则与融合判定继续生效，启用上下文不会自动消除规则阻断。
-审计不记录任务原文，只保存指纹与是否实际使用；详见 [SDK 配置](operations.md#为-rag-文档提供可信任务上下文)。
+审计不记录任务原文，只保存指纹与是否实际使用；`semantic_execution.reason` 给出未执行或失败原因。
+详见 [SDK 和 CLI 配置](operations.md#为-rag-文档提供可信任务上下文)。
 
 ### `POST /v1/scan/output`
 
@@ -302,21 +327,30 @@ python -m prompt_ids.api --semantic --semantic-mode always --allow-context --api
 
 ```json
 {
-  "fingerprint": "183521d279a5",
   "text": "<原文，这里才提供>",
-  "label": false,
-  "note": "正常业务请求",
-  "action": ""
+  "is_attack": false,
+  "reviewer": "operator",
+  "note": "正常业务请求"
 }
 ```
 
-⚠ **`action` 留空** —— 人工结论填进 `action` 会污染 `by_action` 聚合。
-⚠ **复核后样本必须从队列消失** —— 留在队列里等于一条永远清不掉的工单。
+`is_attack` 必须是 JSON 布尔值。响应的 `verdict` 是人工结论，`level` / `score` / `action`
+是当前检测结果，两者分开解释；复核审计事件的 `action` 留空，避免污染检测动作统计。
+
+如原检测携带任务上下文，复核时也需传相同的 `context` 对象，且服务须开启 `--allow-context`。
+复核队列按 **文本指纹 + 任务指纹** 关联，任务 A 的结论只消除任务 A 的待办；
+无上下文的历史记录按空任务指纹处理。新扫描事件与复核响应共用归一化后的文本指纹。
+审计没有原文和任务内容，调用方负责保存并在复核时提供；备注中也不应粘贴这些内容。
+
+带上下文的复核返回 `memory_absorbed=false`、`memory_reason="context_not_stored"`，
+并跳过当前没有任务维度的复核语料，返回 `corpus.skip_reason="context_not_stored"`。
+这样一个任务下的误报标签不会影响其他任务。人工结论仍落审计，应用可按两种指纹保存完整复核记录。
 
 ### `GET /v1/review/patterns`
 
 规则级嫌疑榜（`ledger` 按规则计数、`suspects` 排嫌疑）。
-⚠ **台账按指纹去重** —— 否则同一篇文档复核 5 次能刷出 100% 误报率。
+台账按规则、文本指纹、任务指纹去重；同一任务下重复复核不增加样本数。
+这里的误报比例只针对已人工复核的样本，不能当作生产流量误报率。
 
 ## 观测
 

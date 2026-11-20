@@ -447,6 +447,7 @@ class LLMBackend(SemanticBackend):
     def _try_endpoint(self, ep: Endpoint, text: str) -> tuple[str, str, str]:
         """试一个端点，返回 (content, finish_reason, error)；error 为空表示成功。"""
         last_error = ""
+        self._tls.failure = ("backend_error", None)
         for attempt in range(self.max_retries + 1):
             for use_json in self._json_attempts(ep):
                 remaining = remaining_timeout()
@@ -465,12 +466,15 @@ class LLMBackend(SemanticBackend):
                 except PredictionTimeout:
                     raise
                 except urllib.error.HTTPError as exc:
+                    self._tls.failure = ("http_error", exc.code)
                     last_error = self._http_error_summary(exc)
                     if use_json and exc.code in _JSON_MODE_COMPLAINT:
                         continue  # 该网关不认 response_format，去掉重试
                     if exc.code in _FATAL_HTTP:
                         return "", "", last_error
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    self._tls.failure = ("timeout" if isinstance(getattr(exc, "reason", exc), TimeoutError)
+                                         else "backend_error", None)
                     # Windows socket timeouts can fire before monotonic() reports the
                     # same boundary. A timeout granted all remaining budget exhausts
                     # the request even if the clock still shows a fraction of a tick.
@@ -478,6 +482,7 @@ class LLMBackend(SemanticBackend):
                         raise PredictionTimeout("LLM 请求已耗尽剩余时间预算") from exc
                     last_error = str(exc)[:120]
                 except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+                    self._tls.failure = ("invalid_response", None)
                     last_error = f"响应结构异常：{exc}"[:120]
             if attempt < self.max_retries:
                 time.sleep(remaining_timeout(0.4 * (2**attempt)))
@@ -523,7 +528,8 @@ class LLMBackend(SemanticBackend):
         if not isinstance(context, ScanContext):
             raise TypeError("context must be a ScanContext")
         if "messages" in self.extra_body or "system" in self.extra_body:
-            return Prediction(0.0, "请求体覆盖与任务上下文不兼容，已弃票", self.name, ok=False)
+            return Prediction(0.0, "请求体覆盖与任务上下文不兼容，已弃票", self.name, ok=False,
+                              failure_code="request_override")
         token = _JUDGE_CONTEXT.set(context)
         try:
             return self.predict(text)
@@ -532,10 +538,12 @@ class LLMBackend(SemanticBackend):
 
     def predict(self, text: str) -> Prediction:
         self.last_parsed = False
+        self._tls.failure = ("backend_error", None)
         if not text.strip():
-            return Prediction(0.0, "空文本", self.name, ok=False)
+            return Prediction(0.0, "空文本", self.name, ok=False, failure_code="empty_input")
         if not self.is_available():
-            return Prediction(0.0, self.unavailable_reason(), self.name, ok=False)
+            return Prediction(0.0, self.unavailable_reason(), self.name, ok=False,
+                              failure_code="backend_unavailable")
 
         started = time.perf_counter()
         selection = self._select_input(text)
@@ -554,7 +562,8 @@ class LLMBackend(SemanticBackend):
         except PredictionTimeout:
             self.last_parsed = False
             return Prediction(0.0, "LLM 裁判调用失败：总时间预算已耗尽", self.name,
-                              (time.perf_counter() - started) * 1000, ok=False, coverage=coverage)
+                              (time.perf_counter() - started) * 1000, ok=False, coverage=coverage,
+                              failure_code="timeout")
 
     def _predict_with_budget(self, text: str, started: float) -> Prediction:
         problems: list[str] = []
@@ -568,6 +577,7 @@ class LLMBackend(SemanticBackend):
                 continue
             probability, rationale, parsed = self._parse_verdict(content, finish)
             if not parsed:
+                self._tls.failure = ("invalid_response", None)
                 problems.append(f"{ep.label}: {rationale}")
                 continue
             self.last_parsed = True
@@ -576,8 +586,10 @@ class LLMBackend(SemanticBackend):
 
         self.last_parsed = False
         elapsed = (time.perf_counter() - started) * 1000
+        code, http_status = self._tls.failure
         return Prediction(
-            0.0, "LLM 裁判调用失败：" + "；".join(problems)[:220], self.name, elapsed, ok=False
+            0.0, "LLM 裁判调用失败：" + "；".join(problems)[:220], self.name, elapsed, ok=False,
+            failure_code=code, http_status=http_status
         )
 
     def info(self) -> dict[str, Any]:

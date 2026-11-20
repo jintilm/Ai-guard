@@ -177,6 +177,11 @@ python -m prompt_ids.api --port 8790 --api-key "$PROMPT_IDS_API_KEY"
 Key routes include `/v1/scan`, `/v1/scan/batch`, `/v1/scan/output`, `/v1/rules`,
 `/v1/canary/*`, `/v1/memory/*`, `/v1/review*`, `/v1/metrics`, and `/v1/events`.
 
+For RAG tasks, trusted application code can supply an explicit `ScanContext`; REST requires
+`--allow-context`. Scans and human reviews share the task fingerprint, and task-specific labels
+are kept out of general memory. Context remains optional: current evaluations have not established
+an overall detection benefit. See [task context setup](docs/operations.md#为-rag-文档提供可信任务上下文).
+
 ### Transparent Proxy
 
 ```bash
@@ -203,12 +208,20 @@ python -m prompt_ids.cli --semantic --semantic-backend local --semantic-mode alw
 python -m prompt_ids.cli --policy strict "..."
 ```
 
+Use `--context-file task.json` to read a trusted task (`user_task` / `source_role`) separately
+from the document. JSON results include `semantic_execution` to explain skipped or failed calls,
+and `semantic_context_used` to confirm whether a valid verdict used the task.
+
 ### Dashboard / Playground
 
 ```bash
 python -m prompt_ids.web              # generate reports/dashboard.html
 python -m prompt_ids.web --serve      # start the playground on 8765
 ```
+
+The playground switches between English and Chinese and displays semantic execution states,
+failure reasons, HTTP status, and context usage. Review queues show both document and task
+fingerprints; submit reviews for contextual scans through the API with their original context.
 
 ## Security Design
 

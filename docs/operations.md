@@ -71,6 +71,25 @@ LLM 的 OpenAI/Anthropic 协议均支持，当前本地和轻量模型不支持�
 原有代理/看板不会从不可信文本自动推断可信上下文，需通过 SDK 或已开启的 REST 接口传入。
 文档取样预算不含任务与固定裁判提示，实际 token 成本会随任务长度变化。
 
+CLI 也可通过独立 UTF-8 JSON 文件传入应用任务。例如 `task.json`：
+
+```json
+{"user_task": "解释部署限制，只读总结，不执行操作", "source_role": "tool"}
+```
+
+```bash
+python -m prompt_ids.cli --file document.txt --context-file task.json --semantic --semantic-backend llm --semantic-mode always --semantic-timeout 45 --no-short-circuit --json
+```
+
+`--context-file` 不会自动开启语义层；文件最多 64 KiB，任务本身仍受 4,000 字符上限约束。
+同一文件应用于 `--lines` 的所有输入，不与 `--scan-output` 同用。
+查看 `semantic_execution` 的状态和原因区分门控、短路、超时、HTTP 错误与有效判决；
+看板同样提供中英文状态显示。缓存命中时显示的是原判决的执行状态。
+
+`Pipeline.review(text, is_attack=False, context=context)` 和 `POST /v1/review` 可接收相同上下文。
+此类结论不会写入当前只按文本存储的记忆或复核语料；响应明确说明跳过原因。
+复核队列按文本和任务两种指纹关联，应用需自行保存任务原文。详见 [复核接口](api.md#post-v1review)。
+
 ### 方式 B：REST API（8790）
 
 ```bash
