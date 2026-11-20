@@ -226,11 +226,45 @@ curl -s localhost:8790/v1/metrics | jq
 | `semantic.info.degraded` | `true` ⇒ L3 实际未生效 |
 | `cache.scope` | `process` ⇒ 多实例部署时命中率**不可比** |
 | `guard.cache` / `guard.rate_limited` | 缓存与限流状态 |
+| `semantic.info.in_flight` / `running` / `queued` | 占用的预测槽位、正在执行的任务、等待执行或清理的任务 |
+| `semantic.info.capacity` | 预测槽位上限，默认 8（4 个工作线程 + 4 个等待位置） |
+| `semantic.info.overloaded` | 容量已满而直接弃票的调用数，计入 `abstained` |
+| `semantic.info.cancelled` | 已取消的等待任务数，包括超时和关闭时的取消 |
 
 ⚠ **`is_available()` 只看 Key 配没配，不看网关通不通**。所以配了 Key
 但网关挂着时，`auto` 照样选它，于是每次调用都失败并**按弃票处理**
 ⇒ **L3 静默失效，分数看起来仍然正常**（只是悄悄退回规则层）。
 所以 `degraded` 必须配告警 —— 这是唯一能看见它的信号。
+
+### 语义层负载与超时保护
+
+默认最多占用 8 个预测槽位。容量满时本次 L3 返回 `ok=False`，按既有规则弃票，
+由已执行的检测层继续决定结果。这个机制限制后台工作量，不能把弃票理解为“文本安全”。
+未拿到 L3 判决的扫描结果不会进入最终结果缓存，恢复后相同文本会重新调用 L3。
+`max_workers` 与 `max_pending` 可通过 `SemanticDetector` 的 SDK 参数配置；
+`max_pending=0` 表示线程池不留等待位置。
+较小的队列会更早弃票；较大的队列可以吸收短突发，但会增加排队时间和资源占用。
+
+`timeout_s` 包括排队时间。LLM 的 HTTP 重试、JSON 模式回退、备用提供商和退避等待
+共用同一截止时间；SDK 直接调用 `LLMBackend.predict()` 时，总预算使用
+`default_timeout_s`。检测器设置了预算时，后端沿用该预算，单次 HTTP 操作仍受
+后端自己的超时上限约束。
+
+超时的排队任务不会再调用后端，但占位会保留到工作线程清理它，防止连续超时把
+线程池内部队列再次撑大。已经开始的 Python 推理或 HTTP 操作无法保证立即中断，
+会继续占用槽位直到返回，过期结果不参与融合。关闭检测器会取消等待任务，并在
+已运行任务结束后释放后端资源；关闭后的检测器不能再次使用。
+
+可复跑的合成负载测量：
+
+```bash
+python -X utf8 scripts/semantic_load_check.py --out reports/semantic_load_after.json
+```
+
+2026-11-20 的 [增强前](../reports/semantic_load_before.json) / [增强后](../reports/semantic_load_after.json)
+记录：16 个并发请求、4 个工作线程、50ms 请求预算、250ms 模拟后端耗时。
+超时后额外启动的后端调用从 12 次降到 0 次；60ms 的模拟 LLM 重试预算从
+约 3125ms 收敛到约 60ms。此测量使用本地替身，不代表真实厂商延迟或攻击检出率。
 
 ## 六、审计日志
 

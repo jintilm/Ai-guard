@@ -1,0 +1,46 @@
+{
+  "generated_at": "2026-11-20T08:27:39.103012+00:00",
+  "method": "Synthetic backend and HTTP substitutes; no external requests.",
+  "burst": {
+    "requests": 16,
+    "workers": 4,
+    "timeout_s": 0.05,
+    "backend_delay_s": 0.25,
+    "backend_calls_at_return": 4,
+    "backend_calls_after_drain": 4,
+    "late_backend_calls": 0,
+    "successful_predictions": 0,
+    "max_client_ms": 55.196,
+    "drain_total_ms": 256.228,
+    "stats_at_return": {
+      "backend": "synthetic_slow",
+      "model": "synthetic_slow",
+      "mode": "always",
+      "available": true,
+      "timeout_s": 0.05,
+      "calls": 16,
+      "timeouts": 8,
+      "errors": 0,
+      "abstained": 16,
+      "overloaded": 8,
+      "cancelled": 4,
+      "in_flight": 8,
+      "running": 4,
+      "queued": 4,
+      "capacity": 8,
+      "max_workers": 4,
+      "max_pending": 4,
+      "closed": false,
+      "failed_share": 1.0,
+      "degraded": true,
+      "avg_latency_ms": 27.5,
+      "last_error": "语义后端超时（>0.05s）"
+    }
+  },
+  "retry_budget": {
+    "budget_s": 0.06,
+    "attempts": 1,
+    "elapsed_ms": 60.285,
+    "ok": false
+  }
+}

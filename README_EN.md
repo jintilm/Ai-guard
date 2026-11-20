@@ -212,6 +212,9 @@ python -m prompt_ids.web --serve      # start the playground on 8765
 - Truncation, sampling, degradation, and rate limiting are all recorded in the audit trail.
 - Streaming responses can only warn after the fact; audit records `outbound=warned`, not “handled”.
 - Rule regexes are protected against ReDoS with structural tests.
+- Semantic work has bounded admission and queueing. Expired queued work is cancelled;
+  LLM retries and fallbacks share one time budget. `/v1/metrics` exposes overload,
+  cancellation, and queue counts. See the [load protection measurements](docs/operations.md#语义层负载与超时保护) (Chinese).
 
 ## Installation
 

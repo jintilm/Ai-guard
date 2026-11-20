@@ -7,12 +7,19 @@ from __future__ import annotations
 
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from typing import Any
 
 from prompt_ids.core.types import DETECTOR_SEMANTIC, Finding
 from prompt_ids.detectors.base import Detector, DetectorContext
-from prompt_ids.detectors.semantic.base import NullBackend, Prediction, SemanticBackend
+from prompt_ids.detectors.semantic.base import (
+    NullBackend,
+    Prediction,
+    SemanticBackend,
+    current_deadline,
+    prediction_deadline,
+    remaining_timeout,
+)
 from prompt_ids.detectors.semantic.factory import build_backend
 
 # fallback: 只在初判不确定的区间调用，省成本
@@ -28,6 +35,10 @@ _EVIDENCE_LEN = 120
 #: reliability 账用的是同一个阈值 —— 之前脚本里写死 0.20、运行时压根没有这个判断，
 #: 于是「离线会把超时组标成不可用、线上却一切正常」这类不一致无从发现。
 DEGRADED_CALL_FAIL_SHARE = 0.20
+
+
+class SemanticOverloaded(RuntimeError):
+    """All running and queued prediction slots are occupied."""
 
 
 def _coerce(raw: Any, backend_name: str) -> Prediction:
@@ -52,10 +63,17 @@ class SemanticDetector(Detector):
         timeout_s: float | None = None,
         backend_kwargs: dict[str, Any] | None = None,
         max_workers: int = 4,
+        max_pending: int | None = None,
     ):
         super().__init__(enabled=enabled)
         if mode not in MODES:
             raise ValueError(f"未知语义层模式 {mode}，可选：{MODES}")
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int) or max_workers < 1:
+            raise ValueError("max_workers 必须是正整数")
+        if max_pending is None:
+            max_pending = max_workers
+        if isinstance(max_pending, bool) or not isinstance(max_pending, int) or max_pending < 0:
+            raise ValueError("max_pending 必须是非负整数")
         self.mode = mode
         self.model_name = model_name
         self.backend: SemanticBackend = self._resolve_backend(
@@ -78,6 +96,16 @@ class SemanticDetector(Detector):
         self._executor: ThreadPoolExecutor | None = None
         self._executor_lock = threading.Lock()
         self._max_workers = max_workers
+        # scripts/semantic_load_check.py: 16 个请求超时后旧队列仍额外执行 12 次后端调用。
+        self._max_pending = max_pending
+        self._capacity = max_workers + max_pending
+        self._work_lock = threading.Lock()
+        self._in_flight = 0
+        self._running = 0
+        self._closed = False
+        self._backend_closed = False
+        self.overloaded = 0
+        self.cancelled = 0
 
     @property
     def last_prediction(self) -> Prediction | None:
@@ -115,22 +143,49 @@ class SemanticDetector(Detector):
             self.backend.warmup()
 
     def close(self) -> None:
-        self.backend.close()
-        if self._executor is not None:
-            self._executor.shutdown(wait=False)
+        with self._executor_lock:
+            with self._work_lock:
+                self._closed = True
+            executor = self._executor
             self._executor = None
+        if executor is not None:
+            executor.shutdown(wait=False, cancel_futures=True)
+        self._close_if_idle()
+
+    def _close_if_idle(self) -> None:
+        with self._work_lock:
+            if not self._closed or self._in_flight or self._backend_closed:
+                return
+            self._backend_closed = True
+        try:
+            self.backend.close()
+        except Exception as exc:  # noqa: BLE001 - shutdown must also be safe from a worker callback
+            with self._work_lock:
+                self.last_error = f"语义后端关闭失败：{type(exc).__name__}"
+
+    def _completed(self, future=None, state=None) -> None:
+        with self._work_lock:
+            self._in_flight -= 1
+            if future is not None and future.cancelled() and not state["cancelled"]:
+                self.cancelled += 1
+        self._close_if_idle()
 
     # ---------- 预测（对外入口，带超时与异常兜底） ----------
     def predict(self, text: str) -> Prediction:
         started = time.perf_counter()
+        failure = ""
         try:
             raw = self._submit(lambda: self.predict_impl(text))
             prediction = _coerce(raw, self.backend.name)
+        except SemanticOverloaded:
+            failure = "overloaded"
+            prediction = Prediction(0.0, "语义层过载，已弃票", self.backend.name, ok=False)
+        except CancelledError:
+            prediction = Prediction(0.0, "语义任务已取消，已弃票", self.backend.name, ok=False)
         except TimeoutError:
-            self.timeouts += 1
-            self.last_error = f"语义后端超时（>{self.timeout_s}s）"
+            failure = "timeout"
             prediction = Prediction(
-                0.0, self.last_error, self.backend.name, self.timeout_s * 1000, ok=False
+                0.0, f"语义后端超时（>{self.timeout_s}s）", self.backend.name, ok=False
             )
         # 说明（抑制见下一行行尾的 noqa）：21 家提供商 + 自定义端点抛的异常类型各不相同
         # （urllib / HTTPError / JSONDecodeError / KeyError…），
@@ -138,10 +193,9 @@ class SemanticDetector(Detector):
         # contribution() 返回 None。漏掉任何一类都会让后端故障
         # 变成整条扫描抛异常。
         except Exception as exc:  # noqa: BLE001
-            self.errors += 1
-            self.last_error = str(exc)[:200]
+            failure = "error"
             prediction = Prediction(
-                0.0, f"语义后端异常：{self.last_error}", self.backend.name, ok=False
+                0.0, f"语义后端异常：{str(exc)[:200]}", self.backend.name, ok=False
             )
 
         prediction = prediction.clamp()
@@ -153,13 +207,17 @@ class SemanticDetector(Detector):
                 (time.perf_counter() - started) * 1000,
                 prediction.ok,
             )
-        self.calls += 1
         # 弃权计数：ok=False 意味着这一层从融合里退出（不贡献分数），
         # 连续大量弃权 = L3 实际上没在工作，必须能被 metrics 看见。
-        if not prediction.ok:
-            self.abstained += 1
-            self.last_error = prediction.rationale[:200]
-        self.total_latency_ms += prediction.latency_ms
+        with self._work_lock:
+            self.calls += 1
+            self.timeouts += int(failure == "timeout")
+            self.errors += int(failure == "error")
+            self.overloaded += int(failure == "overloaded")
+            if not prediction.ok:
+                self.abstained += 1
+                self.last_error = prediction.rationale[:200]
+            self.total_latency_ms += prediction.latency_ms
         self.last_prediction = prediction
         return prediction
 
@@ -168,19 +226,67 @@ class SemanticDetector(Detector):
         return self.backend.predict(text)
 
     def _submit(self, task):
-        if not self.timeout_s or self.timeout_s <= 0:
-            return task()
-        if self._executor is None:
-            # 懒初始化必须加锁：否则并发首访会各建一个池，其中一个泄漏。
-            # max_workers 原来是 1：所有请求的 L3 调用排成一条队，而
-            # `.result(timeout=…)` 超时**不取消已提交的任务** ——
-            # 一个慢网关调用（实测 p90 ≈ 40s）会把后面所有请求一起堵住，
-            # 代理的并发在这里等于 1。给一个小的有界池（默认 4）。
+        deadline = time.monotonic() + self.timeout_s if self.timeout_s and self.timeout_s > 0 else None
+        parent = current_deadline()
+        if parent is not None:
+            deadline = parent if deadline is None else min(parent, deadline)
+        with self._work_lock:
+            if self._closed:
+                raise RuntimeError("语义检测器已关闭")
+            if self._in_flight >= self._capacity:
+                raise SemanticOverloaded()
+            self._in_flight += 1
+        state = {"started": False, "cancelled": False}
+
+        def execute():
+            with self._work_lock:
+                if state["cancelled"] or self._closed:
+                    if not state["cancelled"]:
+                        state["cancelled"] = True
+                        self.cancelled += 1
+                    raise CancelledError()
+                state["started"] = True
+                self._running += 1
+            try:
+                with prediction_deadline(deadline):
+                    remaining_timeout()
+                    value = task()
+                    remaining_timeout()
+                    return value
+            finally:
+                with self._work_lock:
+                    self._running -= 1
+
+        if deadline is None:
+            try:
+                return execute()
+            finally:
+                self._completed()
+        future = None
+        try:
             with self._executor_lock:
+                with self._work_lock:
+                    if self._closed:
+                        raise RuntimeError("语义检测器已关闭")
                 if self._executor is None:
                     self._executor = ThreadPoolExecutor(
                         max_workers=self._max_workers, thread_name_prefix="semantic")
-        return self._executor.submit(task).result(timeout=self.timeout_s)
+                future = self._executor.submit(execute)
+            future.add_done_callback(lambda completed: self._completed(completed, state))
+        except BaseException:
+            if future is None:
+                self._completed()
+            raise
+        try:
+            return future.result(timeout=max(0.0, deadline - time.monotonic()))
+        except TimeoutError:
+            # Future.cancel() leaves its work item in the executor queue. Keep the slot
+            # until the worker drains it, so repeated timeouts cannot grow that queue.
+            with self._work_lock:
+                if not state["started"] and not state["cancelled"]:
+                    state["cancelled"] = True
+                    self.cancelled += 1
+            raise
 
     # ---------- Detector 接口 ----------
     def detect(self, ctx: DetectorContext) -> list[Finding]:
@@ -242,27 +348,29 @@ class SemanticDetector(Detector):
         return 20.0 <= preliminary_score <= 70.0
 
     def stats(self) -> dict[str, Any]:
-        return {
+        info = {
             "backend": self.backend.name,
             "model": self.effective_model_name,
             "mode": self.mode,
             "available": self.backend.is_available(),
             "timeout_s": self.timeout_s,
-            "calls": self.calls,
-            "timeouts": self.timeouts,
-            "errors": self.errors,
             # 弃权计数。**后端自己返回 ok=False 时 timeouts/errors 都是 0** ——
             # 而「网关 401/503」「推理模型 content 为空」这些恰恰走这条路。
             # 缺了它，一次死网关就是 L3 彻底静默失效：每次调用都弃票，
             # 分数回到只有规则层，看板上一切正常（`ablation.json` 那次
             # 87.2% 超时把召回压到 0.33 的教训，同一个坑在运行时也会踩）。
-            "abstained": self.abstained,
-            "failed_share": (
-                round(self.abstained / self.calls, 4) if self.calls else 0.0
-            ),
-            "degraded": (
-                self.calls > 0 and self.abstained / self.calls > DEGRADED_CALL_FAIL_SHARE
-            ),
-            "avg_latency_ms": round(self.total_latency_ms / self.calls, 2) if self.calls else 0.0,
-            "last_error": self.last_error,
         }
+        with self._work_lock:
+            info.update({
+                "calls": self.calls, "timeouts": self.timeouts, "errors": self.errors,
+                "abstained": self.abstained, "overloaded": self.overloaded,
+                "cancelled": self.cancelled, "in_flight": self._in_flight,
+                "running": self._running, "queued": self._in_flight - self._running,
+                "capacity": self._capacity, "max_workers": self._max_workers,
+                "max_pending": self._max_pending, "closed": self._closed,
+                "failed_share": round(self.abstained / self.calls, 4) if self.calls else 0.0,
+                "degraded": self.calls > 0 and self.abstained / self.calls > DEGRADED_CALL_FAIL_SHARE,
+                "avg_latency_ms": round(self.total_latency_ms / self.calls, 2) if self.calls else 0.0,
+                "last_error": self.last_error,
+            })
+        return info

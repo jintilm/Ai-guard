@@ -7,8 +7,43 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any
+
+_DEADLINE: ContextVar[float | None] = ContextVar("semantic_deadline", default=None)
+
+
+class PredictionTimeout(TimeoutError):
+    """The complete prediction budget, including retries and queueing, has expired."""
+
+
+def current_deadline() -> float | None:
+    return _DEADLINE.get()
+
+
+@contextmanager
+def prediction_deadline(deadline: float | None):
+    parent = current_deadline()
+    if parent is not None:
+        deadline = parent if deadline is None else min(parent, deadline)
+    token = _DEADLINE.set(deadline)
+    try:
+        yield
+    finally:
+        _DEADLINE.reset(token)
+
+
+def remaining_timeout(maximum: float | None = None) -> float | None:
+    deadline = current_deadline()
+    if deadline is None:
+        return maximum
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise PredictionTimeout("语义预测总时间预算已耗尽")
+    return min(maximum, remaining) if maximum and maximum > 0 else remaining
 
 
 @dataclass(frozen=True, slots=True)

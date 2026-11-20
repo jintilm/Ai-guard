@@ -39,7 +39,14 @@ import urllib.error
 import urllib.request
 from typing import Any, NamedTuple
 
-from prompt_ids.detectors.semantic.base import Prediction, SemanticBackend
+from prompt_ids.detectors.semantic.base import (
+    Prediction,
+    PredictionTimeout,
+    SemanticBackend,
+    current_deadline,
+    prediction_deadline,
+    remaining_timeout,
+)
 from prompt_ids.detectors.semantic.providers import (
     PROVIDERS,
     Provider,
@@ -382,9 +389,13 @@ class LLMBackend(SemanticBackend):
         last_error = ""
         for attempt in range(self.max_retries + 1):
             for use_json in self._json_attempts(ep):
+                timeout_s = remaining_timeout(self.default_timeout_s)
                 try:
-                    content, finish = self._request(ep, text, self.default_timeout_s, use_json)
+                    content, finish = self._request(ep, text, timeout_s, use_json)
+                    remaining_timeout()
                     return content, finish, ""
+                except PredictionTimeout:
+                    raise
                 except urllib.error.HTTPError as exc:
                     last_error = self._http_error_summary(exc)
                     if use_json and exc.code in _JSON_MODE_COMPLAINT:
@@ -396,7 +407,7 @@ class LLMBackend(SemanticBackend):
                 except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
                     last_error = f"响应结构异常：{exc}"[:120]
             if attempt < self.max_retries:
-                time.sleep(0.4 * (2**attempt))
+                time.sleep(remaining_timeout(0.4 * (2**attempt)))
         return "", "", last_error
 
     def _parse_verdict(
@@ -442,9 +453,24 @@ class LLMBackend(SemanticBackend):
             return Prediction(0.0, self.unavailable_reason(), self.name, ok=False)
 
         started = time.perf_counter()
+        # 调度器的预算包括排队；SDK 直接调用时使用后端默认总预算。
+        deadline = current_deadline()
+        if deadline is None and self.default_timeout_s > 0:
+            deadline = time.monotonic() + self.default_timeout_s
+        try:
+            with prediction_deadline(deadline):
+                return self._predict_with_budget(text, started)
+        except PredictionTimeout:
+            self.last_parsed = False
+            return Prediction(0.0, "LLM 裁判调用失败：总时间预算已耗尽", self.name,
+                              (time.perf_counter() - started) * 1000, ok=False)
+
+    def _predict_with_budget(self, text: str, started: float) -> Prediction:
         problems: list[str] = []
         for index, ep in enumerate(self.endpoints):
+            remaining_timeout()
             content, finish, error = self._try_endpoint(ep, text)
+            remaining_timeout()
             elapsed = (time.perf_counter() - started) * 1000
             if error:
                 problems.append(f"{ep.label}: {error}")

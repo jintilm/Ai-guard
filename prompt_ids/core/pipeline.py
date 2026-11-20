@@ -308,6 +308,7 @@ class Pipeline:
         elapsed_total = 0.0
 
         skipped: list[str] = []
+        cacheable = True
         cold_notes: list[str] = []
         cold_used_ms = 0.0
         detectors = [d for d in self.registry if d.enabled]
@@ -337,6 +338,11 @@ class Pipeline:
                     continue
             cold = detector.name not in self._warm
             layer_findings, used = detector.timed_detect(ctx)
+            if isinstance(detector, SemanticDetector):
+                prediction = detector.last_prediction
+                if prediction is not None and not prediction.ok:
+                    # 后端过载/超时是临时状态，不能让缓存把降级判定固化。
+                    cacheable = False
             result.latency_ms[detector.name] = used
             if cold:
                 # 首次执行含一次性初始化（模型加载 / 索引构建）。那不属于
@@ -415,7 +421,7 @@ class Pipeline:
                     source="pipeline", total=len(mem.store),
                 )
 
-        if self.config.enable_cache:
+        if self.config.enable_cache and cacheable:
             self.guard.cache.put(cache_key, result)
 
         # 遥测（默认 off，未启用时只是几次字典查表）。
