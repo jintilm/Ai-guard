@@ -49,8 +49,72 @@
 | `inserted_span` / `position` / `pair_id` | 原始文本中的插入区间和对应对照；坐标不是归一化后的模型坐标 |
 | `text_sha256` / `provenance` | 内容指纹、来源、许可、转换方式、复核状态 |
 
-当前生产检测器只接收文档文本，**尚未将 `context.user_task` 作为独立可信上下文传入裁判**。
-评测报告明确写出 `context_supplied_to_detector=false`，避免把有上下文标注等同于具备上下文判断能力。
+原始基线只接收文档文本，报告中的 `context_supplied_to_detector=false` 保留其历史口径。
+现在 SDK 的 `ScanContext` 和显式开启的 REST 接口可把应用任务单独传给 LLM；
+`--compare-context` 使用同一套规则和头部取样，比较 `text_only` / `task_context`。
+结果逐条记录 `semantic_context_used`，成功判决必须实际使用上下文才算接入有效。
+这是“任务＋来源＋引用判断提示”的整体协议对比，不能把收益单独归因于任务字段。
+
+SDK/REST 接入及信任边界见 [运维说明](operations.md#为-rag-文档提供可信任务上下文)。
+批量上下文评测示例：
+
+```bash
+python -X utf8 scripts/eval_rag_bench.py --mode llm --split dev --sample 120 --compare-context --max-llm-calls 240 --timeout 45 --out reports/rag_context_dev.json
+```
+
+### PV-C008 收窄测量
+
+`PV-C008` 原先允许“把”后跟任意短片段及“指令/提示”等名词，
+因此“把文档内容提升为助手指令”这种描述也会触发 critical 下限分。
+现在该分支还要求名词后出现明确的提取、输出、翻译或交付动作；
+前置提取动词分支保留。没有添加“引用内容一律放行”的例外，也没有改变融合下限分。
+
+[开发测量前](../reports/rag_rule_before.json) / [开发测量后](../reports/rag_rule_after.json)
+与 [冻结留出测量](../reports/rag_rule_holdout.json)记录如下：
+
+| 规则＋启发层 | 修复前 | 修复后 |
+|---|---:|---:|
+| RAG 开发攻击阻断 | 12/60 | 12/60 |
+| RAG 开发正常阻断 | 20/60 | 7/60 |
+| RAG 留出攻击阻断 | 20/226 | 20/226 |
+| RAG 留出正常阻断 | 102/269 | 24/269 |
+
+deepset 训练/留出、PINT 形状训练/留出的召回保持不变。
+正常样本的 `>=medium` 标记率仍为开发集 80%、留出集 84.01%；
+大量样本从阻断降为复核，所以这项修复减少的是错误阻断，不能宣称复核负担也已消失。
+规则设计只参考开发集；冻结后才读取留出测量，未据其结果回调规则。
+`re`/`regex` 在 2,354 条 PINT 训练文本和长文本档上逐条 finding 等价，
+见 [引擎证据](../reports/context_rule_engine_ab.json)；83 规则×10 类长输入的单规则匹配均低于 50ms。
+
+### 上下文裁判的冻结留出验证
+
+[120 条开发对比](../reports/rag_context_dev.json)在新规则、相同头部取样下，
+仅文档/上下文组分别阻断攻击 37/60、35/60，正常阻断 17/60、15/60；
+正常 `>=medium` 标记率为 43.33%、51.67%，review 动作为 9/60、13/60。
+失败分别为 8/120（全部 HTTP 406）和 16/120（406×15、其他后端失败×1）。
+两组共同取得判决的 104 条中，攻击召回同为 35/53，正常阻断为 15/51 对 14/51。
+完整样本的组宏召回差为 -0.0417，95% bootstrap 区间 [-0.125, 0]。
+错误阻断小幅减少伴随召回下降、复核增加和网关拒绝差异，不能据此宣称上下文协议更优。
+
+[48 条样本计划](../reports/rag_context_holdout_plan.json)在调用前固定：
+8 个留出母组各 6 条，中英文各 24 条，24 攻击/12 正常原文/12 引用对照。
+[结果](../reports/rag_context_holdout.json)比较同一套新规则、相同头部取样的两种裁判协议：
+
+| 指标 | 仅文档 | 可信任务＋文档 |
+|---|---:|---:|
+| 攻击阻断 | 16/24 = 66.67% | 16/24 = 66.67% |
+| 正常阻断 | 6/24 = 25.00% | 6/24 = 25.00% |
+| 正常进入 review | 4/24 = 16.67% | 5/24 = 20.83% |
+| 有效语义判决 | 48/48 | 48/48 |
+| 实际使用上下文的有效判决 | 0 | 48 |
+
+这批数据没有证明上下文协议改善最终召回或阻断误报；复核还多了一条。
+8 个母组上的召回差都为 0，bootstrap 差区间也为 [0, 0]，这只描述本次有限样本，
+不代表所有任务上两种协议等效。新能力保持显式可选，高危规则下限分继续生效。
+没有依据留出结果回改提示或规则。全量规则留出验证与这份 48 条 LLM 试跑的分母不同，
+不得将两表混用。
+两份真实模型报告记录的判决代码版本为 `b20d4dc`，之后仅补了不兼容上下文请求的
+`last_parsed` 状态清理，未改变提示或重新调用模型。每组均无缓存命中。
 
 ### 复现
 
@@ -212,10 +276,52 @@ normalization. This detects lexical overlap, not all semantic paraphrases.
 Glossary shortcode display text is retained so extraction does not drop nouns.
 
 Each row includes the user task, untrusted `tool` role, expected behavior, document identity,
-split, insertion coordinates, hashes and license. **The production detector currently receives
-only document text**; context defines labels but is not supplied as a separate trusted judge
-input. Reports record `context_supplied_to_detector=false`. Template review is AI-assisted;
-`human_reviewed=false` makes the absence of independent human review explicit.
+split, insertion coordinates, hashes and license. Original baselines receive only document
+text and retain `context_supplied_to_detector=false`. SDK `ScanContext` and an explicitly
+enabled REST input now supply the application task separately to the LLM. `--compare-context`
+compares `text_only` with `task_context` using the same rules and head sampling, recording
+actual use in `semantic_context_used`. Template review is AI-assisted; `human_reviewed=false`
+makes the absence of independent human review explicit.
+The comparison covers the combined task/source/quotation-aware judge protocol; it does
+not isolate the causal contribution of the task field alone.
+
+The narrowed `PV-C008` now requires an extraction/output/translation/handover action after
+the Chinese “把 … instruction/prompt” construction. Explicit extraction remains covered,
+with no blanket exemption for quoted attacks and no change to the critical-rule floor.
+Rules-only attack blocking stayed at 12/60 on development and 20/226 on the frozen RAG
+holdout; benign blocking fell from 20/60 to 7/60 and from 102/269 to 24/269 respectively.
+deepset and PINT-shaped training/holdout recall remained unchanged. Benign `>=medium`
+flagging stayed at 80% / 84.01%: many cases moved from blocking to review, so the review
+burden remains. See the [before](../reports/rag_rule_before.json),
+[after](../reports/rag_rule_after.json), and [holdout](../reports/rag_rule_holdout.json) reports.
+The rule was frozen before reading holdout outcomes. Re/regex finding equivalence and
+long-input checks passed. Context integration is opt-in through SDK `ScanContext` or
+REST `--allow-context`; only trusted application code may provide the task and source role.
+Unsupported backends abstain explicitly. Context-aware scans skip context-free memory
+retrieval/automatic learning; caches isolate task fingerprints, and audit records no task text.
+
+The [frozen context holdout plan](../reports/rag_context_holdout_plan.json) uses 48 cases:
+six from each of eight holdout groups, 24 per language, with 24 attacks/12 clean/12 quotation
+controls. The [comparison](../reports/rag_context_holdout.json), using identical updated
+rules and head sampling, blocked 16/24 attacks and 6/24 benign cases under both protocols.
+Review actions increased from 4/24 to 5/24 benign cases. Both groups obtained 48/48 valid
+verdicts, and all contextual verdicts confirmed actual context use. This sample does not
+demonstrate a final-decision improvement. The group-macro recall differences were all zero;
+the [0, 0] bootstrap difference interval describes these eight groups, not universal equivalence.
+Context remains opt-in and critical-rule floors remain active. No prompt/rule tuning followed
+holdout inspection. This LLM pilot and the full rules-only holdout have different denominators.
+
+The [120-case development comparison](../reports/rag_context_dev.json), using the same
+updated rules and head sampling, blocked 37/60 versus 35/60 attacks and 17/60 versus 15/60
+benign cases for text-only/contextual judging. Benign review actions increased from 9/60
+to 13/60. Missing verdicts rose from 8/120 (HTTP 406) to 16/120 (15 HTTP 406, one other
+backend failure). On 104 jointly valid cases, recall was 35/53 under both protocols and
+benign blocking was 15/51 versus 14/51. The full-sample group-macro recall difference was
+-0.0417 (95% bootstrap [-0.125, 0]). These mixed results and gateway rejection differences
+do not justify enabling context by default. Both model reports identify verdict code
+version `b20d4dc`; a later change only clears stale `last_parsed` status when an incompatible
+context request is rejected locally. No prompt changes or model reruns followed. No cache
+hits occurred in these comparisons.
 
 The default evaluator runs the actual L1/L2 pipeline and separately measures raw-document
 payload visibility. Explicit `--mode llm` compares `head` and `stratified` on the same sample,

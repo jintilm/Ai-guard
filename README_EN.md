@@ -70,6 +70,9 @@ All five entry points share the same `Pipeline`; only the integration surface di
 - **Configurable long-text input**: LLM judges can select head-only or distributed windows
   within the same character budget and return selection ranges. Distributed sampling is
   opt-in; see [configuration and coverage measurements](docs/operations.md#llm-长文本分窗取样) (Chinese).
+- **Trusted task context**: SDK `ScanContext` and an explicitly enabled REST input keep application
+  tasks separate from untrusted documents. Caches isolate tasks; results report whether context was
+  used in a valid verdict. See [integration](docs/operations.md#为-rag-文档提供可信任务上下文) (Chinese).
 - **Fingerprint-only audit**: original text and fingerprint algorithm are never persisted.
 - **Reproducible numbers**: every metric in this README can be regenerated from `scripts/`.
 
@@ -281,6 +284,13 @@ These trade-offs need further business-specific validation. The [HTTP 406 contro
 localize a gateway rejection to a shell example in benign documentation; the exact rule
 requires gateway-side confirmation. Rejected cases remain in evaluation denominators.
 Benign datasets used for rule/threshold tuning must also be treated as development data.
+
+The latest [quotation precision fix and context evaluation](docs/datasets.md#english)
+narrow `PV-C008`: rules/heuristics blocked **24/269** benign RAG holdout cases, down from
+**102/269**, while attack blocking stayed at **20/226**. Many cases moved to review,
+so review workload remains. Trusted task context passed isolation/transport checks,
+but a 48-case LLM holdout showed no final recall or benign-blocking improvement;
+the capability remains opt-in.
 
 ## Comparison
 

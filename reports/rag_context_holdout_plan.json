@@ -1,0 +1,106 @@
+{
+  "dataset_sha256": "953500c5972265cb20932604d6b640045bc607f751880dd5a716cffebe2c1795",
+  "split": "test",
+  "selection": {
+    "method": "balanced-language-label-v1",
+    "composition": {
+      "n": 48,
+      "groups": 8,
+      "ids_sha256": "c6b536bc67706a10bbe5166315240f8c2e688fd7b7ab32d70ced57bb47c94b4a",
+      "by_language": {
+        "en": 24,
+        "zh": 24
+      },
+      "by_kind": {
+        "attack": 24,
+        "clean": 12,
+        "quoted_attack": 12
+      },
+      "by_position": {
+        "boundary": 6,
+        "gap": 6,
+        "head": 6,
+        "middle": 6,
+        "none": 12,
+        "random": 6,
+        "tail": 6
+      },
+      "by_length": {
+        "3001-12000": 17,
+        "<=3000": 15,
+        ">12000": 16
+      },
+      "by_group": {
+        "cronjobs": 6,
+        "custom-resources": 6,
+        "logging": 6,
+        "network-policies": 6,
+        "rbac": 6,
+        "resources": 6,
+        "statefulsets": 6,
+        "storage-classes": 6
+      },
+      "by_language_kind": {
+        "en/attack": 12,
+        "en/clean": 6,
+        "en/quoted_attack": 6,
+        "zh/attack": 12,
+        "zh/clean": 6,
+        "zh/quoted_attack": 6
+      }
+    },
+    "population_note": "Balanced diagnostic quotas do not estimate corpus or production prevalence.",
+    "selected_ids": [
+      "network-policies:zh-cn:11393:attack:middle",
+      "logging:zh-cn:8524:attack:tail",
+      "rbac:zh-cn:6052:quoted_attack:head",
+      "statefulsets:zh-cn:15120:attack:random",
+      "rbac:en:3000:quoted_attack:middle",
+      "network-policies:zh-cn:3000:attack:tail",
+      "resources:en:12000:attack:boundary",
+      "storage-classes:zh-cn:12698:attack:boundary",
+      "statefulsets:zh-cn:15120:attack:boundary",
+      "cronjobs:zh-cn:7103:attack:gap",
+      "custom-resources:en:3000:attack:middle",
+      "network-policies:en:3000:attack:middle",
+      "resources:zh-cn:12000:attack:middle",
+      "resources:en:12000:attack:random",
+      "storage-classes:en:21572:attack:boundary",
+      "storage-classes:en:21572:attack:head",
+      "statefulsets:zh-cn:15120:quoted_attack:boundary",
+      "logging:en:12000:attack:random",
+      "resources:zh-cn:3000:attack:head",
+      "cronjobs:en:13341:quoted_attack:random",
+      "resources:en:3000:quoted_attack:head",
+      "statefulsets:en:25930:clean:none",
+      "rbac:en:12000:attack:head",
+      "rbac:zh-cn:3000:clean:none",
+      "rbac:zh-cn:3000:attack:head",
+      "logging:en:16193:attack:gap",
+      "custom-resources:zh-cn:11934:clean:none",
+      "cronjobs:zh-cn:3000:quoted_attack:tail",
+      "network-policies:en:3000:clean:none",
+      "network-policies:en:21417:attack:tail",
+      "cronjobs:zh-cn:3000:clean:none",
+      "logging:zh-cn:3000:quoted_attack:random",
+      "statefulsets:en:25930:quoted_attack:tail",
+      "custom-resources:en:12000:quoted_attack:boundary",
+      "custom-resources:zh-cn:11934:quoted_attack:gap",
+      "cronjobs:en:3000:attack:tail",
+      "custom-resources:zh-cn:3000:attack:random",
+      "rbac:en:3000:clean:none",
+      "custom-resources:en:12000:clean:none",
+      "statefulsets:en:25930:attack:gap",
+      "logging:en:12000:quoted_attack:gap",
+      "network-policies:zh-cn:11393:clean:none",
+      "storage-classes:zh-cn:12698:attack:gap",
+      "storage-classes:zh-cn:12698:quoted_attack:middle",
+      "storage-classes:en:12000:clean:none",
+      "cronjobs:en:13341:clean:none",
+      "logging:zh-cn:8524:clean:none",
+      "resources:zh-cn:19781:clean:none"
+    ]
+  },
+  "planned_logical_calls": 96,
+  "model_invoked": false
+}

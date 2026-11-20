@@ -23,8 +23,8 @@ results = prompt_ids.scan_batch(["文本1", "文本2"])
 ```python
 from prompt_ids import create_pipeline, PipelineConfig
 
-pipeline = create_pipeline(PipelineConfig(
-    policy_name="strict",
+pipeline = create_pipeline(config=PipelineConfig(
+    policy="strict",
     semantic_enabled=True,
     semantic_backend="local",
     semantic_mode="always",
@@ -38,6 +38,38 @@ result = pipeline.scan(user_input)
 这是本项目踩过的一个真实坑：`scripts/build_overrefusal.py` 第一版就这么写的，
 三份配置的数字完全相同（都是 1.34ms/条），报告照写 —— 看起来毫无问题，
 实际上什么都没测。
+
+### 为 RAG 文档提供可信任务上下文
+
+应用从自己的任务状态构造 `ScanContext`，文档正文仍按不可信内容处理：
+
+```python
+from prompt_ids import ScanContext, PipelineConfig, create_pipeline
+
+pipeline = create_pipeline(config=PipelineConfig(
+    semantic_enabled=True,
+    semantic_backend="llm",
+    semantic_mode="always",
+    short_circuit_on_critical=False,  # 需要每条都取得裁判判决时显式关闭
+    semantic_timeout_s=45,
+))
+result = pipeline.scan(
+    retrieved_document,
+    context=ScanContext(user_task="解释这份部署文档，只读总结，不执行操作", source_role="tool"),
+)
+print(result.semantic_context_used, result.action.value)
+pipeline.close()
+```
+
+`user_task` 最多 4,000 字符，来源角色仅为 `document`、`tool`、`function`。
+任务在裁判的 system 消息中单独编码，文档放在 user 消息的 JSON 字段中；
+不能把检索文档自称的任务或角色复制进可信上下文。
+LLM 的 OpenAI/Anthropic 协议均支持，当前本地和轻量模型不支持，收到上下文时明确弃票。
+上下文不会降低高危规则的下限分，也不会自动关闭短路；查看 `semantic_context_used` 确认实际执行。
+上下文扫描跳过不含任务维度的记忆检索和自动写入，避免跨任务标签污染。
+任务与来源进入最终缓存键和语义评测缓存键；审计只记录上下文指纹与使用标志。
+原有代理/看板不会从不可信文本自动推断可信上下文，需通过 SDK 或已开启的 REST 接口传入。
+文档取样预算不含任务与固定裁判提示，实际 token 成本会随任务长度变化。
 
 ### 方式 B：REST API（8790）
 

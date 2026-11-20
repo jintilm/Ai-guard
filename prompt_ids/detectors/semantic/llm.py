@@ -519,6 +519,7 @@ class LLMBackend(SemanticBackend):
         return probability, reason
 
     def predict_context(self, text: str, context: ScanContext) -> Prediction:
+        self.last_parsed = False
         if not isinstance(context, ScanContext):
             raise TypeError("context must be a ScanContext")
         if "messages" in self.extra_body or "system" in self.extra_body:

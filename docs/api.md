@@ -41,6 +41,7 @@
 | `not_found` | 404 | 未知路由 |
 | `not_enabled` | 404 | 功能没开（记忆层、Canary） |
 | `not_ready` | 503 | 规则层未加载 |
+| `context_disabled` | 400 | 请求携带上下文，但服务未开启可信应用接入 |
 | `payload_too_large` | 413 | 超长文本或批量超限 |
 
 ⚠ **「功能没开」返回 404 而不是 501**：`/v1/memory/stats` 在没 `--memory` 时
@@ -74,6 +75,7 @@
 | `text` | ✅ | 待检测文本，非空字符串 |
 | `user` | | 限流与审计的用户标识，默认 `"api"` |
 | `policy` | | `default`/`strict`/`permissive`/`log-only`。⚠ 必须是字符串 |
+| `context` | | 显式开启后的可信应用任务上下文，见下文 |
 
 ⚠ `policy` 传非字符串返 **400**（不是 500）—— 空 list/dict 会在 `PolicyEngine`
 里变成 `TypeError: unhashable`。
@@ -140,6 +142,36 @@
 
 ⚠ `texts` 为空数组返 **400**（`texts 必须是非空数组`），不是 200 + 空结果。
 ⚠ `results` 里**每条都有完整 `to_dict()`**，批量大了响应体会很大。
+
+### 可选可信任务上下文
+
+服务默认拒绝 `context` 字段（`400 context_disabled`）。仅供可信应用接入时开启：
+
+```bash
+python -m prompt_ids.api --semantic --semantic-mode always --allow-context --api-key "$API_KEY"
+```
+
+请求示例（格式示例，响应取决于后端）：
+
+```json
+{
+  "text": "检索到的文档正文",
+  "context": {
+    "user_task": "解释文档中的部署限制，只读总结，不执行操作",
+    "source_role": "tool"
+  }
+}
+```
+
+`user_task` 必须非空且不超过 4,000 字符；`source_role` 只接受
+`document`（默认）、`tool`、`function`。未知字段和非法类型返回 400。
+批量接口可携带同一 `context`，应用于所有文本；不同任务需分别提交。
+上下文只能由可信应用从真实任务状态构造，不应直接转发最终用户或工具自行声明的上下文。
+
+结果新增 `context_fingerprint` 和 `semantic_context_used`。后者为 true 才表示取得了使用上下文的
+有效判决；语义关闭、后端不支持、短路或调用失败均不能视作已使用上下文。
+规则与融合判定继续生效，启用上下文不会自动消除规则阻断。
+审计不记录任务原文，只保存指纹与是否实际使用；详见 [SDK 配置](operations.md#为-rag-文档提供可信任务上下文)。
 
 ### `POST /v1/scan/output`
 

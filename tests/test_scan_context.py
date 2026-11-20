@@ -177,8 +177,10 @@ def test_actual_http_keeps_task_out_of_untrusted_message_and_isolates_threads(ht
 def test_context_transport_override_abstains_without_request():
     backend = LLMBackend(provider="custom", base_url="http://127.0.0.1:1/v1", api_key="synthetic",
                          model_name="stub", extra_body={"messages": []})
+    backend.last_parsed = True
     result = backend.predict_context("document", ScanContext("task"))
     assert not result.ok and not result.context_used
+    assert not backend.last_parsed
 
 
 def test_context_failure_does_not_leave_task_on_next_call(monkeypatch):
