@@ -414,7 +414,9 @@ class LLMBackend(SemanticBackend):
         last_error = ""
         for attempt in range(self.max_retries + 1):
             for use_json in self._json_attempts(ep):
-                timeout_s = remaining_timeout(self.default_timeout_s)
+                remaining = remaining_timeout()
+                budget_limited = remaining is not None and remaining <= self.default_timeout_s
+                timeout_s = remaining if budget_limited else self.default_timeout_s
                 try:
                     content, finish = self._request(ep, text, timeout_s, use_json)
                     remaining_timeout()
@@ -428,6 +430,11 @@ class LLMBackend(SemanticBackend):
                     if exc.code in _FATAL_HTTP:
                         return "", "", last_error
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    # Windows socket timeouts can fire before monotonic() reports the
+                    # same boundary. A timeout granted all remaining budget exhausts
+                    # the request even if the clock still shows a fraction of a tick.
+                    if budget_limited and isinstance(getattr(exc, "reason", exc), TimeoutError):
+                        raise PredictionTimeout("LLM 请求已耗尽剩余时间预算") from exc
                     last_error = str(exc)[:120]
                 except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
                     last_error = f"响应结构异常：{exc}"[:120]

@@ -192,7 +192,7 @@ def test_retry_and_backoff_share_one_deadline(clock, monkeypatch):
     def timeout(endpoint, text, timeout_s, use_json):
         attempts.append((endpoint.provider, timeout_s))
         clock.advance(min(0.25, timeout_s))
-        raise TimeoutError("slow upstream")
+        raise urllib.error.URLError("temporary network error")
 
     monkeypatch.setattr(backend, "_request", timeout)
     result = backend.predict("sample")
@@ -201,6 +201,42 @@ def test_retry_and_backoff_share_one_deadline(clock, monkeypatch):
     assert [name for name, _ in attempts] == ["custom"] * 3
     assert [limit for _, limit in attempts] == pytest.approx([1, 0.75, 0.1])
     assert not backend.last_parsed
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_budget_limited_socket_timeout_stops_even_before_clock_advances(clock, monkeypatch, wrapped):
+    backend = judge(fallbacks="ollama", max_retries=2)
+    backend.default_timeout_s = 1
+    calls = []
+
+    def timeout(endpoint, text, timeout_s, use_json):
+        calls.append(endpoint.provider)
+        error = TimeoutError("socket timeout rounded before deadline")
+        raise urllib.error.URLError(error) if wrapped else error
+
+    monkeypatch.setattr(backend, "_request", timeout)
+    result = backend.predict("sample")
+    assert not result.ok
+    assert calls == ["custom"]
+    assert clock.now == 0
+
+
+def test_per_operation_timeout_can_retry_with_a_larger_shared_budget(clock, monkeypatch):
+    backend = judge(allow_fallbacks=False, max_retries=0)
+    backend.default_timeout_s = 1
+    calls = []
+
+    def reply(endpoint, text, timeout_s, use_json):
+        calls.append(timeout_s)
+        clock.advance(1)
+        if len(calls) == 1:
+            raise TimeoutError("per-operation timeout")
+        return '{"injection":false,"confidence":1}', "stop"
+
+    monkeypatch.setattr(backend, "_request", reply)
+    with base.prediction_deadline(3):
+        assert backend.predict("sample").ok
+    assert calls == [1, 1]
 
 
 def test_fallback_receives_only_remaining_budget(clock, monkeypatch):
