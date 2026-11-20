@@ -30,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--canary-issue-window", type=float, default=60.0)
     parser.add_argument("--semantic", action="store_true", help="启用 L3 语义层")
     parser.add_argument("--semantic-mode", default="fallback")
+    parser.add_argument("--allow-context", action="store_true",
+                        help="允许可信应用提交任务上下文；不得把此入口直接开放给不可信客户端")
     parser.add_argument("--memory", action="store_true", help="启用 L4 向量记忆库（自进化）")
     parser.add_argument("--memory-encoder", default="auto", help="auto / deberta / hashing")
     parser.add_argument("--memory-threshold", type=float, default=0.86)
@@ -50,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         memory_dir=args.memory_dir,
         audit_path=args.audit,
         review_corpus_path=args.review_corpus,
+        allow_scan_context=args.allow_context,
     )
     if args.review_corpus:
         # 语料含原文，必须挡住误提交。只加精确路径，不用通配符 ——

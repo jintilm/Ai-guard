@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 from time import monotonic
 from typing import Any
 
+from prompt_ids.core.context import ScanContext
 from prompt_ids.core.types import TextCoverage
 
 _DEADLINE: ContextVar[float | None] = ContextVar("semantic_deadline", default=None)
@@ -62,6 +63,7 @@ class Prediction:
     #: 会把规则层证据打 75 折（p=0 → 乘性因子 0.75），凭空制造漏报。
     ok: bool = True
     coverage: TextCoverage | None = None
+    context_used: bool = False
 
     def clamp(self) -> Prediction:
         p = min(1.0, max(0.0, self.probability))
@@ -74,10 +76,15 @@ class SemanticBackend(ABC):
     name: str = "abstract"
     requires_network: bool = False
     default_timeout_s: float = 5.0
+    supports_context: bool = False
 
     @abstractmethod
     def predict(self, text: str) -> Prediction:
         """对单条文本给出注入概率与依据。实现必须自行吞掉可预期的异常。"""
+
+    def predict_context(self, text: str, context: ScanContext) -> Prediction:
+        """Abstain explicitly when the selected backend cannot use task context."""
+        return Prediction(0.0, "语义后端不支持任务上下文，已弃票", self.name, ok=False)
 
     def is_available(self) -> bool:
         """依赖是否齐备。不等于模型已经下载。"""

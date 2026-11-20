@@ -14,6 +14,7 @@ from prompt_ids.env import load_env as _load_env
 
 _load_env()
 
+from prompt_ids.core.context import ScanContext  # noqa: E402
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline  # noqa: E402
 from prompt_ids.core.policy import Policy, PolicyEngine  # noqa: E402
 from prompt_ids.core.types import Action, Finding, Level, ScanResult  # noqa: E402
@@ -30,6 +31,7 @@ __all__ = [
     "Policy",
     "PolicyEngine",
     "ScanResult",
+    "ScanContext",
     "__version__",
     "create_pipeline",
     "get_pipeline",
@@ -59,14 +61,16 @@ def get_pipeline(
     return _pipeline
 
 
-def scan(text: str, user: str = "default", policy: str | None = None) -> ScanResult:
+def scan(text: str, user: str = "default", policy: str | None = None,
+         *, context: ScanContext | None = None) -> ScanResult:
     """扫描单条文本，返回 ScanResult。"""
-    return get_pipeline().scan(text, user=user, policy_name=policy)
+    return get_pipeline().scan(text, user=user, policy_name=policy, context=context)
 
 
-def scan_batch(texts: list[str], user: str = "default", policy: str | None = None) -> list[ScanResult]:
+def scan_batch(texts: list[str], user: str = "default", policy: str | None = None,
+               *, context: ScanContext | None = None) -> list[ScanResult]:
     """批量扫描。重复文本走缓存。"""
-    return get_pipeline().scan_batch(texts, user=user, policy_name=policy)
+    return get_pipeline().scan_batch(texts, user=user, policy_name=policy, context=context)
 
 
 class Guard:
@@ -76,13 +80,13 @@ class Guard:
         policies = PolicyEngine()
         if policy is not None:
             policies.register(policy)
-        self.pipeline = Pipeline(
+        self.pipeline = create_pipeline(
             config=config or PipelineConfig(policy=policy.name if policy else "default"),
             policies=policies,
         )
 
-    def scan(self, text: str, user: str = "default") -> ScanResult:
-        return self.pipeline.scan(text, user=user)
+    def scan(self, text: str, user: str = "default", *, context: ScanContext | None = None) -> ScanResult:
+        return self.pipeline.scan(text, user=user, context=context)
 
     def score(self, text: str) -> float:
         return self.pipeline.scan(text).score

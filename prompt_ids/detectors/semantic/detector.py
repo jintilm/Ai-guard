@@ -11,6 +11,7 @@ from concurrent.futures import CancelledError, ThreadPoolExecutor
 from dataclasses import replace
 from typing import Any
 
+from prompt_ids.core.context import ScanContext
 from prompt_ids.core.types import DETECTOR_SEMANTIC, Finding
 from prompt_ids.detectors.base import Detector, DetectorContext
 from prompt_ids.detectors.semantic.base import (
@@ -172,11 +173,12 @@ class SemanticDetector(Detector):
         self._close_if_idle()
 
     # ---------- 预测（对外入口，带超时与异常兜底） ----------
-    def predict(self, text: str) -> Prediction:
+    def predict(self, text: str, *, context: ScanContext | None = None) -> Prediction:
         started = time.perf_counter()
         failure = ""
         try:
-            raw = self._submit(lambda: self.predict_impl(text))
+            raw = self._submit(lambda: self.backend.predict_context(text, context)
+                               if context is not None else self.predict_impl(text))
             prediction = _coerce(raw, self.backend.name)
         except SemanticOverloaded:
             failure = "overloaded"
@@ -291,7 +293,7 @@ class SemanticDetector(Detector):
         text = (ctx.canonical or ctx.raw or "").strip()
         if not text:
             return []
-        prediction = self.predict(text)
+        prediction = self.predict(text, context=ctx.extra.get("scan_context"))
         # 低于阈值不产生 finding，但概率值仍由 last_prediction 供决策层降噪使用
         if prediction.probability <= 0.5:
             return []

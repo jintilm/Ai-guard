@@ -162,6 +162,9 @@ def event_from_scan(result, *, text: str = "", user: str = "",
     if isinstance(coverage, TextCoverage):
         extra["semantic_coverage"] = coverage.to_dict()
         extra["semantic_ok"] = bool(getattr(result, "semantic_ok", False))
+    if getattr(result, "context_fingerprint", ""):
+        extra["context_fingerprint"] = result.context_fingerprint
+        extra["semantic_context_used"] = bool(result.semantic_context_used)
     return AuditEvent(
         ts=time.time(),
         kind=KIND_SCAN,

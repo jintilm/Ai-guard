@@ -14,6 +14,7 @@ from typing import Any
 
 from prompt_ids.audit.logger import AuditLogger
 from prompt_ids.canary.tokens import CanaryRegistry
+from prompt_ids.core.context import MAX_TASK_CHARS, SOURCE_ROLES, ScanContext
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig, create_pipeline
 from prompt_ids.output import MAX_HITS, redact, scan_text
 
@@ -48,7 +49,9 @@ class ApiContext:
         review_corpus_path: str = "",
         canary_issue_limit: int = 0,
         canary_issue_window_s: float = 60.0,
+        allow_scan_context: bool = False,
     ):
+        self.allow_scan_context = allow_scan_context
         self.pipeline = pipeline or create_pipeline(
             config=PipelineConfig(
                 semantic_enabled=semantic,
@@ -226,6 +229,20 @@ def _clamp_int(value: Any, *, default: int, low: int, high: int) -> int:
 
 
 # ---------------------------------------------------------------- 处理器
+def _scan_context(ctx: ApiContext, payload: dict) -> ScanContext | None:
+    raw = payload.get("context")
+    if raw is None:
+        return None
+    if not ctx.allow_scan_context:
+        raise ApiError(400, "context_disabled", "服务未启用可信应用上下文接入")
+    if not isinstance(raw, dict) or set(raw) - {"user_task", "source_role"}:
+        raise ApiError(400, "bad_request", "context 只接受 user_task 和 source_role")
+    try:
+        return ScanContext(raw.get("user_task"), raw.get("source_role", "document"))
+    except (TypeError, ValueError) as exc:
+        raise ApiError(400, "bad_request", str(exc)) from None
+
+
 def handle_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]:
     text = _require_text(payload)
     user = _require_str(payload, "user", "api") or "api"
@@ -234,7 +251,9 @@ def handle_scan(ctx: ApiContext, payload: Any, params: dict) -> tuple[int, dict]
     policy = payload.get("policy") if isinstance(payload, dict) else None
     if policy is not None and not isinstance(policy, str):
         raise ApiError(400, "bad_request", "policy 必须是字符串（default/strict/permissive/log-only）")
-    result = ctx.pipeline.scan(text, user=user, policy_name=policy)
+    context = _scan_context(ctx, payload)
+    kwargs = {"context": context} if context is not None else {}
+    result = ctx.pipeline.scan(text, user=user, policy_name=policy, **kwargs)
     ctx.record(result)
     if ctx.audit is not None:
         ctx.audit.log_scan(result, text=text, user=user, source="api")
@@ -263,7 +282,9 @@ def handle_scan_batch(ctx: ApiContext, payload: Any, params: dict) -> tuple[int,
     policy = payload.get("policy")
     if policy is not None and not isinstance(policy, str):
         raise ApiError(400, "bad_request", "policy 必须是字符串（default/strict/permissive/log-only）")
-    results = [ctx.pipeline.scan(t, user=user, policy_name=policy) for t in cleaned]
+    context = _scan_context(ctx, payload)
+    kwargs = {"context": context} if context is not None else {}
+    results = [ctx.pipeline.scan(t, user=user, policy_name=policy, **kwargs) for t in cleaned]
     for r, t in zip(results, cleaned):
         ctx.record(r)
         if ctx.audit is not None:
@@ -737,6 +758,8 @@ _SCAN_RESULT_SCHEMA = {
         "latency_ms": {"type": "object"},
         "skipped": {"type": "array"},
         "semantic_ok": {"type": "boolean", "nullable": True},
+        "context_fingerprint": {"type": "string", "description": "SHA-256 of supplied task context; empty if absent."},
+        "semantic_context_used": {"type": "boolean", "description": "A valid verdict used the supplied context."},
         "semantic_coverage": {
             "type": "object", "nullable": True,
             "description": "Selected LLM input; offsets refer to normalized backend input, not the original document. Null means unavailable or not applicable.",
@@ -755,12 +778,22 @@ _SCAN_RESULT_SCHEMA = {
     },
 }
 
+_CONTEXT_SCHEMA = {
+    "type": "object", "required": ["user_task"], "additionalProperties": False,
+    "description": "Trusted application context. Server must opt in with --allow-context.",
+    "properties": {
+        "user_task": {"type": "string", "minLength": 1, "maxLength": MAX_TASK_CHARS},
+        "source_role": {"type": "string", "enum": list(SOURCE_ROLES), "default": "document"},
+    },
+}
+
 _REQUEST_BODIES: dict[str, dict[str, Any]] = {
     "/v1/scan": {
         "type": "object",
         "required": ["text"],
         "properties": {
             "text": {"type": "string"},
+            "context": _CONTEXT_SCHEMA,
             "user": {"type": "string"},
             "policy": {"type": "string",
                        "enum": ["default", "strict", "permissive", "log-only"]},
@@ -771,6 +804,7 @@ _REQUEST_BODIES: dict[str, dict[str, Any]] = {
         "required": ["texts"],
         "properties": {
             "texts": {"type": "array", "items": {"type": "string"}},
+            "context": _CONTEXT_SCHEMA,
             "user": {"type": "string"},
             "policy": {"type": "string",
                        "enum": ["default", "strict", "permissive", "log-only"]},

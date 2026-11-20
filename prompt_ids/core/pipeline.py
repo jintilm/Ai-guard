@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 
 from prompt_ids.audit.logger import AuditLogger
+from prompt_ids.core.context import ScanContext
 from prompt_ids.core.policy import PolicyEngine
 from prompt_ids.core.types import Action, Finding, Level, ScanResult
 from prompt_ids.core.verdict import FusionConfig, decide, explain, fuse, grade
@@ -219,7 +220,7 @@ class Pipeline:
 
     # ---------- 主流程 ----------
     def cache_key(self, fp: str, policy_name: str | None = None,
-                  *, semantic: bool | None = None) -> str:
+                  *, semantic: bool | None = None, context: ScanContext | None = None) -> str:
         """缓存键必须包含一切会影响判定结果的维度。
 
         只拿文本指纹当键会导致两种静默错误：
@@ -235,6 +236,10 @@ class Pipeline:
             parts.append(f"sem={self.config.semantic_mode}")
         # system/developer 的规则结果不能冒充 user/tool 的完整检测结果。
         parts.append("l3=off" if semantic is False else "l3=config")
+        if context is not None:
+            parts.append("context=" + context.fingerprint())
+            version = getattr(getattr(self.semantic_detector, "backend", None), "context_prompt_version", 0)
+            parts.append(f"context_prompt={version}")
         if semantic is not False:
             sampling = getattr(getattr(self.semantic_detector, "backend", None), "input_sampling", None)
             if sampling:
@@ -246,14 +251,17 @@ class Pipeline:
         return "|".join(parts)
 
     def scan(self, text: str, user: str = "default", policy_name: str | None = None,
-             *, semantic: bool | None = None) -> ScanResult:
+             *, semantic: bool | None = None, context: ScanContext | None = None) -> ScanResult:
         started = time.perf_counter()
+        if context is not None and not isinstance(context, ScanContext):
+            raise TypeError("context must be a ScanContext")
         if text is None:
             text = ""
         text = str(text)
         policy, fell_back = self.policies.resolve(policy_name or self.config.policy)
 
         result = ScanResult()
+        result.context_fingerprint = context.fingerprint() if context else ""
         # 限流（默认关闭：GuardConfig.rate_limit=0）。开着时按 user 分桶，
         # 超限**不阻断**而是转人工 —— 限流的语义是「别让一个人吃掉全部算力」，
         # 不是「判定为攻击」，所以动作是 review + 说明里写明原因。
@@ -293,7 +301,7 @@ class Pipeline:
 
         # 键必须在整次扫描中固定：若在结尾重新计算，自进化刚写入的记忆
         # 会把版本号抬高，导致 put 与 get 用不同的键，缓存失效机制被架空
-        cache_key = (self.cache_key(fp, policy_name, semantic=semantic)
+        cache_key = (self.cache_key(fp, policy_name, semantic=semantic, context=context)
                      if self.config.enable_cache else "")
         if self.config.enable_cache:
             cached = self.guard.cache.get(cache_key)
@@ -306,7 +314,8 @@ class Pipeline:
                 hit_result.latency_ms["total_cached"] = (time.perf_counter() - started) * 1000.0
                 return hit_result
 
-        ctx = DetectorContext(raw=text, canonical=canonical, variants=variants)
+        ctx = DetectorContext(raw=text, canonical=canonical, variants=variants,
+                              extra={"scan_context": context} if context else {})
 
         findings: list[Finding] = []
         subscores: dict[str, float] = {}
@@ -318,6 +327,11 @@ class Pipeline:
         cold_used_ms = 0.0
         detectors = [d for d in self.registry if d.enabled]
         for index, detector in enumerate(detectors):
+            if context is not None and isinstance(detector, MemoryDetector):
+                # Stored labels have no task/source context and cannot adjudicate
+                # a context-specific scan. Do not leak those labels across tasks.
+                skipped.append(detector.name)
+                continue
             # 预筛门禁：L3 是否调用由前置层的初判分决定
             # 「这次别用语义层」这道门按 **layer == 3** 判，不按 isinstance：
             # 「第 3 层是语义层」是结构约定，写死具体类会让任何别的 L3 实现
@@ -348,6 +362,7 @@ class Pipeline:
                 if prediction is not None:
                     result.semantic_coverage = prediction.coverage
                     result.semantic_ok = prediction.ok
+                    result.semantic_context_used = prediction.context_used
                 if prediction is not None and not prediction.ok:
                     # 后端过载/超时是临时状态，不能让缓存把降级判定固化。
                     cacheable = False
@@ -417,7 +432,8 @@ class Pipeline:
         # 自进化：把确认的攻击写回记忆库，下次遇到相似措辞直接认出来
         mem = self.memory_detector
         learned_now = False
-        if mem is not None and mem.enabled and mem.learn(text, result):
+        # A context-specific label must not enter the context-free memory store.
+        if context is None and mem is not None and mem.enabled and mem.learn(text, result):
             result.explained += "；已写入向量记忆库"
             learned_now = True
 
@@ -451,8 +467,8 @@ class Pipeline:
         return result
 
     def scan_batch(self, texts: list[str], user: str = "default",
-                   policy_name: str | None = None) -> list[ScanResult]:
-        return [self.scan(t, user=user, policy_name=policy_name) for t in texts]
+                   policy_name: str | None = None, *, context: ScanContext | None = None) -> list[ScanResult]:
+        return [self.scan(t, user=user, policy_name=policy_name, context=context) for t in texts]
 
 
 def create_pipeline(

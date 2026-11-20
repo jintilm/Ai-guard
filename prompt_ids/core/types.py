@@ -102,6 +102,8 @@ class ScanResult:
     skipped: tuple[str, ...] = ()
     semantic_coverage: TextCoverage | None = None
     semantic_ok: bool | None = None
+    context_fingerprint: str = ""
+    semantic_context_used: bool = False
 
     @property
     def is_blocked(self) -> bool:
@@ -136,6 +138,8 @@ class ScanResult:
             "skipped": list(self.skipped),
             "semantic_coverage": self.semantic_coverage.to_dict() if self.semantic_coverage else None,
             "semantic_ok": self.semantic_ok,
+            "context_fingerprint": self.context_fingerprint,
+            "semantic_context_used": self.semantic_context_used,
         }
 
     def summary(self) -> str:

@@ -1,0 +1,56 @@
+{
+  "engine_a": "re",
+  "engine_b": "regex",
+  "eq_method": "per-sample finding fingerprint",
+  "regex_version": "2026.5.9",
+  "dataset": "pint_shape_train.jsonl",
+  "sections": {
+    "public_corpus": {
+      "samples": 2354,
+      "rounds": 1,
+      "re_ms": 6346.242,
+      "regex_ms": 5091.647,
+      "speedup": 1.2464,
+      "identical": true,
+      "difference_count": 0
+    },
+    "long_text": [
+      {
+        "label": "中文为主",
+        "chars": 8241,
+        "re_ms": 111.215,
+        "regex_ms": 52.529,
+        "speedup": 2.1172,
+        "identical": true
+      },
+      {
+        "label": "英文为主",
+        "chars": 24609,
+        "re_ms": 252.699,
+        "regex_ms": 211.107,
+        "speedup": 1.197,
+        "identical": true
+      }
+    ],
+    "extreme": [
+      {
+        "label": "中文为主",
+        "chars": 16053,
+        "re_ms": 182.291,
+        "regex_ms": 64.149,
+        "speedup": 2.8417,
+        "identical": true
+      },
+      {
+        "label": "英文为主",
+        "chars": 47973,
+        "re_ms": 473.914,
+        "regex_ms": 396.368,
+        "speedup": 1.1956,
+        "identical": true
+      }
+    ]
+  },
+  "failures": 0,
+  "verdict": "identical"
+}

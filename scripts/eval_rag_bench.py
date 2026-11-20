@@ -19,8 +19,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from prompt_ids.core.context import ScanContext
 from prompt_ids.detectors.semantic.detector import DEGRADED_CALL_FAIL_SHARE
-from prompt_ids.detectors.semantic.llm import JUDGE_PROMPT, LLMBackend
+from prompt_ids.detectors.semantic.llm import CONTEXT_JUDGE_PROMPT, JUDGE_PROMPT, LLMBackend
 from prompt_ids.detectors.semantic.windowing import sample_text
 from prompt_ids.eval.datasets import Dataset, Sample
 from prompt_ids.eval.metrics import Confusion, latency_stats, percentile
@@ -171,10 +172,11 @@ def summarize(records: list[dict], semantic: bool) -> dict:
     }
 
 
-def paired_difference(records: dict[str, list[dict]]) -> dict | None:
-    if "stratified" not in records:
+def paired_difference(records: dict[str, list[dict]], reference: str = "head",
+                      candidate: str = "stratified") -> dict | None:
+    if candidate not in records:
         return None
-    left, right = records["head"], records["stratified"]
+    left, right = records[reference], records[candidate]
     if [r["id"] for r in left] != [r["id"] for r in right]:
         raise ValueError("Strategy comparison must use exactly the same cases in the same order")
     groups_a, groups_b = grouped(left, "group_id"), grouped(right, "group_id")
@@ -186,17 +188,17 @@ def paired_difference(records: dict[str, list[dict]]) -> dict | None:
         return {"eligible_groups": len(delta), "risk_recall_delta": None, "ci95": None}
     rng = random.Random(SEED)
     draws = [sum(rng.choices(delta, k=len(delta))) / len(delta) for _ in range(2000)]
-    return {"metric": "stratified minus head, paired group-macro risk recall",
+    return {"metric": f"{candidate} minus {reference}, paired group-macro risk recall",
             "eligible_groups": len(delta), "risk_recall_delta": round(sum(delta) / len(delta), 4),
             "ci95": [round(percentile(draws, q), 4) for q in (0.025, 0.975)]}
 
 
 def valid_pair_analysis(records: dict[str, list[dict]]) -> dict | None:
-    if "stratified" not in records:
+    if len(records) != 2:
         return None
     valid = set.intersection(*({r["id"] for r in items if r["semantic_ok"] is True}
                                for items in records.values()))
-    return {"n": len(valid), "excluded": len(records["head"]) - len(valid),
+    return {"n": len(valid), "excluded": len(next(iter(records.values()))) - len(valid),
             "note": "Conditional on both judges succeeding; excludes failures, not an unbiased correction.",
             "results": {name: metrics([r for r in items if r["id"] in valid])
                         for name, items in records.items()}}
@@ -227,6 +229,8 @@ def main() -> int:
     parser.add_argument("--sample", type=int, default=0, help="quota-balanced subset; 0 means full split")
     parser.add_argument("--sampling", choices=("balanced", "legacy"), default="balanced")
     parser.add_argument("--plan-only", action="store_true", help="write sample plan without calling detectors")
+    parser.add_argument("--compare-context", action="store_true",
+                        help="compare text-only vs trusted task context, both using head sampling")
     parser.add_argument("--provider", default="auto")
     parser.add_argument("--model", default="")
     parser.add_argument("--timeout", type=float, default=30)
@@ -236,6 +240,8 @@ def main() -> int:
     parser.add_argument("--cache-dir", type=Path, default=ROOT / "logs/rag_eval_cache")
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args()
+    if args.compare_context and args.mode != "llm":
+        parser.error("--compare-context requires --mode llm")
     if args.sample < 0 or args.timeout <= 0 or args.budget < 1 or not 1 <= args.windows <= 8:
         parser.error("Sample size must be nonnegative; timeout/budget positive; windows 1..8")
     rows, manifest = load_corpus(args.dataset)
@@ -261,19 +267,22 @@ def main() -> int:
         parser.error(f"This comparison needs at most {len(selected) * 2} logical calls. "
                      "Set --max-llm-calls explicitly or reduce --sample (HTTP attempts <= 2x).")
     output = args.out or ROOT / f"reports/rag_{args.mode}_{args.split}.json"
-    names = ("rules",) if args.mode == "rules" else ("head", "stratified")
+    names = (("rules",) if args.mode == "rules" else
+             ("text_only", "task_context") if args.compare_context else ("head", "stratified"))
     pipelines, caches, backend_info = {}, {}, {}
     for name in names:
         semantic = None
         if args.mode == "llm":
             backend = LLMBackend(provider=args.provider, model_name=args.model, max_retries=0,
                                  allow_fallbacks=False, fallbacks=[], extra_body={},
-                                 input_strategy=name, max_input_chars=args.budget,
+                                 input_strategy="head" if args.compare_context else name,
+                                 max_input_chars=args.budget,
                                  max_windows=args.windows)
             if not backend.is_available():
                 parser.error("Explicit LLM evaluation requested but no usable backend is configured")
             backend.default_timeout_s = args.timeout
-            prompt_hash = sha256(JUDGE_PROMPT.encode("utf-8"))[:16]
+            prompt_hash = sha256((CONTEXT_JUDGE_PROMPT if name == "task_context" else
+                                  JUDGE_PROMPT).encode("utf-8"))[:16]
             cache = CachedSemanticBackend(backend, args.cache_dir / f"{prompt_hash}.{name}.json", 1)
             caches[name] = cache
             semantic = {"enabled": True, "mode": "always", "backend": cache,
@@ -281,6 +290,7 @@ def main() -> int:
             backend_info[name] = {"provider": backend.provider, "model": backend.model_name,
                                   "max_tokens": backend.max_tokens,
                                   "backend_fingerprint": cache._fingerprint,
+                                  "task_context": name == "task_context",
                                   "input_sampling": backend.input_sampling,
                                   "judge_prompt_sha256": prompt_hash}
         pipelines[name] = build_pipeline(semantic=semantic, short_circuit=False, enable_cache=False)
@@ -296,8 +306,9 @@ def main() -> int:
         "method": {"mode": args.mode, "policy": "default",
                    "semantic_mode": "always" if args.mode == "llm" else None,
                    "short_circuit": False, "pipeline_budget_ms": 5000,
-                   "context_supplied_to_detector": False,
-                   "context_note": "Context defines labels; current production scan accepts document text only.",
+                   "context_supplied_to_detector": args.compare_context,
+                   "context_note": ("Only task_context receives application task and untrusted source role."
+                                    if args.compare_context else "No task context supplied."),
                    "order": "paired/interleaved, alternating which strategy runs first",
                    "max_logical_calls": args.max_llm_calls,
                    "max_http_attempts": args.max_llm_calls * 2,
@@ -306,7 +317,7 @@ def main() -> int:
                    "cost_note": "Character budget is not a token count; provider token usage is not collected.",
                    "code_sha256": {name: sha256((ROOT / name).read_bytes()) for name in (
                        "scripts/eval_rag_bench.py", "scripts/eval_semantic.py",
-                       "prompt_ids/eval/rag_sampling.py",
+                       "prompt_ids/eval/rag_sampling.py", "prompt_ids/core/context.py",
                        "prompt_ids/core/pipeline.py", "prompt_ids/core/verdict.py",
                        "prompt_ids/detectors/semantic/llm.py")},
                    "rules_sha256": {p.name: sha256(p.read_bytes())
@@ -323,7 +334,9 @@ def main() -> int:
             # Pairing limits the effect of endpoint health drifting over time.
             for name in names if index % 2 == 0 else names[::-1]:
                 hits_before = caches[name].hits if name in caches else 0
-                result = pipelines[name].scan(row["text"])
+                context = (ScanContext(row["context"]["user_task"], row["context"]["role"])
+                           if name == "task_context" else None)
+                result = pipelines[name].scan(row["text"], context=context)
                 detector = pipelines[name].semantic_detector
                 prediction = detector.last_prediction if detector else None
                 record = {key: row[key] for key in
@@ -334,6 +347,8 @@ def main() -> int:
                                "flagged": int(result.level.value in ("medium", "high", "critical")),
                                "action": result.action.value, "score": result.score,
                                "semantic_ok": result.semantic_ok,
+                               "semantic_context_used": result.semantic_context_used,
+                               "context_fingerprint": result.context_fingerprint,
                                "semantic_probability": prediction.probability
                                if prediction and prediction.ok else None,
                                "finding_ids": sorted({f.pattern_id for f in result.findings}),
@@ -363,7 +378,11 @@ def main() -> int:
     report["results"] = {name: summarize(items, args.mode == "llm") for name, items in records.items()}
     usable = report["complete"] and all(
         r["reliability"]["usable_for_comparison"] for r in report["results"].values())
-    report["paired_difference"] = paired_difference(records) if usable else None
+    context_observed = (not args.compare_context or all(
+        r["semantic_context_used"] for r in records["task_context"] if r["semantic_ok"] is True))
+    usable = usable and context_observed
+    report["context_observed_when_successful"] = context_observed
+    report["paired_difference"] = (paired_difference(records, *names) if usable and len(names) == 2 else None)
     report["valid_pair_analysis"] = valid_pair_analysis(records)
     report["comparison_usable"] = usable
     report["model_calls_this_run"] = {name: cache.misses for name, cache in caches.items()}

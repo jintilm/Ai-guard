@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from prompt_ids.core.context import ScanContext
 from prompt_ids.core.pipeline import Pipeline, PipelineConfig
 from prompt_ids.core.types import Action, TextCoverage
 from prompt_ids.core.verdict import FusionConfig
@@ -129,7 +130,27 @@ class CachedSemanticBackend(SemanticBackend):
 
     # ---------- 后端接口 ----------
     def predict(self, text: str) -> Prediction:
-        key = hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+        return self._predict(text)
+
+    @property
+    def supports_context(self) -> bool:
+        return self._inner.supports_context
+
+    @property
+    def context_prompt_version(self) -> int:
+        return getattr(self._inner, "context_prompt_version", 0)
+
+    def predict_context(self, text: str, context: ScanContext) -> Prediction:
+        return self._predict(text, context)
+
+    def _predict(self, text: str, context: ScanContext | None = None) -> Prediction:
+        material = text
+        if context:
+            from prompt_ids.detectors.semantic.llm import CONTEXT_JUDGE_PROMPT
+
+            material = json.dumps([text, context.to_dict(), CONTEXT_JUDGE_PROMPT,
+                                   self.context_prompt_version], ensure_ascii=False, sort_keys=True)
+        key = hashlib.sha256(material.encode("utf-8")).hexdigest()[:32]
         hit = self._data.get(key)
         if hit is not None:
             self.hits += 1
@@ -139,8 +160,9 @@ class CachedSemanticBackend(SemanticBackend):
                 str(hit.get("b", self.name)),
                 float(hit.get("t", 0.0)),
                 coverage=TextCoverage.from_dict(hit["coverage"]) if hit.get("coverage") else None,
+                context_used=bool(hit.get("context_used", False)),
             )
-        prediction = self._inner.predict(text)
+        prediction = (self._inner.predict_context(text, context) if context else self._inner.predict(text))
         self.misses += 1
         if not prediction.ok:
             # 失败**绝不入缓存**：网络抖动/超时是一次性事件，缓存下来会变成
@@ -154,6 +176,7 @@ class CachedSemanticBackend(SemanticBackend):
             # 保留原始延迟，让命中缓存时不把统计拉成 0
             "t": round(prediction.latency_ms, 3),
             "coverage": prediction.coverage.to_dict() if prediction.coverage else None,
+            "context_used": prediction.context_used,
         }
         self._dirty += 1
         if self._dirty >= self._flush_every:
